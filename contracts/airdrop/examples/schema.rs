@@ -3,8 +3,8 @@ use std::fs::create_dir_all;
 
 use cosmwasm_schema::{export_schema, remove_schemas, schema_for};
 
-use mars_airdrop::msg::{ConfigResponse,ClaimResponse,SignatureResponse, ExecuteMsg, InstantiateMsg, QueryMsg};
-use mars_airdrop::state::{Config, IsClaimed};
+use astro_airdrop::msg::{ConfigResponse,ClaimResponse,SignatureResponse, ExecuteMsg, InstantiateMsg, QueryMsg};
+use astro_airdrop::state::{Config, IsClaimed};
 
 fn main() {
     let mut out_dir = current_dir().unwrap();

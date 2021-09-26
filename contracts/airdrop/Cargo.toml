@@ -1,9 +1,9 @@
 [package]
-name = "mars-airdrop"
+name = "astro-airdrop"
 version = "0.1.0"
 authors = ["Alien hunter no. 42 <84127070+alienHunterOnMars@users.noreply.github.com>"]
 edition = "2018"
-description = "Contract to facilitate MARS Token airdrop"
+description = "Contract to facilitate ASTRO Token airdrop"
 license = "MIT"
 
 exclude = [
