@@ -288,8 +288,8 @@ async function testTransferAstroByAdmin(recepient_address:string, amountToTransf
     let signature_2 = get_EVM_Signature(evm_user_2, evm_user_2.address + terra.wallets.test8.key.accAddress  );
     await testClaimByEvmUser( terra.wallets.test8, evm_user_2.address, Number(evm_claimees_data[1]["amount"]), toHexString(publicKey_2), signature_2["messageHash"], signature_2["signature"], merkle_proof_for_evm_user_2, 0 )
     
-    // ClaimByEVMUser :: Test #4
-    console.log(chalk.yellow("\nTest #4: Airdrop Claim By EVM user : " + chalk.cyan(evm_user_4.address)  ));
+    // ClaimByEVMUser :: Test #3
+    console.log(chalk.yellow("\nTest #3: Airdrop Claim By EVM user : " + chalk.cyan(evm_user_4.address)  ));
     let privateKey_4 = Buffer.from(PRIVATE_KEY_4, 'hex');
     let publicKey_4 = secp256k1.publicKeyCreate(stringToU8a(PRIVATE_KEY_4), false).slice(1);
     let merkle_proof_for_evm_user_4 = merkle_tree_evm.getMerkleProof( {"address":evm_user_4.address, "amount":(1 * 10**6).toString()} );
