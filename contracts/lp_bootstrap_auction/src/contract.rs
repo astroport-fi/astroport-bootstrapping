@@ -520,10 +520,8 @@ pub fn update_state_on_reward_claim( deps: DepsMut, env: Env, user_address:Addr,
 
     if astro_claimed > Uint256::zero() {
         update_astro_rewards_index(&mut state, astro_claimed);
-        compute_user_accrued_reward(&state, &mut user_info);
-        staking_reward = user_info.unclaimed_staking_rewards;
+        staking_reward = compute_user_accrued_reward(&state, &mut user_info);
         user_astro_rewards += staking_reward;
-        user_info.unclaimed_staking_rewards = Uint256::zero();
     }
 
     // CHECK :: ASTRO Rewards must be > 0
@@ -550,13 +548,6 @@ pub fn update_state_on_reward_claim( deps: DepsMut, env: Env, user_address:Addr,
 
 
 
-
-
-
-
-
-
-
 //----------------------------------------------------------------------------------------
 // Query functions
 //----------------------------------------------------------------------------------------
@@ -566,26 +557,31 @@ pub fn update_state_on_reward_claim( deps: DepsMut, env: Env, user_address:Addr,
 fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
     let config = CONFIG.load(deps.storage)?;
     Ok(ConfigResponse { 
-        astro_token_address: config.astro_token_address.to_string(),
         owner: config.owner.to_string(),
-        terra_merkle_roots: config.terra_merkle_roots, 
-        evm_merkle_roots: config.evm_merkle_roots, 
-        from_timestamp: config.from_timestamp,
-        till_timestamp: config.till_timestamp,
-        boostrap_auction_address: config.boostrap_auction_address.to_string(),
-        are_claims_allowed: config.are_claims_allowed
+        astro_token_address: config.astro_token_address.to_string(),
+        astroport_lp_pool: config.astroport_lp_pool.to_string(),
+        lp_token_address: config.lp_token_address.to_string(),
+        lp_staking_contract: config.lp_staking_contract.to_string(),
+        astro_rewards: config.astro_rewards,
+        init_timestamp: config.init_timestamp,
+        deposit_window: config.deposit_window,
+        withdrawal_window: config.withdrawal_window
     })
 }
+
 
 /// @dev Returns the airdrop contract state
 fn query_state(deps: Deps) -> StdResult<StateResponse> {
     let state = STATE.load(deps.storage)?;
     Ok(StateResponse { 
-        total_airdrop_size: state.total_airdrop_size,
-        tokens_used_for_auction: state.tokens_used_for_auction,
-        unclaimed_tokens: state.unclaimed_tokens 
+        total_astro_deposited: state.total_astro_deposited,
+        total_ust_deposited: state.total_ust_deposited,
+        total_lp_shares_minted: state.total_lp_shares_minted ,
+        staked_lp_shares: state.staked_lp_shares ,
+        global_reward_index: state.global_reward_index 
     })
 }
+
 
 
 /// @dev Returns details around user's ASTRO Airdrop claim
@@ -593,9 +589,11 @@ fn query_user_info(deps: Deps, user_address: String) -> StdResult<UserInfoRespon
     let user_address = deps.api.addr_validate(&user_address)?;
     let user_info = USERS.may_load(deps.storage, &user_address )?.unwrap_or_default();
     Ok(UserInfoResponse { 
-        airdrop_amount: user_info.airdrop_amount,
-        tokens_used_for_auction: user_info.tokens_used_for_auction,
-        tokens_claimed: user_info.tokens_claimed
+        astro_delegated: user_info.astro_delegated,
+        ust_deposited: user_info.ust_deposited,
+        lp_shares: user_info.lp_shares,
+        auction_astro_incentives: user_info.auction_astro_incentives,
+        user_reward_index: user_info.user_reward_index
     })
 }
 
@@ -632,32 +630,23 @@ fn calculate_auction_reward_for_user(state: &State, user_info: &UserInfo, astro_
 
 
 
-// Accrue XMARS rewards by updating the reward index
-fn update_xmars_rewards_index(state: &mut State, xmars_accured: Uint256) {
-    if state.total_maust_locked == Uint256::zero() {
+// Accrue ASTRO rewards by updating the reward index
+fn update_astro_rewards_index(state: &mut State, astro_accured: Uint256)  {
+    if state.staked_lp_shares == Uint256::zero() {
         return;
     }
-    let xmars_rewards_index_increment = Decimal256::from_ratio(
-        Uint256::from(xmars_accured),
-        Uint256::from(state.total_maust_locked),
-    );
-    state.global_reward_index = state.global_reward_index + xmars_rewards_index_increment;
+    let astro_rewards_index_increment = Decimal256::from_ratio( Uint128::from(astro_accured), Uint128::from(state.staked_lp_shares),);
+    state.global_reward_index = state.global_reward_index + astro_rewards_index_increment;
 }
 
-// Accrue MARS reward for the user by updating the user reward index and adding rewards to the pending rewards
-fn compute_user_accrued_reward(state: &State, user_info: &mut UserInfo) {
-    if state.final_ust_locked == Uint256::zero() {
-        return;
+// Accrue ASTRO reward for the user by updating the user reward index and adding rewards to the pending rewards
+fn compute_user_accrued_reward(state: &State, user_info: &mut UserInfo) -> Uint128 {
+    if state.staked_lp_shares == Uint256::zero() {
+        return Uint128::zero();
     }
-    let user_maust_share = calculate_user_ma_ust_share(
-        user_info.total_ust_locked,
-        state.final_ust_locked,
-        state.final_maust_locked,
-    );
-    let pending_xmars = (user_maust_share * state.global_reward_index)
-        - (user_maust_share * user_info.reward_index);
-    user_info.reward_index = state.global_reward_index;
-    user_info.pending_xmars += pending_xmars;
+    let pending_user_rewards = (user_info.lp_shares * state.global_reward_index)  - (user_info.lp_shares * user_info.user_reward_index);
+    user_info.user_reward_index = state.global_reward_index;
+    pending_user_rewards
 }
 
 

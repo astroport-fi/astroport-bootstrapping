@@ -25,7 +25,7 @@ pub struct Config {
     ///  ASTRO-UST LP Tokens staking contract address
     pub lp_staking_contract: Addr,
     /// ASTRO token rewards to be used to incentivize boostrap auction participants
-    pub astro_rewards: u64, 
+    pub astro_rewards: Uint128, 
     /// Timestamp from which ASTRO / UST can be deposited in the boostrap auction contract 
     pub init_timestamp: u64, 
     /// Number of seconds post init_timestamp during which deposits will be allowed 
@@ -45,6 +45,8 @@ pub struct State {
     pub total_ust_deposited: Uint128, 
     /// Total LP shares minted post liquidity addition to the ASTRO-UST Pool
     pub total_lp_shares_minted: Uint128 
+    /// ASTRO--UST LP Shares currently staked with the Staking contract
+    pub staked_lp_shares: Uint128 
     /// index used to keep track of LP staking rewards and distribute them proportionally among the auction participants
     pub global_reward_index: Decimal 
 }
@@ -56,6 +58,7 @@ impl Default for State {
             total_astro_deposited: Uint128::zero(),
             total_ust_deposited: Uint128::zero(),
             total_lp_shares_minted: Uint128::zero(),
+            staked_lp_shares: Uint128::zero(),
             global_reward_index: Decimal::zero()
         }
     }
