@@ -10,6 +10,7 @@ pub struct InstantiateMsg {
     pub airdrop_contract_address: String,
     pub lockdrop_contract_address: String,
     pub astroport_lp_pool: Option<String>,
+    pub lp_token_contract : Option<String>,
     pub lp_staking_contract: Option<String>,
     pub astro_rewards: Uint128,
     pub init_timestamp: u64,

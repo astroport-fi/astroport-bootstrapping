@@ -20,6 +20,8 @@ pub struct Config {
     pub astro_token_address: Addr,
     ///  ASTRO-UST LP Pool address
     pub astroport_lp_pool: Addr,
+    ///  ASTRO-UST LP Token address
+    pub lp_token_address: Addr,
     ///  ASTRO-UST LP Tokens staking contract address
     pub lp_staking_contract: Addr,
     /// ASTRO token rewards to be used to incentivize boostrap auction participants
@@ -67,10 +69,8 @@ pub struct UserInfo {
     pub astro_delegated: Uint128,
     pub ust_deposited: Uint128,
     pub lp_shares: Uint128,
-    pub total_auction_incentives: Uint128,
-    pub unclaimed_auction_incentives: Uint128,
+    pub auction_astro_incentives: Uint128,
     pub user_reward_index: Decimal,
-    pub unclaimed_staking_rewards: Uint128
 }
 
 impl Default for UserInfo {
@@ -79,10 +79,8 @@ impl Default for UserInfo {
             astro_delegated: Uint128::zero(),
             ust_deposited: Uint128::zero(),
             lp_shares: Uint128::zero(),
-            total_auction_incentives: Uint128::zero(),
-            unclaimed_auction_incentives: Uint128::zero(),
+            auction_astro_incentives: Uint128::zero(),
             user_reward_index: Decimal::zero(),
-            unclaimed_staking_rewards: Uint128::zero()
         }
     }
 }

@@ -7,6 +7,10 @@ use cosmwasm_std::{
 use crate::msg::{UserInfoResponse, StateResponse, ConfigResponse, WithdrawalStatus, ExecuteMsg, InstantiateMsg, QueryMsg  } ;
 use crate::state::{Config, State, CONFIG, STATE, USERS, CLAIMEES};
 
+use astroport::pair::{  ExecuteMsg };
+use astroport_periphery::airdrop::{  ExecuteMsg as AirdropExecuteMsg};
+use astroport_periphery::lockdrop::{ ExecuteMsg as LockdropExecuteMsg};
+
 use cw20_base::msg::{ExecuteMsg as CW20ExecuteMsg };
 use sha3::{ Digest, Keccak256 };
 use std::cmp::Ordering;
@@ -67,9 +71,40 @@ pub fn execute( deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg)  ->
         ExecuteMsg::AddLiquidityToAstroportPool {  }  => handle_add_liquidity_to_astroport_pool(deps, env,  info),
 
         ExecuteMsg::ClaimRewards {  }  => handle_claim_rewards(deps, env,  info),
-        ExecuteMsg::WithdrawLpShares { amount  }  => handle_withdraw_lp_shares(deps, env,  info, amount),
+        ExecuteMsg::WithdrawLpShares { }  => handle_withdraw_unlocked_lp_shares(deps, env,  info),
+
+        ExecuteMsg::Callback(msg) => _handle_callback(deps, _env, info, msg),
     }
 }
+
+
+
+fn _handle_callback(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    msg: CallbackMsg,
+) -> StdResult<Response> {
+    // Callback functions can only be called this contract itself
+    if info.sender != env.contract.address {
+        return Err(StdError::generic_err(
+            "callbacks cannot be invoked externally",
+        ));
+    }
+    match msg {
+        CallbackMsg::UpdateStateOnLiquidityAdditionToPool {
+            prev_lp_balance,
+        } => update_state_on_liquidity_addition_to_pool(deps, env, prev_lp_balance),
+        CallbackMsg::UpdateStateOnRewardClaim {
+            user_address,
+            prev_astro_balance
+        } => update_state_on_reward_claim(deps, env, user_address, prev_astro_balance),
+        // CallbackMsg::DissolvePosition { user, duration } => {
+        //     try_dissolve_position(deps, env, user, duration)
+        // }
+    }
+}
+
 
 
 
@@ -224,8 +259,8 @@ pub fn handle_withdraw_ust(
     }
 
     // UPDATE STATE
-    state.total_ust_deposited = state.total_ust_deposited - amount;
-    user_info.ust_deposited = user_info.ust_deposited - amount;
+    state.total_ust_deposited = state.total_ust_deposited.checked_sub(amount); 
+    user_info.ust_deposited = user_info.ust_deposited.checked_sub(amount);
 
     // SAVE UPDATED STATE
     STATE.save(deps.storage, &state)?;
@@ -245,128 +280,278 @@ pub fn handle_withdraw_ust(
 
 
 
-
+/// APPROVE TOKEN --> ADD LIQUIDITY
 /// @dev Admin Function to allow users to delegate their ASTRO Tokens to the LP Bootstrap auction contract
 /// @param amount_to_delegate Amount of ASTRO to be delegate
 pub fn handle_add_liquidity_to_astroport_pool( 
     deps: DepsMut, 
     _env: Env, 
-    info: MessageInfo
+    info: MessageInfo,
+    slippage: Option<Decimal>
 ) -> Result<Response, StdError> {
     let config = CONFIG.load(deps.storage)?;
-    let mut state = STATE.load(deps.storage)?;
+    let state = STATE.load(deps.storage)?;
 
-    state.tokens_used_for_auction += amount_to_delegate;
-    user_info.tokens_used_for_auction += amount_to_delegate;
-
-    // CHECK :: HAS THE BOOTSTRAP AUCTION CONCLUDED ? 
-    if config.are_claims_allowed {
-        return Err(StdError::generic_err("LP bootstrap auction has concluded"));        
+    // CHECK :: Only admin can call this function
+    if info.sender != config.owner {
+        return Err(StdError::generic_err("Unauthorized"));
     }
 
-    // CHECK :: TOKENS BEING DELEGATED SHOULD NOT EXCEED USER'S CLAIMABLE AIRDROP AMOUNT
-    if user_info.tokens_used_for_auction > user_info.airdrop_amount {
-        return Err(StdError::generic_err("Total amount being delegated for boostrap auction cannot exceed your claimable airdrop balance"));        
+    // CHECK :: Deposit / withdrawal windows need to be over
+    if !are_windows_closed(env.block.time.seconds(), &config) {
+        return Err(StdError::generic_err("Deposit/withdrawal windows are open"));
     }
-    
-    // COSMOS MSG :: DELEGATE ASTRO TOKENS TO LP BOOTSTRAP AUCTION CONTRACT
-    let delegate_msg = build_delegate_tokens_to_auction_contract_msg(deps.api.addr_validate(&info.sender.to_string().clone())? , config.boostrap_auction_address.to_string(), amount_to_delegate.into())?;
 
-    // STATE UPDATE : SAVE UPDATED STATES
-    USERS.save(deps.storage, &info.sender , &user_info)?;  
-    STATE.save( deps.storage, &state )?;
+    let mut msgs_ = vec![];
+    // QUERY CURRENT LP TOKEN BALANCE (FOR SAFETY - IN ANY CASE)
+    let cur_lp_balance = cw20_get_balance(&deps.querier, config.lp_token_contract.clone(), _env.contract.adddress );
+
+    // COSMOS MSGS
+    // :: 1.  APPROVE ASTRO WITH LP POOL ADDRESS AS BENEFICIARY
+    // :: 2.  ADD LIQUIDITY 
+    // :: 3. CallbackMsg :: Update state on liquidity addition to LP Pool
+    // :: 4. Activate Claims on Lockdrop Contract
+    // :: 5. Update Claims on Airdrop Contract
+    let approve_astro_msg = build_approve_astro_msg( deps.storage, config, state);
+    let add_liquidity_msg = build_provide_liquidity_to_lp_pool_msg( deps.storage, config, state, slippage)
+    let update_state_msg = CallbackMsg::UpdateStateOnLiquidityAdditionToPool {
+        prev_lp_balance: cur_lp_balance,
+    }
+    let activate_claims_lockdrop = build_activate_claims_lockdrop_msg( deps.storage, config);
+    let activate_claims_airdrop = build_activate_claims_airdrop_msg( deps.storage, config);
+    msgs_.push(approve_astro_msg );
+    msgs_.push(add_liquidity_msg );
+    msgs_.push(update_state_msg );
+    msgs_.push(activate_claims_lockdrop );
+    msgs_.push(activate_claims_airdrop );
 
     Ok(Response::new()
     .add_message(delegate_msg)        
     .add_attributes(vec![
-        attr("action", "Airdrop::ExecuteMsg::DelegateAstroToBootstrapAuction"),
-        attr("user", info.sender.to_string() ),
-        attr("amount_delegated", amount_to_delegate ),
+        attr("action", "Auction::ExecuteMsg::AddLiquidityToAstroportPool"),
+        attr("astro_deposited", state.total_astro_deposited ),
+        attr("ust_deposited", state.total_ust_deposited ),
     ]))
 
 }
 
 
 
-/// @dev Function to allow users to withdraw their undelegated ASTRO Tokens 
-/// @param amount_to_delegate Amount of ASTRO to be delegate
-pub fn handle_withdraw_airdrop_rewards( 
-    deps: DepsMut, 
+
+/// @dev Facilitates ASTRO Reward claim for users
+pub fn handle_claim_rewards( 
+    deps: DepsMut,
     _env: Env, 
     info: MessageInfo
 ) -> Result<Response, StdError> {
     let config = CONFIG.load(deps.storage)?;
-    let mut user_info =  USERS.may_load(deps.storage, &info.sender.clone() )?.unwrap_or_default();
+    let state = STATE.load(deps.storage)?;
+    let depositor_address = info.sender.clone();
+    let user_info =  USERS.may_load(deps.storage, &depositor_address.clone() )?.unwrap_or_default();
 
-    // CHECK :: HAS THE BOOTSTRAP AUCTION CONCLUDED ? 
-    if !config.are_claims_allowed {
-        return Err(StdError::generic_err("LP Boostrap auction in progress. Claims not allowed during this period"));        
+    // CHECK :: Deposit / withdrawal windows need to be over
+    if !are_windows_closed(env.block.time.seconds(), &config) {
+        return Err(StdError::generic_err("Deposit/withdrawal windows are open"));
     }
 
-    // CHECK :: HAS USER ALREADY WITHDRAWN THEIR REWARDS ? 
-    if user_info.tokens_claimed > Uint128::zero() {
-        return Err(StdError::generic_err("Tokens have already been claimed"));        
+    // CHECK :: User has valid delegation / deposit balances
+    if user_info.astro_delegated == Uint256::zero() && user_info.ust_deposited == Uint256::zero() {
+        return Err(StdError::generic_err("No rewards to claim"));
     }
 
-    // TRANSFER ASTRO IF CLAIMS ARE ALLOWED (i.e LP Boostrap auction has concluded)
-    user_info.tokens_claimed = user_info.airdrop_amount - user_info.tokens_used_for_auction;
-    let transfer_msg = build_send_cw20_token_msg(info.sender.clone(), config.astro_token_address.to_string(), user_info.tokens_claimed.into())? ;    
+    let mut cosmos_msgs = vec![];
 
-    USERS.save(deps.storage, &info.sender , &user_info)?;  
+    // QUERY :: ARE ASTRO REWARDS TO BE CLAIMED FOR LP STAKING > 0 ?
+    // --> If unclaimed rewards > 0, add claimReward {} msg to the cosmos msg array
+    if ( deps.api.addr_validate(&config.lp_staking_contract)? ) {
+        let astro_unclaimed: Uint128 = deps.querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
+                                                contract_addr: config.lp_staking_contract.to_string(),
+                                                msg: to_binary(&UserUnclaimedRewards {
+                                                    user_address: env.contract.address.to_string(),
+                                                }).unwrap(),
+                                        })).unwrap();
+        if astro_unclaimed > Uint128::zero() {
+            cosmos_msgs.push(build_claim_astro_rewards(config.lp_staking_contract.clone())?);
+        }        
+    }
 
-    Ok(Response::new()
-    .add_message(transfer_msg)        
+    // QUERY :: Current ASTRO Contract Balance
+    // -->add CallbackMsg::UpdateStateOnRewardClaim{} msg to the cosmos msg array    
+    let astro_balance: cw20::BalanceResponse = deps.querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
+                                                                    contract_addr: config.astro_token_address.to_string(),
+                                                                    msg: to_binary(&cw20_base::msg::QueryMsg::Balance {
+                                                                        address: env.contract.address.to_string(),
+                                                                    }).unwrap(),
+                                                                })).unwrap();
+    let update_state_msg = CallbackMsg::UpdateStateOnRewardClaim {  user_address: depositor_address, 
+                                                                    prev_astro_balance: astro_balance
+                                                                }.to_cosmos_msg(&env.contract.address)?;
+    cosmos_msgs.push(update_state_msg);
+
+
+    Ok(Response::new()        
+    .add_messages(cosmos_msgs)    
     .add_attributes(vec![
-        attr("action", "Airdrop::ExecuteMsg::WithdrawAirdropRewards"),
-        attr("user", info.sender.to_string() ),
-        attr("amount", user_info.tokens_claimed ),
+        attr("action", "Auction::ExecuteMsg::ClaimRewards"),
+        attr("user", depositor_address.to_string() )
     ]))
 }
 
 
- 
-/// @dev Admin function to transfer ASTRO Tokens to the recepient address
-/// @param recepient Recepient receiving the ASTRO tokens
-/// @param amount Amount of ASTRO to be transferred
-pub fn handle_transfer_unclaimed_tokens( 
-    deps: DepsMut, 
+
+/// @dev Facilitates ASTRO Reward claim for users
+pub fn handle_withdraw_unlocked_lp_shares( 
+    deps: DepsMut,
     _env: Env, 
-    info: MessageInfo,
-    recepient: String, 
-    amount: Uint128
+    info: MessageInfo
 ) -> Result<Response, StdError> {
+    let config = CONFIG.load(deps.storage)?;
+    let state = STATE.load(deps.storage)?;
+    let depositor_address = info.sender.clone();
+    let mut user_info =  USERS.may_load(deps.storage, &depositor_address.clone() )?.unwrap_or_default();
+
+    // CHECK :: Deposit / withdrawal windows need to be over
+    if !are_windows_closed(env.block.time.seconds(), &config) {
+        return Err(StdError::generic_err("Deposit/withdrawal windows are open"));
+    }
+
+    // CHECK :: User has valid delegation / deposit balances
+    if user_info.astro_delegated == Uint256::zero() && user_info.ust_deposited == Uint256::zero() {
+        return Err(StdError::generic_err("No rewards to claim"));
+    }
+
+    let mut cosmos_msgs = vec![];
+
+    // QUERY :: ARE ASTRO REWARDS TO BE CLAIMED FOR LP STAKING > 0 ?
+    // --> If unclaimed rewards > 0, add claimReward {} msg to the cosmos msg array
+    if ( deps.api.addr_validate(&config.lp_staking_contract)? ) {
+        let astro_unclaimed: Uint128 = deps.querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
+                                                contract_addr: config.lp_staking_contract.to_string(),
+                                                msg: to_binary(&UserUnclaimedRewards {
+                                                    user_address: env.contract.address.to_string(),
+                                                }).unwrap(),
+                                        })).unwrap();
+        if astro_unclaimed > Uint128::zero() {
+            cosmos_msgs.push(build_claim_astro_rewards(config.lp_staking_contract.clone())?);
+        }        
+    }
+
+    // QUERY :: Current ASTRO Contract Balance
+    // -->add CallbackMsg::UpdateStateOnRewardClaim{} msg to the cosmos msg array    
+    let astro_balance: cw20::BalanceResponse = deps.querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
+                                                                    contract_addr: config.astro_token_address.to_string(),
+                                                                    msg: to_binary(&cw20_base::msg::QueryMsg::Balance {
+                                                                        address: env.contract.address.to_string(),
+                                                                    }).unwrap(),
+                                                                })).unwrap();
+    let update_state_msg = CallbackMsg::UpdateStateOnRewardClaim {  user_address: depositor_address, 
+                                                                    prev_astro_balance: astro_balance
+                                                                }.to_cosmos_msg(&env.contract.address)?;
+    cosmos_msgs.push(update_state_msg);
+
+    // CALCULATE LP SHARES THAT THE USER CAN WITHDRAW (TO DO :: FIGURE THE LOGIC i.e cliff or vesting)                                                                
+    let lp_shares_to_withdraw = calculate_withdrawable_lp_shares(&config, &user_info);
+    
+    if lp_shares_to_withdraw == Uint128::zero() {
+        return Err(StdError::generic_err("No LP shares to withdraw"));
+    }
+
+    // COSMOS MSG's :: LP SHARES CLAIM
+    // --> 1. Unstake LP shares
+    // --> 2. Withdraw LP shares
+    let unstake_lp_shares =  build_unstake_lp_msg(config, lp_shares_to_withdraw)?;
+    let transfer_lp_shares =  build_send_cw20_token_msg(user_address.clone(), config.lp_token_address, lp_shares_to_withdraw)?;
+    cosmos_msgs.push(unstake_lp_shares);
+    cosmos_msgs.push(transfer_lp_shares);
+
+    // STATE UPDATE --> SAVE
+    user_info.lp_shares = user_info.lp_shares.checked_sub(lp_shares_to_withdraw);
+    USERS.save(deps.storage, &user_account, &user_info)?;
+
+    Ok(Response::new()        
+    .add_messages(cosmos_msgs)    
+    .add_attributes(vec![
+        attr("action", "Auction::ExecuteMsg::WithdrawLPShares"),
+        attr("user", depositor_address.to_string() ),
+        attr("LP_shares_withdrawn", lp_shares_to_withdraw )
+    ]))
+}
+
+
+
+
+// CALLBACK :: CALLED AFTER ASTRO, UST LIQUIDITY IS ADDED TO THE LP POOL
+pub fn update_state_on_liquidity_addition_to_pool( deps: DepsMut, env: Env, prev_lp_balance: Uint128) -> StdResult<Response> {
     let config = CONFIG.load(deps.storage)?;
     let mut state = STATE.load(deps.storage)?;
 
-    // CHECK :: CAN ONLY BE CALLED BY THE OWNER 
-    if info.sender != config.owner {
-        return Err(StdError::generic_err("Sender not authorized!"));        
+    // QUERY CURRENT LP TOKEN BALANCE :: NEWLY MINTED LP TOKENS
+    let cur_lp_balance = cw20_get_balance(&deps.querier, config.lp_token_contract.clone(), _env.contract.adddress );
+    let lp_minted = cur_lp_balance - prev_lp_balance;
+
+    // STATE :: UPDATE --> SAVE
+    state.total_lp_shares_minted = lp_minted;
+    STATE.save(deps.storage, &state)?;
+
+    Ok(Response::new().add_attributes(vec![
+        ("action", "Auction::CallbackMsg::UpdateStateOnLiquidityAddition"),
+        ("maUST_minted", m_ust_minted.to_string().as_str()),
+    ]))
+}
+
+
+
+// CALLBACK :: CALLED WITH REWARD_CLAIM{} 
+pub fn update_state_on_reward_claim( deps: DepsMut, env: Env, user_address:Addr, prev_astro_balance: Uint128) -> StdResult<Response> {
+    let config = CONFIG.load(deps.storage)?;
+    let mut state = STATE.load(deps.storage)?;
+
+    // QUERY CURRENT LP TOKEN BALANCE :: NEWLY MINTED LP TOKENS
+    let cur_astro_balance = cw20_get_balance(&deps.querier, config.lp_token_contract.clone(), _env.contract.adddress );
+    let astro_claimed = cur_astro_balance - prev_astro_balance;
+
+    let mut user_astro_rewards = Uint128::zero();
+
+    // ASTRO INCENTIVES :: Calculates ASTRO rewards for auction participation for a user
+    // --> Will be > 0 during 1st fn. execution for a user and then will be 0 everytime after that
+    let staking_reward =  Uint128::zero();
+    let auction_reward =  calculate_auction_reward_for_user(state, &mut user_info, config.astro_rewards);
+    user_astro_rewards += auction_reward;
+
+    if astro_claimed > Uint256::zero() {
+        update_astro_rewards_index(&mut state, astro_claimed);
+        compute_user_accrued_reward(&state, &mut user_info);
+        staking_reward = user_info.unclaimed_staking_rewards;
+        user_astro_rewards += staking_reward;
+        user_info.unclaimed_staking_rewards = Uint256::zero();
     }
 
-    // CHECK :: CAN ONLY BE CALLED AFTER THE CLAIM PERIOD IS OVER 
-    if config.till_timestamp > _env.block.time.seconds() {
-        return Err(StdError::generic_err("Airdrop claim period has not concluded"));        
+    // CHECK :: ASTRO Rewards must be > 0
+    if user_astro_rewards == Uint256::zero() {
+        return  Err(StdError::generic_err("No rewards to claim"));
     }
 
-    if amount > state.unclaimed_tokens {
-        return Err(StdError::generic_err("Amount to transfer cannot exceed unclaimed token balance!"));       
-    }
+    // SAVE UPDATED STATE
+    STATE.save(deps.storage, &state)?;
+    USERS.save(deps.storage, &user_account, &user_info)?;
 
-
-
-    // COSMOS MSG :: TRANSFER ASTRO TOKENS
-    state.unclaimed_tokens = state.unclaimed_tokens - amount;
-    let transfer_msg = build_send_cw20_token_msg(deps.api.addr_validate(&recepient.clone())? , config.astro_token_address.to_string(), amount.into())?;
+    // COSMOS MSG :: Transfer Rewards to the user
+    let transfer_astro_rewards =  build_send_cw20_token_msg(user_address.clone(), config.astro_token_address, user_astro_rewards)?;
 
     Ok(Response::new()
-    .add_message(transfer_msg)        
+    .add_messages(transfer_astro_rewards)
     .add_attributes(vec![
-        attr("action", "Airdrop::ExecuteMsg::TransferUnclaimedRewards"),
-        attr("recepient", recepient.to_string() ),
-        attr("amount", amount ),
+        ("action", "Auction::CallbackMsg::UpdateStateOnRewardClaim"),
+        ("user_address", user_address.to_string().as_str()),
+        ("auction_participation_reward", auction_reward),
+        ("staking_lp_reward", staking_reward),
     ]))
-
 }
+
+
+
+
+
 
 
 
@@ -417,38 +602,75 @@ fn query_user_info(deps: Deps, user_address: String) -> StdResult<UserInfoRespon
 
 
 
-
-
-
-/// @dev Returns true if the user has claimed the airdrop [EVM addresses to be provided in lower-case without the '0x' prefix]
-fn check_user_claimed(deps: Deps, address: String  ) -> StdResult<ClaimResponse> {
-    let res = CLAIMEES.may_load(deps.storage, &address.as_bytes() )?.unwrap_or_default();
-    Ok(ClaimResponse {  is_claimed: res.is_claimed }) 
-}
-
-
-/// @dev Returns the recovered public key, evm address and a boolean value which is true if the evm address provided was used for signing the message.
-/// @param evm_address : EVM address claiming the airdop. Needs to be in lower case without the `0x` prefix
-/// @param evm_signature : ECDSA Signature string generated by signing the message (without the `0x` prefix and the last 2 characters which originate from `v`)
-/// @param signed_msg_hash : Keccak256 hash of the signed message following the EIP-191 prefix standard.(without the `0x` prefix) 
-fn verify_signature(_deps: Deps, evm_address:String, evm_signature: String, signed_msg_hash: String  ) -> StdResult<SignatureResponse> {
-    
-    let verification_response = handle_verify_signature(_deps.api,  evm_address, evm_signature,  signed_msg_hash);
-    
-    Ok(SignatureResponse {
-        is_valid: verification_response.is_valid,
-        public_key: verification_response.public_key,
-        recovered_address: verification_response.recovered_address
-    }) 
-
-}
-
-
-
-
 //----------------------------------------------------------------------------------------
 // HELPERS
 //----------------------------------------------------------------------------------------
+
+
+/// Calculates ASTRO rewards for participation in the auction for a user
+fn calculate_auction_reward_for_user(state: &State, user_info: &UserInfo, astro_rewards_alloc: Uint128 ) -> Uint128 {
+
+    // In-case ASTRO incentives for participation in the auction are already claimed
+    if user_info.auction_astro_incentives > Uint128::zero() {
+        return Uint128::zero();
+    }
+
+    astro_rewards_alloc_half = Decimal256::from_ratio(astro_rewards_alloc, Uint128::from(2u128) )
+    let total_astro_rewards  = Uint128::zero();
+
+    // Calculate rewards for ASTRO Allocation by user
+    if (user_info.astro_delegated > Uint128::zero() ) {
+        total_astro_rewards +=  astro_rewards_alloc_half * Decimal256::from_ratio(user_info.astro_delegated, state.total_astro_deposited);
+    }
+    // Calculate rewards for UST provided by user
+    if (user_info.ust_deposited > Uint128::zero() ) {
+        total_astro_rewards +=  astro_rewards_alloc_half * Decimal256::from_ratio(user_info.ust_deposited, state.total_ust_deposited );
+    }
+    user_info.auction_astro_incentives = total_astro_rewards;
+    user_info.auction_astro_incentives
+}
+
+
+
+// Accrue XMARS rewards by updating the reward index
+fn update_xmars_rewards_index(state: &mut State, xmars_accured: Uint256) {
+    if state.total_maust_locked == Uint256::zero() {
+        return;
+    }
+    let xmars_rewards_index_increment = Decimal256::from_ratio(
+        Uint256::from(xmars_accured),
+        Uint256::from(state.total_maust_locked),
+    );
+    state.global_reward_index = state.global_reward_index + xmars_rewards_index_increment;
+}
+
+// Accrue MARS reward for the user by updating the user reward index and adding rewards to the pending rewards
+fn compute_user_accrued_reward(state: &State, user_info: &mut UserInfo) {
+    if state.final_ust_locked == Uint256::zero() {
+        return;
+    }
+    let user_maust_share = calculate_user_ma_ust_share(
+        user_info.total_ust_locked,
+        state.final_ust_locked,
+        state.final_maust_locked,
+    );
+    let pending_xmars = (user_maust_share * state.global_reward_index)
+        - (user_maust_share * user_info.reward_index);
+    user_info.reward_index = state.global_reward_index;
+    user_info.pending_xmars += pending_xmars;
+}
+
+
+
+
+
+
+/// true if deposit / withdrawal windows are allowed
+fn are_windows_closed(current_timestamp: u64, config: &Config) -> bool {
+    let opened_till = config.init_timestamp + config.deposit_window + config.withdrawal_window;
+    (current_timestamp > opened_till) || (current_timestamp <  config.init_timestamp)
+}
+
 
 /// true if deposits are allowed
 fn is_deposit_open(current_timestamp: u64, config: &Config) -> bool {
@@ -506,9 +728,92 @@ fn calculate_max_withdrawals_allowed(current_timestamp: u64, config: &Config) ->
 
 
 
+// CW20
+pub fn cw20_get_balance(querier: &QuerierWrapper, token_address: Addr, balance_address: Addr) -> StdResult<Uint128> {
+    let query: BalanceResponse = querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
+        contract_addr: token_address.into(),
+        msg: to_binary(&Cw20QueryMsg::Balance {
+            address: balance_address.into(),
+        })?,
+    }))?;
+
+    Ok(query.balance)
+}
 
 
 
+fn build_provide_liquidity_to_lp_pool_msg(
+    deps: Deps,
+    config: &Config,
+    state: &State,
+    slippage_tolerance_: Option<Decimal>
+) -> StdResult<CosmosMsg> {
+
+    // ASSET DEFINATION
+    let astro_asset =  Asset { 
+        info: &astroport::asset::AssetInfo::Token { contract_addr: deps.api.addr_validate(&config.astro_token_address)? },
+        amount: state.total_astro_deposited.into()
+    }
+    let ust_asset =  Asset { 
+        info: &astroport::asset::AssetInfo::NativeToken { denom: "uusd" },
+        amount: state.total_ust_deposited.into()
+    }
+    let assets_ = [astro_asset, ust_asset]
+
+    // COSMOS MSG 
+    Ok(CosmosMsg::Wasm(WasmMsg::Execute {
+        contract_addr: lp_pool_address.to_string(),
+        funds: vec![deduct_tax(
+            deps,
+            Coin {
+                denom: "uusd",
+                amount: state.total_ust_deposited.into(),
+            },
+        )?],
+        msg: to_binary(&astroport::pair::ExecuteMsg::ProvideLiquidity {
+            assets: assets_,
+            slippage_tolerance: slippage_tolerance_
+        })?,
+    }))
+}
+
+
+
+fn build_approve_astro_msg( deps: Deps, config: &Config, state: &State) -> StdResult<CosmosMsg> {
+    Ok(CosmosMsg::Wasm(WasmMsg::Execute {
+        contract_addr: config.astro_token_address,
+        msg: to_binary(&CW20ExecuteMsg::IncreaseAllowance {
+            spender: config.astroport_lp_pool,
+            amount: state.total_astro_deposited.into()
+        })?,
+        funds: vec![],
+    }))
+}
+
+fn build_activate_claims_lockdrop_msg( deps: Deps, config: &Config, state: &State) -> StdResult<CosmosMsg> {
+    Ok(CosmosMsg::Wasm(WasmMsg::Execute {
+        contract_addr: config.lockdrop_contract_address,
+        msg: to_binary(&LockdropExecuteMsg::EnableClaims { })?,
+        funds: vec![],
+    }))
+}
+
+fn build_activate_claims_airdrop_msg( deps: Deps, config: &Config, state: &State) -> StdResult<CosmosMsg> {
+    Ok(CosmosMsg::Wasm(WasmMsg::Execute {
+        contract_addr: config.lockdrop_contract_address,
+        msg: to_binary(&AirdropExecuteMsg::EnableClaims { })?,
+        funds: vec![],
+    }))
+}
+
+
+fn build_claim_astro_rewards(lp_staking_contract: Addr) -> StdResult<CosmosMsg> {
+    Ok(CosmosMsg::Wasm(WasmMsg::Execute {
+        contract_addr: lp_staking_contract.to_string(),
+        funds: vec![],
+        msg: to_binary(&astroport::lp_staking::ExecuteMsg::ClaimRewards {})?,
+    }))
+}
 
 
 
@@ -519,93 +824,9 @@ fn calculate_max_withdrawals_allowed(current_timestamp: u64, config: &Config) ->
 //----------------------------------------------------------------------------------------
 
 
-/// @dev Verify whether a claim is valid
-/// @param account Account on behalf of which the airdrop is to be claimed (etherum addresses without `0x` prefix)
-/// @param amount Airdrop amount to be claimed by the user
-/// @param merkle_proof Array of hashes to prove the input is a leaf of the Merkle Tree
-/// @param merkle_root Hash of Merkle tree's root
-fn verify_claim( account: String, amount: Uint128, merkle_proof: Vec<String>, merkle_root: String) -> bool {
-
-    let leaf = account.clone() + &amount.to_string();
-    let mut hash_buf  = Keccak256::digest(leaf.as_bytes()).as_slice().try_into().expect("Wrong length");
-    let mut hash_str: String; 
-
-    for p in merkle_proof {
-        let mut proof_buf: [u8; 32] = [0; 32];
-        hex::decode_to_slice(p, &mut proof_buf).unwrap();
-        let proof_buf_str = hex::encode(proof_buf);
-        hash_str = hex::encode(hash_buf);
-
-        if proof_buf_str.cmp(&hash_str.clone()) == Ordering::Greater {
-            hash_buf = Keccak256::digest(&[hash_buf, proof_buf].concat()).as_slice().try_into().expect("Wrong length")
-        } else {
-            hash_buf = Keccak256::digest(&[proof_buf, hash_buf].concat()).as_slice().try_into().expect("Wrong length")
-        }
-    }
-        
-    hash_str = hex::encode(hash_buf);
-    
-    merkle_root == hash_str
-}
 
 
-/// @dev Verify whether Signature provided is valid
-/// @param evm_address : EVM address claiming to have signed the message. Needs to be in lower case without the `0x` prefix
-/// @param evm_signature : ECDSA Signature string generated by signing the message (without the `0x` prefix and the last 2 characters which originate from `v`)
-/// @param signed_msg_hash : Keccak256 hash of the signed message following the EIP-191 prefix standard.(without the `0x` prefix) 
-pub fn handle_verify_signature( api: &dyn Api, evm_address:String, evm_signature: String, signed_msg_hash: String ) -> SignatureResponse {
-    let msg_hash = hex::decode(signed_msg_hash).unwrap();
-    let signature = hex::decode(evm_signature).unwrap();
-    let recovery_param = normalize_recovery_id(signature[63]);
 
-    let mut recovered_public_key = vec![0; 64];
-    recovered_public_key = api.secp256k1_recover_pubkey(&msg_hash, &signature, recovery_param ).unwrap_or([].to_vec()) ;
-    let recovered_public_key_string = hex::encode(&recovered_public_key );
-
-    let recovered_address = evm_address_raw(&recovered_public_key ).unwrap_or([0;20] ) ;
-    let recovered_address_string = hex::encode(recovered_address);
-  
-    SignatureResponse {
-        is_valid: evm_address == recovered_address_string,
-        public_key: recovered_public_key_string,
-        recovered_address: recovered_address_string 
-    }
-}
-
-
-/// Returns a raw 20 byte Ethereum address
-/// Copied from https://github.com/CosmWasm/cosmwasm/blob/96a1f888f0cdb7446e29f60054165e635b258e39/contracts/crypto-verify/src/ethereum.rs#L99
-pub fn evm_address_raw(pubkey: &[u8]) -> StdResult<[u8; 20]> {
-    let (tag, data) = match pubkey.split_first() {
-        Some(pair) => pair,
-        None => return Err(StdError::generic_err("Public key must not be empty")),
-    };
-    if *tag != 0x04 {
-        return Err(StdError::generic_err("Public key must start with 0x04"));
-    }
-    if data.len() != 64 {
-        return Err(StdError::generic_err("Public key must be 65 bytes long"));
-    }
-
-    let hash = Keccak256::digest(data);
-    Ok(hash[hash.len() - 20..].try_into().unwrap())
-}
-
-
-/// Normalizes recovery id for recoverable signature while getting the recovery param from the value `v`
-/// See [EIP-155] for how `v` is composed.
-/// [EIP-155]: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-155.md
-/// Copied from https://github.com/gakonst/ethers-rs/blob/01cc80769c291fc80f5b1e9173b7b580ae6b6413/ethers-core/src/types/signature.rs#L142
-pub fn normalize_recovery_id(v: u8) -> u8 {
-    match v {
-        0 => 0,
-        1 => 1,
-        27 => 0,
-        28 => 1,
-        v if v >= 35 => ((v - 1) % 2) as _,
-        _ => 4,
-    }
-}
 
 
 /// @dev Helper function which returns a cosmos wasm msg to transfer cw20 tokens to a recepient address 
@@ -646,6 +867,7 @@ fn build_delegate_tokens_to_auction_contract_msg(user_address: Addr, boostrap_au
         funds: vec![],
     }))
 }
+
 
 
 
