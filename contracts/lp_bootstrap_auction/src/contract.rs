@@ -4,7 +4,7 @@ use cosmwasm_std::{
     attr, Binary, Deps, Api, DepsMut, MessageInfo, Env, Response, 
     StdError, StdResult, Uint128, WasmMsg, to_binary, Addr, CosmosMsg, 
 };
-use crate::msg::{UserInfoResponse, StateResponse, ConfigResponse, ClaimResponse, SignatureResponse, ExecuteMsg, InstantiateMsg, QueryMsg  } ;
+use crate::msg::{UserInfoResponse, StateResponse, ConfigResponse, WithdrawalStatus, ExecuteMsg, InstantiateMsg, QueryMsg  } ;
 use crate::state::{Config, State, CONFIG, STATE, USERS, CLAIMEES};
 
 use cw20_base::msg::{ExecuteMsg as CW20ExecuteMsg };
@@ -19,33 +19,28 @@ use std::convert::{TryInto};
 
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn instantiate( 
-    deps: DepsMut, 
-    _env: Env, 
-    _info: MessageInfo, 
-    msg: InstantiateMsg
-) -> StdResult<Response> {
-
-    if msg.till_timestamp.unwrap() <= _env.block.time.seconds() {
-       return Err(StdError::generic_err("Invalid airdrop claim window closure timestamp"));
-    }
+pub fn instantiate( deps: DepsMut, _env: Env, _info: MessageInfo, msg: InstantiateMsg) -> StdResult<Response> {
 
     let config = Config {
         owner: deps.api.addr_validate(&msg.owner.unwrap())?,
-        astro_token_address: deps.api.addr_validate(&msg.astro_token_address.unwrap_or(Addr::unchecked("").to_string() ))?,
-        terra_merkle_roots: msg.terra_merkle_roots.unwrap_or(vec![]) ,
-        evm_merkle_roots: msg.evm_merkle_roots.unwrap_or(vec![]) ,
-        from_timestamp: msg.from_timestamp.unwrap_or( _env.block.time.seconds()) ,
-        till_timestamp: msg.till_timestamp.unwrap(),
-        boostrap_auction_address: deps.api.addr_validate(&msg.boostrap_auction_address.unwrap_or(Addr::unchecked("").to_string() ))?,
-        are_claims_allowed: false
+        astro_token_address: deps.api.addr_validate(&msg.astro_token_address).to_string(),
+        airdrop_contract_address: deps.api.addr_validate(&msg.airdrop_contract_address).to_string(),
+        lockdrop_contract_address: deps.api.addr_validate(&msg.lockdrop_contract_address).to_string(),
+        astroport_lp_pool: deps.api.addr_validate(&msg.astroport_lp_pool.unwrap_or(Addr::unchecked("").to_string() ))?,
+        lp_staking_contract: deps.api.addr_validate(&msg.lp_staking_contract.unwrap_or(Addr::unchecked("").to_string() ))?,
+        astro_rewards: msg.astro_rewards ,
+        init_timestamp: msg.init_timestamp.unwrap_or( _env.block.time.seconds()) ,
+        deposit_window: msg.deposit_window,
+        withdrawal_window: msg.withdrawal_window,
     };
 
     let state = State {
-        total_airdrop_size: msg.total_airdrop_size,
-        tokens_used_for_auction: Uint128::zero(),
-        unclaimed_tokens: msg.total_airdrop_size
+        total_astro_deposited: Uint128::zero(),
+        total_ust_deposited: Uint128::zero(),
+        total_lp_shares_minted: Uint128::zero(),
+        global_reward_index: Decimal::zero()
     };
+
 
     CONFIG.save(deps.storage, &config)?;
     STATE.save( deps.storage, &state )?;
@@ -53,56 +48,39 @@ pub fn instantiate(
 }
 
 
-
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn execute( 
-    deps: DepsMut, 
-    env: Env, 
-    info: MessageInfo, 
-    msg: ExecuteMsg
-)  -> Result<Response, StdError> {
+pub fn execute( deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg)  -> Result<Response, StdError> {
     match msg {
         ExecuteMsg::UpdateConfig { 
             new_config 
         }  => handle_update_config(deps, info,  new_config),
-        ExecuteMsg::ClaimByTerraUser { 
-            claim_amount, 
-            merkle_proof, 
-            root_index
-        } => handle_terra_user_claim(deps, env, info,  claim_amount, merkle_proof, root_index),
-        ExecuteMsg::ClaimByEvmUser { 
-            eth_address, 
-            claim_amount, 
-            merkle_proof, 
-            root_index,
-            signature, 
-            signed_msg_hash
-        } => handle_evm_user_claim(deps, env, info,  eth_address, claim_amount, merkle_proof, root_index, signature, signed_msg_hash),       
-        ExecuteMsg::DelegateAstroToBootstrapAuction { 
-            amount_to_delegate
-        }  => handle_delegate_astro_to_bootstrap_auction(deps, env,  info, amount_to_delegate),
-        ExecuteMsg::WithdrawAirdropReward {  }  => handle_withdraw_airdrop_rewards(deps, env,  info),
-        ExecuteMsg::TransferUnclaimedTokens { 
-            recepient, 
-            amount 
-        }  => handle_transfer_unclaimed_tokens(deps, env,  info, recepient, amount),
+
+        ExecuteMsg::DelegateAstroTokens { 
+            user_address, 
+            amount, 
+        } => handle_delegate_astro_tokens(deps, env, info,  user_address, amount),
+        ExecuteMsg::DepositUst { } => handle_deposit_ust(deps, env, info ),       
+        ExecuteMsg::WithdrawUst { 
+            amount
+        }  => handle_withdraw_ust(deps, env,  info, amount),
+
+        ExecuteMsg::AddLiquidityToAstroportPool {  }  => handle_add_liquidity_to_astroport_pool(deps, env,  info),
+
+        ExecuteMsg::ClaimRewards {  }  => handle_claim_rewards(deps, env,  info),
+        ExecuteMsg::WithdrawLpShares { amount  }  => handle_withdraw_lp_shares(deps, env,  info, amount),
     }
 }
+
+
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg,) -> StdResult<Binary> {
     match msg {
         QueryMsg::Config {} => to_binary(&query_config(deps)?),
         QueryMsg::State {} => to_binary(&query_state(deps)?),
-        QueryMsg::HasUserClaimed { address } => to_binary(&query_user_claimed(deps, address)?),        
         QueryMsg::UserInfo { 
             address 
         } => to_binary(&query_user_info(deps, address)?),
-        QueryMsg::IsValidSignature { 
-            evm_address, 
-            evm_signature, 
-            signed_msg_hash 
-        } => to_binary(&verify_signature(deps, evm_address, evm_signature, signed_msg_hash )?),
     }
 }
 
@@ -115,186 +93,168 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg,) -> StdResult<Binary> {
 
 /// @dev Admin function to update Configuration parameters
 /// @param new_config : Same as InstantiateMsg struct
-pub fn handle_update_config( deps: DepsMut, info: MessageInfo, new_config: InstantiateMsg ) -> StdResult<Response> { 
-    let mut config = CONFIG.load(deps.storage)?;
+// pub fn handle_update_config( deps: DepsMut, info: MessageInfo, new_config: InstantiateMsg ) -> StdResult<Response> { 
+//     let mut config = CONFIG.load(deps.storage)?;
     
-    // CHECK :: ONLY OWNER CAN CALL THIS FUNCTION
-    if info.sender != config.owner {    
-        return Err(StdError::generic_err("Only owner can update configuration"));
-    }
+//     // CHECK :: ONLY OWNER CAN CALL THIS FUNCTION
+//     if info.sender != config.owner {    
+//         return Err(StdError::generic_err("Only owner can update configuration"));
+//     }
 
-    // UPDATE :: ADDRESSES IF PROVIDED
-    config.owner = option_string_to_addr(deps.api, new_config.owner, config.owner)?;
-    config.astro_token_address = option_string_to_addr(deps.api, new_config.astro_token_address, config.astro_token_address)?;
-    config.boostrap_auction_address = option_string_to_addr(deps.api, new_config.boostrap_auction_address, config.boostrap_auction_address)?;
+//     // UPDATE :: ADDRESSES IF PROVIDED
+//     config.owner = option_string_to_addr(deps.api, new_config.owner, config.owner)?;
+//     config.astro_token_address = option_string_to_addr(deps.api, new_config.astro_token_address, config.astro_token_address)?;
+//     config.boostrap_auction_address = option_string_to_addr(deps.api, new_config.boostrap_auction_address, config.boostrap_auction_address)?;
 
-    // UPDATE :: VALUES IF PROVIDED
-    config.terra_merkle_roots = new_config.terra_merkle_roots.unwrap_or(config.terra_merkle_roots);
-    config.evm_merkle_roots = new_config.evm_merkle_roots.unwrap_or(config.evm_merkle_roots);
-    config.from_timestamp = new_config.from_timestamp.unwrap_or(config.from_timestamp);
-    config.till_timestamp = new_config.till_timestamp.unwrap_or(config.till_timestamp );
+//     // UPDATE :: VALUES IF PROVIDED
+//     config.terra_merkle_roots = new_config.terra_merkle_roots.unwrap_or(config.terra_merkle_roots);
+//     config.evm_merkle_roots = new_config.evm_merkle_roots.unwrap_or(config.evm_merkle_roots);
+//     config.from_timestamp = new_config.from_timestamp.unwrap_or(config.from_timestamp);
+//     config.till_timestamp = new_config.till_timestamp.unwrap_or(config.till_timestamp );
 
-    CONFIG.save(deps.storage, &config)?;
-    Ok(Response::new().add_attribute("action", "Airdrop::ExecuteMsg::UpdateConfig"))
-}
+//     CONFIG.save(deps.storage, &config)?;
+//     Ok(Response::new().add_attribute("action", "Airdrop::ExecuteMsg::UpdateConfig"))
+// }
 
 
 
-/// @dev Executes an airdrop claim for a Terra User
-/// @param claim_amount : Airdrop to be claimed by the user
-/// @param merkle_proof : Array of hashes to prove the input is a leaf of the Merkle Tree
-/// @param root_index : Merkle Tree root identifier to be used for verification
-pub fn handle_terra_user_claim( 
+/// @dev Delegates ASTRO tokens to be used for the LP Bootstrapping via auction. Callable only by Airdrop / Lockdrop contracts
+/// @param user_address : User address who is delegating the ASTRO tokens for LP Pool bootstrap via auction
+/// @param amount : Number of ASTRO Tokens being delegated
+pub fn handle_delegate_astro_tokens( 
     deps: DepsMut, 
     _env: Env, 
     info: MessageInfo,
-    claim_amount: Uint128,  
-    merkle_proof: Vec<String>, 
-    root_index: u32
+    user_address: String,  
+    amount: Uint128
 ) -> Result<Response, StdError> {
     let config = CONFIG.load(deps.storage)?;
     let mut state = STATE.load(deps.storage)?;
-    let user_account =  info.sender.clone();
+    let user_account =  deps.api.addr_validate(&user_address)?;
     let mut user_info =  USERS.may_load(deps.storage, &user_account.clone() )?.unwrap_or_default();
 
-    // CHECK :  HAS USER ALREADY CLAIMED THEIR AIRDROP ? 
-    let mut claim_check = CLAIMEES.may_load(deps.storage, &user_account.to_string().as_bytes())?.unwrap_or_default();
-    if claim_check.is_claimed {
-        return Err(StdError::generic_err("Already claimed"));
-    }
-    claim_check.is_claimed = true;
-
-    // CHECK :: IS AIRDROP CLAIM WINDOW OPEN ? 
-    if config.from_timestamp > _env.block.time.seconds() {
-        return Err(StdError::generic_err("Claim not allowed"));
+    // CHECK :: Lockdrop deposit window open
+    if !is_deposit_open(env.block.time.seconds(), &config) {
+        return Err(StdError::generic_err("Deposit window closed"));
     }
 
-    // CHECK :: IS AIRDROP CLAIM WINDOW OPEN ? 
-    if config.till_timestamp < _env.block.time.seconds() {
-        return Err(StdError::generic_err("Claim period has concluded"));
-    }
-  
-    // MERKLE PROOF VERIFICATION
-    if !verify_claim(user_account.to_string() , claim_amount, merkle_proof.clone(), config.terra_merkle_roots[root_index as usize].clone()) {
-        return Err(StdError::generic_err("Incorrect Merkle Proof"));
+    // CHECK :: Lockdrop / Airdrop contract is the function call origin point
+    if info.sender != config.airdrop_contract_address && info.sender != config.lockdrop_contract_address {
+        return Err(StdError::generic_err("Unauthorized"));
     }
 
-    state.unclaimed_tokens = state.unclaimed_tokens - claim_amount;
-    user_info.airdrop_amount += claim_amount;
-    let mut messages_ = vec![];
+    // UPDATE STATE
+    state.total_astro_deposited += amount;
+    user_info.astro_delegated += amount;
 
-    // TRANSFER ASTRO IF CLAIMS ARE ALLOWED (i.e LP Boostrap auction has concluded)
-    if config.are_claims_allowed {
-        user_info.tokens_claimed = user_info.airdrop_amount - user_info.tokens_used_for_auction; 
-        messages_.push( build_send_cw20_token_msg(user_account.clone(), config.astro_token_address.to_string(), user_info.tokens_claimed.into())? );
-    }
-
-    // STATE UPDATE : SAVE UPDATED STATES
-    CLAIMEES.save(deps.storage, &user_account.to_string().as_bytes(), &claim_check)?;  
-    USERS.save(deps.storage, &user_account , &user_info)?;  
-    STATE.save( deps.storage, &state )?;
+    // SAVE UPDATED STATE
+    STATE.save(deps.storage, &state)?;
+    USERS.save(deps.storage, &user_account, &user_info)?;
 
     Ok(Response::new()        
     .add_messages(messages_)    
     .add_attributes(vec![
-        attr("action", "Airdrop::ExecuteMsg::ClaimByTerraUser"),
-        attr("claimee", user_account.to_string() ),
-        attr("airdrop", claim_amount)
+        attr("action", "Auction::ExecuteMsg::DelegateAstroTokens"),
+        attr("user", user_account.to_string() ),
+        attr("astro_delegated", amount)
     ]))
 }
 
 
-/// @dev Executes an airdrop claim by an EVM User
-/// @param eth_address : EVM address claiming the airdop. Needs to be in lower case without the `0x` prefix
-/// @param claim_amount : Airdrop amount claimed by the user
-/// @param merkle_proof : Array of hashes to prove the input is a leaf of the Merkle Tree
-/// @param root_index : Merkle Tree root identifier to be used for verification
-/// @param signature : ECDSA Signature string generated by signing the message (without the `0x` prefix and the last 2 characters which originate from `v`)
-/// @param signed_msg_hash : Keccak256 hash of the signed message following the ethereum prefix standard.(without the `0x` prefix) 
-/// https://web3js.readthedocs.io/en/v1.2.2/web3-eth-accounts.html#hashmessage
-pub fn handle_evm_user_claim( 
+
+
+/// @dev Facilitates UST deposits by users to be used for LP Bootstrapping via auction
+pub fn handle_deposit_ust( 
+    deps: DepsMut,
+    _env: Env, 
+    info: MessageInfo
+) -> Result<Response, StdError> {
+    let config = CONFIG.load(deps.storage)?;
+    let mut state = STATE.load(deps.storage)?;
+    let depositor_address = info.sender.clone();
+    let mut user_info =  USERS.may_load(deps.storage, &depositor_address.clone() )?.unwrap_or_default();
+
+    // Retrieve UST sent by the user
+    let deposit_amount = get_denom_amount_from_coins(&info.funds,  "uusd".to_string() );
+
+    // CHECK :: Lockdrop deposit window open
+    if !is_deposit_open(env.block.time.seconds(), &config) {
+        return Err(StdError::generic_err("Deposit window closed"));
+    }
+
+    // UPDATE STATE
+    state.total_ust_deposited += deposit_amount;
+    user_info.deposit_amount += deposit_amount;
+
+    // SAVE UPDATED STATE
+    STATE.save(deps.storage, &state)?;
+    USERS.save(deps.storage, &user_account, &user_info)?;
+
+    Ok(Response::new()        
+    .add_messages(messages_)    
+    .add_attributes(vec![
+        attr("action", "Auction::ExecuteMsg::DepositUst"),
+        attr("user", depositor_address.to_string() ),
+        attr("ust_deposited", deposit_amount)
+    ]))
+
+}
+
+
+
+
+/// @dev Facilitates UST withdrawals by users from their initial deposited balances
+/// @param amount : UST amounf being withdrawn
+pub fn handle_withdraw_ust( 
     deps: DepsMut,
     _env: Env, 
     info: MessageInfo,
-    eth_address: String, 
-    claim_amount: Uint128, 
-    merkle_proof: Vec<String>, 
-    root_index: u32,
-    signature: String, 
-    signed_msg_hash: String
+    amount: Uint128
 ) -> Result<Response, StdError> {
     let config = CONFIG.load(deps.storage)?;
     let mut state = STATE.load(deps.storage)?;
-    let recepient_account =  info.sender;
-    let mut user_info =  USERS.may_load(deps.storage, &recepient_account.clone() )?.unwrap_or_default();
+    let user_address = info.sender.clone();
+    let mut user_info =  USERS.may_load(deps.storage, &user_address.clone() )?.unwrap_or_default();
 
-    // CHECK :  HAS USER ALREADY CLAIMED THEIR AIRDROP ? 
-    let mut claim_check = CLAIMEES.may_load(deps.storage, &eth_address.as_bytes())?.unwrap_or_default();
-    if claim_check.is_claimed {
-        return Err(StdError::generic_err("Already claimed"));
-    }
-    claim_check.is_claimed = true;
-
-    // CHECK :: IS AIRDROP CLAIM WINDOW OPEN ? 
-    if config.from_timestamp > _env.block.time.seconds() {
-        return Err(StdError::generic_err("Claim not allowed"));
+    // Check :: Amount should be withing the allowed withdrawal limit bounds
+    let withdrawals_status = calculate_max_withdrawals_allowed(env.block.time.seconds(), &config);
+    let max_withdrawal_allowed = user_info.ust_deposited * withdrawals_status.max_withdrawal_percent;
+    if amount > max_withdrawal_allowed  {
+        return Err(StdError::generic_err("Amount exceeds maximum allowed withdrawal limit"));
     }
 
-    // CHECK :: IS AIRDROP CLAIM WINDOW OPEN ? 
-    if config.till_timestamp < _env.block.time.seconds() {
-        return Err(StdError::generic_err("Claim period has concluded"));
-    }
+    // UPDATE STATE
+    state.total_ust_deposited = state.total_ust_deposited - amount;
+    user_info.ust_deposited = user_info.ust_deposited - amount;
 
-    // MERKLE PROOF VERIFICATION
-    if !verify_claim(eth_address.clone() , claim_amount, merkle_proof.clone(), config.evm_merkle_roots[root_index as usize].clone()) {
-        return Err(StdError::generic_err("Incorrect Merkle Proof"));
-    }
-
-    // SIGNATURE VERIFICATION
-    let sig_verification_response = handle_verify_signature(deps.api,  eth_address.clone(), signature.clone(),  signed_msg_hash.clone());
-    if !sig_verification_response.is_valid {
-        return Err(StdError::generic_err("Invalid Signature"));
-    }
-
-    state.unclaimed_tokens = state.unclaimed_tokens - claim_amount;
-    user_info.airdrop_amount += claim_amount;
-    let mut messages_ = vec![];
-
-    // TRANSFER ASTRO IF CLAIMS ARE ALLOWED (i.e LP Boostrap auction has concluded)
-    if config.are_claims_allowed {
-        user_info.tokens_claimed = user_info.airdrop_amount - user_info.tokens_used_for_auction; 
-        messages_.push( build_send_cw20_token_msg(recepient_account.clone(), config.astro_token_address.to_string(), user_info.tokens_claimed.into())? );
-    }
-
-    // STATE UPDATE : SAVE UPDATED STATES
-    CLAIMEES.save(deps.storage, &eth_address.as_bytes(), &claim_check)?;    
-    USERS.save(deps.storage, &recepient_account , &user_info)?;  
-    STATE.save( deps.storage, &state )?;
+    // SAVE UPDATED STATE
+    STATE.save(deps.storage, &state)?;
+    USERS.save(deps.storage, &user_account, &user_info)?;
 
     Ok(Response::new()        
     .add_messages(messages_)    
     .add_attributes(vec![
-        attr("action", "Airdrop::ExecuteMsg::ClaimByEvmUser"),
-        attr("claimee", eth_address.to_string() ),
-        attr("recepient", recepient_account.to_string() ),
-        attr("airdrop", claim_amount.to_string() ),
+        attr("action", "Auction::ExecuteMsg::WithdrawUst"),
+        attr("user", user_address.to_string() ),
+        attr("ust_withdrawn", amount)
     ]))
 
 }
 
 
 
-/// @dev Function to allow users to delegate their ASTRO Tokens to the LP Bootstrap auction contract
+
+
+
+/// @dev Admin Function to allow users to delegate their ASTRO Tokens to the LP Bootstrap auction contract
 /// @param amount_to_delegate Amount of ASTRO to be delegate
-pub fn handle_delegate_astro_to_bootstrap_auction( 
+pub fn handle_add_liquidity_to_astroport_pool( 
     deps: DepsMut, 
     _env: Env, 
-    info: MessageInfo,
-    amount_to_delegate: Uint128
+    info: MessageInfo
 ) -> Result<Response, StdError> {
     let config = CONFIG.load(deps.storage)?;
     let mut state = STATE.load(deps.storage)?;
-    let mut user_info =  USERS.may_load(deps.storage, &info.sender.clone() )?.unwrap_or_default();
 
     state.tokens_used_for_auction += amount_to_delegate;
     user_info.tokens_used_for_auction += amount_to_delegate;
@@ -461,7 +421,7 @@ fn query_user_info(deps: Deps, user_address: String) -> StdResult<UserInfoRespon
 
 
 /// @dev Returns true if the user has claimed the airdrop [EVM addresses to be provided in lower-case without the '0x' prefix]
-fn query_user_claimed(deps: Deps, address: String  ) -> StdResult<ClaimResponse> {
+fn check_user_claimed(deps: Deps, address: String  ) -> StdResult<ClaimResponse> {
     let res = CLAIMEES.may_load(deps.storage, &address.as_bytes() )?.unwrap_or_default();
     Ok(ClaimResponse {  is_claimed: res.is_claimed }) 
 }
@@ -482,6 +442,77 @@ fn verify_signature(_deps: Deps, evm_address:String, evm_signature: String, sign
     }) 
 
 }
+
+
+
+
+//----------------------------------------------------------------------------------------
+// HELPERS
+//----------------------------------------------------------------------------------------
+
+/// true if deposits are allowed
+fn is_deposit_open(current_timestamp: u64, config: &Config) -> bool {
+    let deposits_opened_till = config.init_timestamp + config.deposit_window;
+    (config.init_timestamp <= current_timestamp) && (current_timestamp <= deposits_opened_till)
+}
+
+// native coins
+fn get_denom_amount_from_coins(coins: &[Coin], denom: &str) -> Uint256 {
+    coins
+        .iter()
+        .find(|c| c.denom == denom)
+        .map(|c| Uint256::from(c.amount))
+        .unwrap_or_else(Uint256::zero)
+}
+
+/// true if deposits are allowed
+fn calculate_max_withdrawals_allowed(current_timestamp: u64, config: &Config) -> WithdrawalStatus {
+    let withdrawal_cutoff_init_point = config.init_timestamp + config.deposit_window;
+    // 100% withdrawals allowed
+    if current_timestamp <= withdrawal_cutoff_init_point {
+        return  WithdrawalStatus {
+            max_withdrawal_percent: Decimal::from_ratio(100u128, 100u128),
+            update_withdrawal_counter: false
+        }
+    }
+
+    let withdrawal_cutoff_sec_point = withdrawal_cutoff_init_point + (config.withdrawal_window/2u64);
+    // 50% withdrawals allowed
+    if current_timestamp <= withdrawal_cutoff_sec_point {
+        return  WithdrawalStatus {
+            max_withdrawal_percent: Decimal::from_ratio(50u128, 100u128),
+            update_withdrawal_counter: true
+        }
+    }
+
+    let withdrawal_cutoff_final = withdrawal_cutoff_sec_point + (config.withdrawal_window/2u64);
+    // max withdrawal allowed decreasing linearly from 50% to 0% vs time elapsed
+    if current_timestamp < withdrawal_cutoff_final {
+        let slope = Decimal::from_ratio( 50u128, (config.withdrawal_window/2u64) );
+        let time_elapsed = current_timestamp - withdrawal_cutoff_sec_point;
+        return  WithdrawalStatus {
+            max_withdrawal_percent: time_elapsed * slope,
+            update_withdrawal_counter: true
+        }
+    }
+    // Withdrawals not allowed
+    else {
+        return  WithdrawalStatus {
+            max_withdrawal_percent: Decimal::from_ratio(0u128, 100u128),
+            update_withdrawal_counter: true
+        }
+    }
+}
+
+
+
+
+
+
+
+
+
+
 
 //----------------------------------------------------------------------------------------
 // Helper functions
@@ -928,7 +959,7 @@ fn build_delegate_tokens_to_auction_contract_msg(user_address: Addr, boostrap_au
 //         claim_f = execute(deps.as_mut(), env.clone(), user_info_1.clone(), claim_msg_wrong_amount.clone() );
 //         assert_generic_error_message(claim_f,"Incorrect Merkle Proof");
 
-//         let mut is_claimed = query_user_claimed(deps.as_ref(), "terra17lmam6zguazs5q5u6z5mmx76uj63gldnse2pdp".to_string() ).unwrap();
+//         let mut is_claimed = check_user_claimed(deps.as_ref(), "terra17lmam6zguazs5q5u6z5mmx76uj63gldnse2pdp".to_string() ).unwrap();
 //         assert_eq!(is_claimed.is_claimed, false );
 
 //         // **** Should process the airdrop successfully **** 
@@ -953,7 +984,7 @@ fn build_delegate_tokens_to_auction_contract_msg(user_address: Addr, boostrap_au
 //             }))]
 //         );
 
-//         is_claimed = query_user_claimed(deps.as_ref(), "terra17lmam6zguazs5q5u6z5mmx76uj63gldnse2pdp".to_string() ).unwrap();
+//         is_claimed = check_user_claimed(deps.as_ref(), "terra17lmam6zguazs5q5u6z5mmx76uj63gldnse2pdp".to_string() ).unwrap();
 //         assert_eq!(is_claimed.is_claimed, true );
 
 //         // ** "Already claimed" Error should be returned **
@@ -987,7 +1018,7 @@ fn build_delegate_tokens_to_auction_contract_msg(user_address: Addr, boostrap_au
 //         claim_f = execute(deps.as_mut(), env.clone(), user_info_2.clone(), claim_msg_wrong_amount.clone() );
 //         assert_generic_error_message(claim_f,"Incorrect Merkle Proof");
 
-//         is_claimed = query_user_claimed(deps.as_ref(), "terra1757tkx08n0cqrw7p86ny9lnxsqeth0wgp0em95".to_string() ).unwrap();
+//         is_claimed = check_user_claimed(deps.as_ref(), "terra1757tkx08n0cqrw7p86ny9lnxsqeth0wgp0em95".to_string() ).unwrap();
 //         assert_eq!(is_claimed.is_claimed, false );
 
 //         // **** Should process the airdrop successfully **** 
@@ -1012,7 +1043,7 @@ fn build_delegate_tokens_to_auction_contract_msg(user_address: Addr, boostrap_au
 //             }))]
 //         );
 
-//         is_claimed = query_user_claimed(deps.as_ref(), "terra1757tkx08n0cqrw7p86ny9lnxsqeth0wgp0em95".to_string() ).unwrap();
+//         is_claimed = check_user_claimed(deps.as_ref(), "terra1757tkx08n0cqrw7p86ny9lnxsqeth0wgp0em95".to_string() ).unwrap();
 //         assert_eq!(is_claimed.is_claimed, true );
 
 //         // ** "Already claimed" Error should be returned **
@@ -1146,7 +1177,7 @@ fn build_delegate_tokens_to_auction_contract_msg(user_address: Addr, boostrap_au
 //         assert_eq!(signature_response.is_valid, true );
 //         assert_eq!(signature_response.recovered_address, user_info_evm_address.to_string() );
 
-//         let mut is_claimed = query_user_claimed(deps.as_ref(), user_info_evm_address.to_string() ).unwrap();
+//         let mut is_claimed = check_user_claimed(deps.as_ref(), user_info_evm_address.to_string() ).unwrap();
 //         assert_eq!(is_claimed.is_claimed, false );
 
 //         // **** Should process the airdrop successfully **** 
@@ -1172,7 +1203,7 @@ fn build_delegate_tokens_to_auction_contract_msg(user_address: Addr, boostrap_au
 //             }))]
 //         );
         
-//         is_claimed = query_user_claimed(deps.as_ref(), user_info_evm_address.to_string() ).unwrap();
+//         is_claimed = check_user_claimed(deps.as_ref(), user_info_evm_address.to_string() ).unwrap();
 //         assert_eq!(is_claimed.is_claimed, true );
 
 //         // ** "Already claimed" Error should be returned **
