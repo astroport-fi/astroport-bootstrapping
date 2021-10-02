@@ -58,34 +58,53 @@ pub struct InstantiateMsg {
 pub enum ExecuteMsg {
     // Receive hook used to accept LP Token deposits
     ExecuteMsg::Receive(msg) => receive_cw20(deps, env, info, msg),
-    // Function to facilitate LP Token withdrawals from lockups
-    WithdrawLpToken {
-        duration: u64,
-        amount: Uint256,
-    },
-    // Delegate ASTRO to Bootstrap via auction contract
-    DelegateAstroToAuction {
-        amount: Uint256
-    },
-
-    // ADMIN Function ::: To Migrate liquidity for a terraswap pool
-    MigrateLiquidity {
-        lp_token_address: String,
-        astroport_pool_address: String,
-        astroport_lp_address: String,
-    }
-    // ADMIN Function ::: To stake LP Tokens with the guage generator contract
-    StakeLpTokens { 
-        lp_token_address: String,
-        generator_address: String
-    }
     // ADMIN Function ::: To update configuration
     UpdateConfig {
         new_config: UpdateConfigMsg,
     },
+    // ADMIN Function ::: Add new Pool
+    InitializePool {
+        lp_token_addr: String,
+        pool_addr: String,
+        incentives_percent: Decimal256,
+        pool_type: PoolType
+    }
 
+    // Function to facilitate LP Token withdrawals from lockups
+    WithdrawFromLockup {
+        duration: u64,
+        amount: Uint256,
+    },
+
+    // ADMIN Function ::: To Migrate liquidity from terraswap to astroport
+    MigrateLiquidity {
+        lp_token_address: String,
+        astroport_pool_address: String,
+        astroport_lp_address: String
+    }
+    // ADMIN Function ::: To stake LP Tokens with the guage generator contract
+    StakeLpTokens { 
+        lp_token_address: String,
+    }
+    // ADMIN Function ::: To unstake LP Tokens with the guage generator contract
+    UnstakeLpTokens { 
+        lp_token_address: String,
+    }
+
+    // Delegate ASTRO to Bootstrap via auction contract
+    DelegateAstroToAuction {
+        amount: Uint256
+    },
     // Facilitates ASTRO reward withdrawal which have not been delegated to bootstrap auction
     WithdrawAstroRewards {},
+    // Facilitates ASSET reward withdrawal which have not been delegated to bootstrap auction
+    WithdrawAssetRewards {},
+    // Unlocks a lockup position whose lockup duration has not concluded. user needs to approve ASTRO Token to
+    // be transferred by the lockdrop contract before calling this function
+    ForceUnlockPosition { 
+        lp_token_address: String,
+        duration: u64
+     },
     // Unlocks a lockup position whose lockup duration has concluded
     UnlockPosition { 
         lp_token_address: String,
@@ -95,20 +114,35 @@ pub enum ExecuteMsg {
     Callback(CallbackMsg),
 }
 
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Cw20HookMsg {
+    /// Open a new user position or add to an existing position (Cw20ReceiveMsg)
+    IncreaseLockup { user_address: String,
+                    lp_token_addr: String,
+                    duration: u64 
+                },
+}
+ 
+
+
+
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum CallbackMsg {
-    UpdateStateOnRedBankDeposit {
-        prev_ma_ust_balance: Uint256,
-    },
-    UpdateStateOnClaim {
-        user: Addr,
-        prev_xmars_balance: Uint256,
-    },
-    DissolvePosition {
-        user: Addr,
-        duration: u64,
-    },
+    // UpdateStateOnRedBankDeposit {
+    //     prev_ma_ust_balance: Uint256,
+    // },
+    // UpdateStateOnClaim {
+    //     user: Addr,
+    //     prev_xmars_balance: Uint256,
+    // },
+    // DissolvePosition {
+    //     user: Addr,
+    //     duration: u64,
+    // },
 }
 
 // Modified from
@@ -129,7 +163,7 @@ pub enum QueryMsg {
     Config {},
     State {},
     UserInfo { address: String },
-    LockUpInfo { address: String, duration: u64 },
+    LockUpInfo { user_address: String, lp_token_address: String, duration: u64 },
     LockUpInfoWithId { lockup_id: String },
 }
 
@@ -195,4 +229,22 @@ pub struct LockUpInfoResponse {
     pub lockdrop_reward: Uint256,
     /// Timestamp beyond which this position can be unlocked
     pub unlock_timestamp: u64,
+}
+
+
+
+
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum PoolType {
+    Terraswap { },
+    Astroport { },
+}
+
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct WithdrawalStatus {
+    pub max_withdrawal_percent: Decimal,
+    pub update_withdrawal_counter: bool,
 }
