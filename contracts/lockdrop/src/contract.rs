@@ -358,7 +358,7 @@ pub fn handle_withdraw_from_lockup(
     ASSET_POOLS.save(deps.storage, &pool_info)?;
 
     // COSMOS_MSG ::TRANSFER WITHDRAWN LP Tokens
-    let send_cw20_msg = build_send_cw20_token_msg(user_address.clone(), pool_info.lp_token_addr, amount)?;
+    let send_cw20_msg = build_transfer_cw20_token_msg(user_address.clone(), pool_info.lp_token_addr, amount)?;
 
     Ok(Response::new()
         .add_messages(vec![send_cw20_msg])
@@ -484,7 +484,7 @@ pub fn handle_force_unlock_position(
         cosmos_msgs.push(unstake_lp_msg);
     }
     // COSMOSMSG :: Returns LP units locked by the user in the current lockup position
-    let transfer_lp_msg = build_send_cw20_token_msg( user_address.clone(),  pool_info.lp_token_addr, lockup_info.lp_units_locked);
+    let transfer_lp_msg = build_transfer_cw20_token_msg( user_address.clone(),  pool_info.lp_token_addr, lockup_info.lp_units_locked);
     cosmos_msgs.push(transfer_lp_msg);
 
     let lp_withdrawn = lockup_info.lp_units_locked;
@@ -582,7 +582,7 @@ pub fn handle_stake_lp_tokens(
 
 
 
-// @dev Function to unstake LP Tokens from an existing Lockup position
+// @dev Function to unstake LP Tokens from the generator contract Lockup position
 pub fn handle_unstake_lp_tokens(
     deps: DepsMut,
     env: Env,
@@ -973,7 +973,7 @@ pub fn handle_unstake_lp_tokens(
 //     messages_.push(callback_dissolve_position_msg);
 
 //     // COSMOS MSG :: TRANSFER USER POSITION's MA-UST SHARE
-//     let maust_transfer_msg = build_send_cw20_token_msg(
+//     let maust_transfer_msg = build_transfer_cw20_token_msg(
 //         depositor_address.clone(),
 //         config.ma_ust_token,
 //         maust_unlocked,
@@ -1095,13 +1095,13 @@ pub fn handle_unstake_lp_tokens(
 //     // COSMOS MSG :: SEND MARS (LOCKDROP REWARD) IF > 0
 //     if total_mars_rewards > Uint256::zero() {
 //         let transfer_mars_msg =
-//             build_send_cw20_token_msg(user.clone(), mars_address, total_mars_rewards)?;
+//             build_transfer_cw20_token_msg(user.clone(), mars_address, total_mars_rewards)?;
 //         messages_.push(transfer_mars_msg);
 //     }
 //     // COSMOS MSG :: SEND X-MARS (DEPOSIT INCENTIVES) IF > 0
 //     if total_xmars_rewards > Uint256::zero() {
 //         let transfer_xmars_msg =
-//             build_send_cw20_token_msg(user.clone(), xmars_address, total_xmars_rewards)?;
+//             build_transfer_cw20_token_msg(user.clone(), xmars_address, total_xmars_rewards)?;
 //         messages_.push(transfer_xmars_msg);
 //     }
 
@@ -1487,7 +1487,7 @@ fn build_send_native_asset_msg(
     }))
 }
 
-fn build_send_cw20_token_msg(
+fn build_transfer_cw20_token_msg(
     recipient: Addr,
     token_contract_address: Addr,
     amount: Uint256,

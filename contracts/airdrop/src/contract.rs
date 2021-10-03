@@ -2,12 +2,14 @@
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{ 
     attr, Binary, Deps, Api, DepsMut, MessageInfo, Env, Response, 
-    StdError, StdResult, Uint128, WasmMsg, to_binary, Addr, CosmosMsg, 
+    StdError, StdResult, Uint128, to_binary, Addr
 };
 use astroport_periphery::airdrop::{UserInfoResponse, StateResponse, ConfigResponse, ClaimResponse, SignatureResponse, ExecuteMsg, InstantiateMsg, QueryMsg  } ;
+use astroport_periphery::lp_bootstrap_auction::Cw20HookMsg::{DelegateAstroTokens } ;
+use astroport_periphery::helpers::{build_transfer_cw20_token_msg,build_send_cw20_token_msg, option_string_to_addr } ;
+
 use crate::state::{Config, State, CONFIG, STATE, USERS, CLAIMEES};
 
-use cw20_base::msg::{ExecuteMsg as CW20ExecuteMsg };
 use sha3::{ Digest, Keccak256 };
 use std::cmp::Ordering;
 use std::convert::{TryInto};
@@ -186,7 +188,7 @@ pub fn handle_terra_user_claim(
     // TRANSFER ASTRO IF CLAIMS ARE ALLOWED (i.e LP Boostrap auction has concluded)
     if config.are_claims_allowed {
         user_info.tokens_claimed = user_info.airdrop_amount - user_info.tokens_used_for_auction; 
-        messages_.push( build_send_cw20_token_msg(user_account.clone(), config.astro_token_address.to_string(), user_info.tokens_claimed.into())? );
+        messages_.push( build_transfer_cw20_token_msg(user_account.clone(), config.astro_token_address.to_string(), user_info.tokens_claimed.into())? );
     }
 
     // STATE UPDATE : SAVE UPDATED STATES
@@ -263,7 +265,7 @@ pub fn handle_evm_user_claim(
     // TRANSFER ASTRO IF CLAIMS ARE ALLOWED (i.e LP Boostrap auction has concluded)
     if config.are_claims_allowed {
         user_info.tokens_claimed = user_info.airdrop_amount - user_info.tokens_used_for_auction; 
-        messages_.push( build_send_cw20_token_msg(recepient_account.clone(), config.astro_token_address.to_string(), user_info.tokens_claimed.into())? );
+        messages_.push( build_transfer_cw20_token_msg(recepient_account.clone(), config.astro_token_address.to_string(), user_info.tokens_claimed.into())? );
     }
 
     // STATE UPDATE : SAVE UPDATED STATES
@@ -310,14 +312,17 @@ pub fn handle_delegate_astro_to_bootstrap_auction(
     }
     
     // COSMOS MSG :: DELEGATE ASTRO TOKENS TO LP BOOTSTRAP AUCTION CONTRACT
-    let delegate_msg = build_delegate_tokens_to_auction_contract_msg(deps.api.addr_validate(&info.sender.to_string().clone())? , config.boostrap_auction_address.to_string(), amount_to_delegate.into())?;
+    let msg_ = to_binary(&DelegateAstroTokens {
+                                        user_address: info.sender.to_string().clone()
+                                    })?;
+    let delegate_msg = build_send_cw20_token_msg(config.boostrap_auction_address.to_string() , config.astro_token_address.to_string(), amount_to_delegate.into(), msg_)?;
 
     // STATE UPDATE : SAVE UPDATED STATES
     USERS.save(deps.storage, &info.sender , &user_info)?;  
     STATE.save( deps.storage, &state )?;
 
     Ok(Response::new()
-    .add_message(delegate_msg)        
+    .add_messages(vec![delegate_msg])        
     .add_attributes(vec![
         attr("action", "Airdrop::ExecuteMsg::DelegateAstroToBootstrapAuction"),
         attr("user", info.sender.to_string() ),
@@ -350,7 +355,7 @@ pub fn handle_withdraw_airdrop_rewards(
 
     // TRANSFER ASTRO IF CLAIMS ARE ALLOWED (i.e LP Boostrap auction has concluded)
     user_info.tokens_claimed = user_info.airdrop_amount - user_info.tokens_used_for_auction;
-    let transfer_msg = build_send_cw20_token_msg(info.sender.clone(), config.astro_token_address.to_string(), user_info.tokens_claimed.into())? ;    
+    let transfer_msg = build_transfer_cw20_token_msg(info.sender.clone(), config.astro_token_address.to_string(), user_info.tokens_claimed.into())? ;    
 
     USERS.save(deps.storage, &info.sender , &user_info)?;  
 
@@ -396,7 +401,7 @@ pub fn handle_transfer_unclaimed_tokens(
 
     // COSMOS MSG :: TRANSFER ASTRO TOKENS
     state.unclaimed_tokens = state.unclaimed_tokens - amount;
-    let transfer_msg = build_send_cw20_token_msg(deps.api.addr_validate(&recepient.clone())? , config.astro_token_address.to_string(), amount.into())?;
+    let transfer_msg = build_transfer_cw20_token_msg(deps.api.addr_validate(&recepient.clone())? , config.astro_token_address.to_string(), amount.into())?;
 
     Ok(Response::new()
     .add_message(transfer_msg)        
@@ -574,46 +579,6 @@ pub fn normalize_recovery_id(v: u8) -> u8 {
         v if v >= 35 => ((v - 1) % 2) as _,
         _ => 4,
     }
-}
-
-
-/// @dev Helper function which returns a cosmos wasm msg to transfer cw20 tokens to a recepient address 
-/// @param recipient : Address to be transferred cw20 tokens to
-/// @param token_contract_address : Contract address of the cw20 token to transfer
-/// @param amount : Number of tokens to transfer
-fn build_send_cw20_token_msg(recipient: Addr, token_contract_address: String, amount: Uint128) -> StdResult<CosmosMsg> {
-    Ok(CosmosMsg::Wasm(WasmMsg::Execute {
-        contract_addr: token_contract_address,
-        msg: to_binary(&CW20ExecuteMsg::Transfer {
-            recipient: recipient.into(),
-            amount: amount.into(),
-        })?,
-        funds: vec![],
-    }))
-}
-
-
-/// Used when unwrapping an optional address sent in a contract call by a user.
-/// Validates addreess if present, otherwise uses a given default value.
-pub fn option_string_to_addr( api: &dyn Api, option_string: Option<String>, default: Addr) -> StdResult<Addr> {
-    match option_string {
-        Some(input_addr) => api.addr_validate(&input_addr),
-        None => Ok(default),
-    }
-}
-
-
-
-/// TO DO
-fn build_delegate_tokens_to_auction_contract_msg(user_address: Addr, boostrap_auction_address: String, amount_to_delegate: Uint128) -> StdResult<CosmosMsg> {
-    Ok(CosmosMsg::Wasm(WasmMsg::Execute {
-        contract_addr: boostrap_auction_address,
-        msg: to_binary(&CW20ExecuteMsg::Transfer {
-            recipient: user_address.into(),
-            amount: amount_to_delegate.into(),
-        })?,
-        funds: vec![],
-    }))
 }
 
 

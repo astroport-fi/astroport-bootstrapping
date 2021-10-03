@@ -24,6 +24,7 @@ pub enum ExecuteMsg {
     UpdateConfig {
         new_config: InstantiateMsg,
     },
+    EnableClaims {},
     /// Allows Terra users to claim their ASTRO Airdrop 
     ClaimByTerraUser {
         claim_amount: Uint128,

@@ -1,7 +1,7 @@
 [workspace]
 members = [
     "contracts/airdrop", 
-    "contracts/lp_bootstrap_auction", 
+     "contracts/lp_bootstrap_auction", 
     "packages/*"
 ]
 
