@@ -4,7 +4,7 @@ use cosmwasm_std::{
     attr, Binary, Deps, Api, DepsMut, MessageInfo, Env, Response, 
     StdError, StdResult, Uint128, WasmMsg, to_binary, Addr, CosmosMsg, 
 };
-use crate::msg::{UserInfoResponse, StateResponse, ConfigResponse, ClaimResponse, SignatureResponse, ExecuteMsg, InstantiateMsg, QueryMsg  } ;
+use astroport_periphery::airdrop::{UserInfoResponse, StateResponse, ConfigResponse, ClaimResponse, SignatureResponse, ExecuteMsg, InstantiateMsg, QueryMsg  } ;
 use crate::state::{Config, State, CONFIG, STATE, USERS, CLAIMEES};
 
 use cw20_base::msg::{ExecuteMsg as CW20ExecuteMsg };

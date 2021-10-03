@@ -518,7 +518,6 @@ pub fn handle_force_unlock_position(
     ASSET_POOLS.save(deps.storage, &pool_info)?;
     STATE.save(deps.storage,  &state)?;
 
-
     Ok(Response::new()
         .add_messages(cosmos_msgs)
         .add_attributes(vec![
@@ -568,7 +567,6 @@ pub fn handle_stake_lp_tokens(
     }
     let stake_lp_msg = build_stake_with_generator_msg( config.generator_address.clone(),  pool_info.lp_token_addr, lp_balance_to_stake);
 
-
     // UPDATE STATE & SAVE
     pool_info.is_staked = true;
     ASSET_POOLS.save(deps.storage, &pool_info)?;
@@ -580,9 +578,56 @@ pub fn handle_stake_lp_tokens(
             ("lp_token_addr", &pool_info.lp_token_addr.to_string()),
             ("pool_type", pool_info.pool_type.),
             ("staked_amount", lp_balance_to_stake.to_string().as_str()),
-        ]))
+    ]))
 
 
+
+// @dev Function to unstake LP Tokens from an existing Lockup position
+pub fn handle_unstake_lp_tokens(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    lp_token_addr: String
+) -> StdResult<Response> {
+    let config = CONFIG.load(deps.storage)?;
+    let mut pool_info = ASSET_POOLS.may_load(deps.storage, deps.api.addr_validate(&lp_token_addr)? )?.unwrap_or_default();
+
+    // CHECK ::: Only owner can call this function
+    if info.sender != config.owner {
+        return Err(StdError::generic_err("Only owner can stake LP Tokens with generator"));
+    }
+
+    // CHECK :: LP Pool is supported or not 
+    if pool_info.lp_token_addr == zero_address() {
+        return Err(StdError::generic_err("Invalid LP Token Pool"));
+    }
+
+    // CHECK :: LP Pool is supported or not 
+    if !pool_info.is_staked  {
+        return Err(StdError::generic_err("Already not staked"));
+    }
+        
+    let mut lp_balance_to_unstake = Uint256::zero();
+
+    //  COSMOSMSG :: If LP Tokens are migrated, used LP after migration balance else use LP before migration balance
+    lp_balance_to_unstake = pool_info.total_lp_units_before_migration;
+    if pool_info.is_migrated {
+        lp_balance_to_unstake = pool_info.total_lp_units_after_migration;
+    }
+    let unstake_lp_msg = build_unstake_from_generator_msg( config.generator_address.clone(),  pool_info.lp_token_addr, lp_balance_to_unstake);
+
+    // UPDATE STATE & SAVE
+    pool_info.is_staked = false;
+    ASSET_POOLS.save(deps.storage, &pool_info)?;
+
+    Ok(Response::new()
+        .add_messages(vec![stake_lp_msg])
+        .add_attributes(vec![
+            ("action", "lockdrop::ExecuteMsg::UnstakeLPTokens"),
+            ("lp_token_addr", &pool_info.lp_token_addr.to_string()),
+            ("pool_type", pool_info.pool_type.),
+            ("unstaked_amount", lp_balance_to_unstake.to_string().as_str()),
+    ]))
 
 
 

@@ -16,10 +16,11 @@ pub struct InstantiateMsg {
 }
 
 
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
-    /// Admin function to update the configuration parameteres
+    /// Admin function to update the configuration parameters
     UpdateConfig {
         new_config: InstantiateMsg,
     },
@@ -52,6 +53,8 @@ pub enum ExecuteMsg {
     },
 }
 
+
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
@@ -67,6 +70,8 @@ pub enum QueryMsg {
         signed_msg_hash: String,                
      },
 }
+
+
 
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -111,4 +116,5 @@ pub struct SignatureResponse {
     pub public_key: String,
     pub recovered_address: String
 }
+
 

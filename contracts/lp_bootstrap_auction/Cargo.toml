@@ -1,10 +1,9 @@
 [package]
-name = "astro-airdrop"
-version = "0.1.0"
-authors = ["Alien hunter no. 42 <84127070+alienHunterOnMars@users.noreply.github.com>"]
+name = "astro-bootstrap-auction"
+version = "1.0.0"
+authors = ["alien Hunter <alienHunterOnMars@protonmail.com>"]
 edition = "2018"
-description = "Contract to facilitate ASTRO Token airdrop"
-license = "MIT"
+description = "Contract to facilitate ASTRO-UST LP Pool bootstrapping via auction"
 
 exclude = [
   # Those files are rust-optimizer artifacts. You might want to commit them for convenience but they should not be part of the source code publication.
@@ -35,14 +34,14 @@ backtraces = ["cosmwasm-std/backtraces"]
 library = []
 
 [dependencies]
+astroport =  { path = "../../packages/astroport" }
+astroport-periphery =  { path = "../../packages/astroport_periphery" }
+
 cosmwasm-std = { version = "0.16.0" }
 cw-storage-plus = { version = "0.8.0" }
 serde = { version = "1.0.127", default-features = false, features = ["derive"] }
 cw20-base = { version = "0.8", features = ["library"] }
 schemars = "0.8.3"
-
-hex = "0.4.3"
-sha3 = "0.9.1"
 
 [dev-dependencies]
 cosmwasm-schema = { version = "0.16.0" }

@@ -1,5 +1,10 @@
 [workspace]
-members = ["contracts/*"]
+members = [
+    "contracts/airdrop", 
+    "contracts/lp_bootstrap_auction", 
+    "packages/*"
+]
+
 
 [profile.release.package.astroport]
 opt-level = 3
@@ -7,6 +12,15 @@ debug = false
 debug-assertions = false
 codegen-units = 1
 incremental = false
+
+
+[profile.release.package.astroport-periphery]
+opt-level = 3
+debug = false
+debug-assertions = false
+codegen-units = 1
+incremental = false
+
 
 [profile.release]
 rpath = false
