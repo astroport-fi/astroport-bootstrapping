@@ -1,7 +1,7 @@
 use cosmwasm_bignumber::{Decimal256, Uint256};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use cosmwasm_std::{ Addr, CosmosMsg,WasmMsg , to_binary, StdResult};
+use cosmwasm_std::{ Addr, Decimal, CosmosMsg,WasmMsg , to_binary, StdResult};
 
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -41,7 +41,9 @@ pub enum ExecuteMsg {
     DepositUst { },
     WithdrawUst { amount: Uint256 },
 
-    AddLiquidityToAstroportPool { },
+    AddLiquidityToAstroportPool { 
+        slippage: Option<Decimal>
+    },
     StakeLpTokens {  } ,
 
     ClaimRewards { },
@@ -64,6 +66,9 @@ pub enum CallbackMsg {
         user_address: Addr,
         prev_astro_balance: Uint256,
     },
+    UpdateStateOnLiquidityAdditionToPool {
+        prev_lp_balance: Uint256
+    }
 }
 
 

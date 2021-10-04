@@ -92,6 +92,21 @@ pub fn cw20_get_balance(querier: &QuerierWrapper, token_address: Addr, balance_a
 }
 
 
+/// @dev Helper function which returns a cosmos wasm msg to approve held cs20 tokens to be transferrable by beneficiary address
+/// @param token_contract_address : Token contract address
+/// @param spender_address : Address to which allowance is being provided to, to allow it to transfer the tokens held by the contract 
+/// @param allowance_amount : Allowance amount
+pub fn build_approve_cw20_msg( token_contract_address: String, spender_address: String, allowance_amount: Uint128) -> StdResult<CosmosMsg> {
+    Ok(CosmosMsg::Wasm(WasmMsg::Execute {
+        contract_addr: token_contract_address,
+        msg: to_binary(&CW20ExecuteMsg::IncreaseAllowance {
+            spender: spender_address,
+            amount: allowance_amount.into(),
+            expires: None
+        })?,
+        funds: vec![],
+    }))
+}
 
 pub fn zero_address() -> Addr {
     Addr::unchecked("")
