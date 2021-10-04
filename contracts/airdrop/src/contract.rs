@@ -83,7 +83,7 @@ pub fn execute(
         ExecuteMsg::DelegateAstroToBootstrapAuction { 
             amount_to_delegate
         }  => handle_delegate_astro_to_bootstrap_auction(deps, env,  info, amount_to_delegate),
-        ExecuteMsg::EnableClaims {} => handle_enable_claims(deps, env,  info),
+        ExecuteMsg::EnableClaims {} => handle_enable_claims(deps,  info),
         ExecuteMsg::WithdrawAirdropReward {  }  => handle_withdraw_airdrop_rewards(deps, env,  info),
         ExecuteMsg::TransferUnclaimedTokens { 
             recepient, 
@@ -143,12 +143,12 @@ pub fn handle_update_config( deps: DepsMut, info: MessageInfo, new_config: Insta
 
 
 /// @dev Admin function to enable ASTRO Claims by users. Called along-with Bootstrap Auction contract's LP Pool provide liquidity tx 
-pub fn handle_enable_claims( deps: DepsMut, env:Env, info: MessageInfo) -> StdResult<Response> { 
+pub fn handle_enable_claims( deps: DepsMut,info: MessageInfo) -> StdResult<Response> { 
     let mut config = CONFIG.load(deps.storage)?;
     
     // CHECK :: ONLY AUCTION CONTRACT CAN CALL THIS FUNCTION
     if info.sender != config.boostrap_auction_address {    
-        return Err(StdError::generic_err("Only owner can update configuration"));
+        return Err(StdError::generic_err("Unauthorized"));
     }
 
     if config.are_claims_allowed {

@@ -9,8 +9,7 @@ use serde::{Deserialize, Serialize};
 pub const CONFIG: Item<Config> = Item::new("config");
 pub const STATE: Item<State> = Item::new("state");
 
-pub const ASSET_POOLS: Map<&Addr, PoolInfo> = Item::new("lp_assets");
-
+pub const ASSET_POOLS: Map<&Addr, PoolInfo> = Map::new("lp_assets");
 pub const USER_INFO: Map<&Addr, UserInfo> = Map::new("users");
 pub const LOCKUP_INFO: Map<&[u8], LockupInfo> = Map::new("lockup_position");
 
@@ -49,6 +48,8 @@ pub struct PoolInfo {
     pub lp_token_addr: Addr,
     /// Pool Address
     pub pool_addr: Addr,
+    /// Dual Reward Address
+    pub dual_reward_addr: Addr,
     /// % of total ASTRO incentives allocated to this pool
     pub incentives_percent: Decimal256,
     /// LP Token balance before liquidity migration to astroport 
@@ -56,7 +57,7 @@ pub struct PoolInfo {
     /// Astroport LP Token balance post liquidity migration to astroport 
     pub total_lp_units_after_migration: Uint256,
     /// Boolean value indicating if the LP Tokens are staked with the Generator contract or not
-    pub is_staked: Uint256,
+    pub is_staked: bool,
     /// Pool Type :: Astro or terra ? 
     pub pool_type: String,
     /// Boolean value indicating if the liquidity has been migrated or not 
@@ -112,9 +113,9 @@ pub struct UserInfo {
 impl Default for UserInfo {
     fn default() -> Self {
         UserInfo {
-            total_astro_reward: Uint256::zero(),
-            unclaimed_astro_reward: Uint256::zero(),
-            delegated_astro_reward: Uint256::zero(),
+            total_astro_rewards: Uint256::zero(),
+            unclaimed_astro_rewards: Uint256::zero(),
+            delegated_astro_rewards: Uint256::zero(),
             lockup_positions: vec![]
         }
     }
@@ -137,12 +138,17 @@ pub struct LockupInfo {
     pub withdrawal_counter: bool,
     /// Timestamp beyond which this position can be unlocked
     pub unlock_timestamp: u64,
+    /// Used to calculate user's pending ASTRO rewards from the generator (staking) contract 
+    pub astro_reward_index: Decimal256,
+    /// Used to calculate user's pending DUAL rewards from the generator (staking) contract 
+    pub dual_reward_index: Decimal256,
 }
 
 
 impl Default for LockupInfo {
     fn default() -> Self {
         LockupInfo {
+            pool_lp_token_addr: Addr::unchecked(""),
             duration: 0 as u64,
             lp_units_locked: Uint256::zero(),
             astro_rewards: Uint256::zero(),

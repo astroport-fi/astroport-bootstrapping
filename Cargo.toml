@@ -2,6 +2,7 @@
 members = [
     "contracts/airdrop", 
      "contracts/lp_bootstrap_auction", 
+     "contracts/lockdrop", 
     "packages/*"
 ]
 

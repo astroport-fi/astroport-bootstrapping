@@ -62,6 +62,7 @@ pub fn instantiate( deps: DepsMut, _env: Env, _info: MessageInfo, msg: Instantia
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute( deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg)  -> Result<Response, StdError> {
     match msg {
+        ExecuteMsg::Receive(msg) => receive_cw20(deps, env, info, msg),
         ExecuteMsg::UpdateConfig {  new_config  }  => handle_update_config(deps, info,  new_config),
 
         ExecuteMsg::DepositUst { } => handle_deposit_ust(deps, env, info ),       
@@ -71,7 +72,7 @@ pub fn execute( deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg)  ->
         ExecuteMsg::StakeLpTokens {  }  => handle_stake_lp_tokens(deps, env,  info),
 
         ExecuteMsg::ClaimRewards {  }  => handle_claim_rewards(deps, env,  info),
-        ExecuteMsg::WithdrawLpShares { amount }  => handle_withdraw_unlocked_lp_shares(deps, env,  info, amount),
+        ExecuteMsg::WithdrawLpShares {  }  => handle_withdraw_unlocked_lp_shares(deps, env,  info),
 
         ExecuteMsg::Callback(msg) => _handle_callback(deps, env, info, msg),
     }
@@ -366,7 +367,7 @@ pub fn handle_stake_lp_tokens( deps: DepsMut, _env: Env,  info: MessageInfo) -> 
     }
 
     //COSMOS MSG :: To stake LP Tokens to the Astroport generator contract
-    let stake_msg = build_stake_lp_msg(&config, state.lp_shares_minted)?;
+    let stake_msg = build_stake_with_generator_msg(&config, state.lp_shares_minted)?;
     state.are_staked = true;
     STATE.save(deps.storage, &state)?;
 
@@ -444,8 +445,7 @@ pub fn handle_claim_rewards(  deps: DepsMut, _env: Env,  info: MessageInfo) -> R
 pub fn handle_withdraw_unlocked_lp_shares( 
     deps: DepsMut,
     _env: Env, 
-    info: MessageInfo,
-    amount: Uint256
+    info: MessageInfo
 ) -> Result<Response, StdError> {
     let config = CONFIG.load(deps.storage)?;
     let mut state = STATE.load(deps.storage)?;
@@ -479,7 +479,7 @@ pub fn handle_withdraw_unlocked_lp_shares(
         }        
     }
 
-    // QUERY :: Current ASTRO Contract Balance
+    // QUERY :: Current ASTRO Token Balance
     // -->add CallbackMsg::UpdateStateOnRewardClaim{} msg to the cosmos msg array    
     let astro_balance: cw20::BalanceResponse = deps.querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
                                                                     contract_addr: config.astro_token_address.to_string(),
@@ -502,7 +502,7 @@ pub fn handle_withdraw_unlocked_lp_shares(
     // --> 1. Withdraw LP shares
     // --> 2. Transfer LP shares
     if state.are_staked { 
-        let unstake_lp_shares =  build_unstake_lp_msg(&config, lp_shares_to_withdraw)?;
+        let unstake_lp_shares =  build_unstake_from_generator_msg(&config, lp_shares_to_withdraw)?;
         cosmos_msgs.push(unstake_lp_shares);
 
     }
@@ -563,7 +563,7 @@ pub fn update_state_on_reward_claim( deps: DepsMut, _env: Env, user_address:Addr
     let mut user_info =  USERS.may_load(deps.storage, &user_address.clone() )?.unwrap_or_default();
 
     // QUERY CURRENT LP TOKEN BALANCE :: NEWLY MINTED LP TOKENS
-    let cur_astro_balance = cw20_get_balance(&deps.querier, config.lp_token_address.clone(), _env.contract.address )?;
+    let cur_astro_balance = cw20_get_balance(&deps.querier, config.astro_token_address.clone(), _env.contract.address )?;
     let astro_claimed = Uint256::from(cur_astro_balance) - prev_astro_balance;
 
     let mut user_astro_rewards = Uint256::zero();
@@ -758,7 +758,7 @@ fn is_deposit_open(current_timestamp: u64, config: &Config) -> bool {
 
 
 
-/// true if deposits are allowed
+/// 
 fn calculate_max_withdrawals_allowed(current_timestamp: u64, config: &Config) -> WithdrawalStatus {
     let withdrawal_cutoff_init_point = config.init_timestamp + config.deposit_window;
     // 100% withdrawals allowed
@@ -830,7 +830,7 @@ pub fn calculate_claimable_auction_reward_for_user(cur_timestamp:u64, config: &C
 
 
 /// Returns CosmosMsg struct to stake LP Tokens to the Generator contract
-pub fn build_stake_lp_msg(config: &Config, amount: Uint256) -> StdResult<CosmosMsg> {
+pub fn build_stake_with_generator_msg(config: &Config, amount: Uint256) -> StdResult<CosmosMsg> {
     Ok(CosmosMsg::Wasm(WasmMsg::Execute {
         contract_addr: config.lp_staking_contract.to_string(),
         msg: to_binary(&astroport::generator::ExecuteMsg::Deposit {
@@ -843,7 +843,7 @@ pub fn build_stake_lp_msg(config: &Config, amount: Uint256) -> StdResult<CosmosM
 
 
 /// Returns CosmosMsg struct to withdraw staked LP Tokens from the Generator contract
-pub fn build_unstake_lp_msg(config: &Config, lp_shares_to_withdraw: Uint256) -> StdResult<CosmosMsg> {
+pub fn build_unstake_from_generator_msg(config: &Config, lp_shares_to_withdraw: Uint256) -> StdResult<CosmosMsg> {
     Ok(CosmosMsg::Wasm(WasmMsg::Execute {
         contract_addr: config.lp_staking_contract.to_string(),
         msg: to_binary(&astroport::generator::ExecuteMsg::Withdraw {

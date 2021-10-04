@@ -49,6 +49,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "astroport-lockdrop"
+version = "1.0.0"
+dependencies = [
+ "astroport",
+ "astroport-periphery",
+ "cosmwasm-bignumber",
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cw-storage-plus",
+ "cw20",
+ "schemars",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "astroport-periphery"
 version = "1.0.0"
 dependencies = [

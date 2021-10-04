@@ -2,7 +2,7 @@ use cosmwasm_bignumber::{Decimal256, Uint256};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use cosmwasm_std::{ Addr, Decimal, CosmosMsg,WasmMsg , to_binary, StdResult};
-
+use cw20::Cw20ReceiveMsg;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InstantiateMsg {
@@ -34,6 +34,7 @@ pub struct UpdateConfigMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
+    Receive(Cw20ReceiveMsg),
     UpdateConfig {
         new_config: UpdateConfigMsg,
     },
@@ -47,7 +48,7 @@ pub enum ExecuteMsg {
     StakeLpTokens {  } ,
 
     ClaimRewards { },
-    WithdrawLpShares { amount: Uint256 },
+    WithdrawLpShares { },
     Callback(CallbackMsg),
 }
 
