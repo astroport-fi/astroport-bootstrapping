@@ -21,6 +21,20 @@ pub fn build_transfer_cw20_token_msg(recipient: Addr, token_contract_address: St
 }
 
 
+/// Helper Function. Returns CosmosMsg which transfers CW20 Tokens from owner to recepient. (Transfers ASTRO from user to itself )
+pub fn build_transfer_cw20_from_user_msg(cw20_token_address: String, owner:String, recepient: String, amount: Uint256) -> StdResult<CosmosMsg> {
+    Ok(CosmosMsg::Wasm(WasmMsg::Execute {
+        contract_addr: cw20_token_address.to_string(),
+        funds: vec![],
+        msg: to_binary(&cw20::Cw20ExecuteMsg::TransferFrom {
+            owner: owner,
+            recipient: recepient,
+            amount: amount.into()
+        })?,
+    }))
+}
+
+
 /// @dev Helper function which returns a cosmos wasm msg to send cw20 tokens to another contract which implements the ReceiveCW20 Hook 
 /// @param recipient_contract_addr : Contract Address to be transferred cw20 tokens to
 /// @param token_contract_address : Contract address of the cw20 token to transfer

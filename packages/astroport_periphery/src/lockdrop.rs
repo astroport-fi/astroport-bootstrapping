@@ -107,10 +107,10 @@ pub enum ExecuteMsg {
      },
     // Unlocks a lockup position whose lockup duration has not concluded. user needs to approve ASTRO Token to
     // be transferred by the lockdrop contract before calling this function
-    // ForceUnlockPosition { 
-    //     lp_token_address: String,
-    //     duration: u64
-    //  },
+    ForceUnlockPosition { 
+        lp_token_address: String,
+        duration: u64
+     },
     /// Callbacks; only callable by the contract itself.
     Callback(CallbackMsg)
 }
@@ -122,7 +122,7 @@ pub enum ExecuteMsg {
 #[serde(rename_all = "snake_case")]
 pub enum Cw20HookMsg {
     /// Open a new user position or add to an existing position (Cw20ReceiveMsg)
-    IncreaseLockup { user_address: String,
+    IncreaseLockup { user_address: Addr,
                     lp_token_addr: String,
                     duration: u64 
                 }
@@ -141,12 +141,9 @@ pub enum CallbackMsg {
     WithdrawUserLockupRewardsCallback {
         user_address: Addr,
         lp_token_addr: Addr,
-        duration: u64
+        duration: u64,
+        withdraw_lp_stake: bool
     },
-    // DissolvePosition {
-    //     user: Addr,
-    //     duration: u64,
-    // },
 }
 
 // Modified from
@@ -169,6 +166,7 @@ impl CallbackMsg {
 pub enum QueryMsg {
     Config {},
     State {},
+    Pool { lp_token_addr: String },
     UserInfo { address: String },
     LockUpInfo { user_address: String, lp_token_address: String, duration: u64 },
     LockUpInfoWithId { lockup_id: String },
@@ -178,64 +176,110 @@ pub enum QueryMsg {
 pub struct ConfigResponse {
     /// Account who can update config
     pub owner: String,
-    /// Contract used to query addresses related to red-bank (MARS Token)
-    pub address_provider: String,
-    ///  maUST token address - Minted upon UST deposits into red bank
-    pub ma_ust_token: String,
-    /// Timestamp till when deposits can be made
+    /// Bootstrap Auction contract address
+    pub auction_contract_address: String,
+    /// Generator (ASTRO-UST Staking) contract address
+    pub generator_address: String,
+    /// ASTRO Token address
+    pub astro_token_address: String,
+    /// Timestamp when Contract will start accepting LP Token deposits
     pub init_timestamp: u64,
-    /// Number of seconds for which lockup deposits will be accepted
+    /// Deposit Window Length
     pub deposit_window: u64,
-    /// Number of seconds for which lockup withdrawals will be allowed
+    /// Withdrawal Window Length :: Post the deposit window
     pub withdrawal_window: u64,
     /// Min. no. of weeks allowed for lockup
-    pub min_duration: u64,
+    pub min_lock_duration: u64,
     /// Max. no. of weeks allowed for lockup
-    pub max_duration: u64,
+    pub max_lock_duration: u64,
+    /// Number of seconds per week
+    pub seconds_per_week: u64,
     /// Lockdrop Reward multiplier
-    pub multiplier: Decimal256,
-    /// Total MARS lockdrop incentives to be distributed among the users
+    pub weekly_multiplier: Decimal256,
+    /// Total ASTRO lockdrop incentives to be distributed among the users
     pub lockdrop_incentives: Uint256,
+
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct GlobalStateResponse {
-    /// Total UST deposited at the end of Lockdrop window. This value remains unchanged post the lockdrop window
-    pub final_ust_locked: Uint256,
-    /// maUST minted at the end of Lockdrop window upon UST deposit in red bank. This value remains unchanged post the lockdrop window
-    pub final_maust_locked: Uint256,
-    /// UST deposited in the contract. This value is updated real-time upon each UST deposit / unlock
-    pub total_ust_locked: Uint256,
-    /// maUST held by the contract. This value is updated real-time upon each maUST withdrawal from red bank
-    pub total_maust_locked: Uint256,
-    /// Total weighted deposits
-    pub total_deposits_weight: Uint256,
-    /// Ratio of MARS rewards accured to total_maust_locked. Used to calculate MARS incentives accured by each user
-    pub global_reward_index: Decimal256,
+pub struct StateResponse {
+    /// ASTRO Tokens delegated to the bootstrap auction contract
+    pub total_astro_delegated: Uint256,
+    /// ASTRO returned to forcefully unlock Lockup positions
+    pub total_astro_returned: Uint256,
+    /// Boolean value indicating if the user can withdraw thier ASTRO rewards or not
+    pub are_claims_allowed: bool,
+    /// Vector containing LP addresses for all the supported LP Pools
+    pub supported_lp_tokens: Vec<String>,
 }
+
+
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct PoolResponse {
+    /// LP Token Address
+    pub lp_token_addr: Addr,
+    /// Pool Address
+    pub pool_addr: Addr,
+    /// Dual Reward Address
+    pub dual_reward_addr: Addr,
+    /// % of total ASTRO incentives allocated to this pool
+    pub incentives_percent: Decimal256,
+    /// LP Token balance before liquidity migration to astroport 
+    pub total_lp_units_before_migration: Uint256,
+    /// Astroport LP Token balance post liquidity migration to astroport 
+    pub total_lp_units_after_migration: Uint256,
+    /// Boolean value indicating if the LP Tokens are staked with the Generator contract or not
+    pub is_staked: bool,
+    /// Pool Type :: Astro or terra ? 
+    pub pool_type: String,
+    /// Boolean value indicating if the liquidity has been migrated or not 
+    pub is_migrated: bool,
+    /// Weighted LP Token balance used to calculate ASTRO rewards a particular user can claim
+    pub weighted_amount: Uint256,
+    /// Ratio of ASTRO rewards accured to total_lp_deposited. Used to calculate ASTRO incentives accured by each user
+    pub astro_global_reward_index: Decimal256,
+    /// Ratio of ASSET rewards accured to total_lp_deposited. Used to calculate ASSET incentives accured by each user
+    pub asset_global_reward_index: Decimal256,
+}
+
+
+
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct UserInfoResponse {
-    pub total_ust_locked: Uint256,
-    pub total_maust_locked: Uint256,
-    pub lockup_position_ids: Vec<String>,
-    pub is_lockdrop_claimed: bool,
-    pub reward_index: Decimal256,
-    pub pending_xmars: Uint256,
+    /// Total ASTRO tokens user received as rewards for participation in the lockdrop
+    pub total_astro_rewards: Uint256,
+    /// Total ASTRO tokens user can still withdraw 
+    pub unclaimed_astro_rewards: Uint256,
+    /// Total ASTRO tokens user delegated to the LP bootstrap auction pool 
+    pub delegated_astro_rewards: Uint256,
+    /// Contains lockup Ids of the User's lockup positions with different pools having different durations / deposit amounts
+    pub lockup_positions: Vec<String>,
 }
+
+
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct LockUpInfoResponse {
+    /// LP Pool identifer whose LP tokens this Lockdrop position accounts for 
+    pub pool_lp_token_addr: Addr,
     /// Lockup Duration
     pub duration: u64,
     /// UST locked as part of this lockup position
-    pub ust_locked: Uint256,
-    /// MA-UST share
-    pub maust_balance: Uint256,
-    /// Lockdrop incentive distributed to this position
-    pub lockdrop_reward: Uint256,
+    pub lp_units_locked: Uint256,
+    /// UST locked as part of this lockup position
+    pub astro_rewards: Uint256,
+    /// Boolean value indicating if the user's LP units have been updated post liquidity migration
+    pub is_migrated: bool,
+    /// Boolean value indicating if the user's has withdrawn funds post the only 1 withdrawal limit cutoff
+    pub withdrawal_counter: bool,
     /// Timestamp beyond which this position can be unlocked
     pub unlock_timestamp: u64,
+    /// Used to calculate user's pending ASTRO rewards from the generator (staking) contract 
+    pub astro_reward_index: Decimal256,
+    /// Used to calculate user's pending DUAL rewards from the generator (staking) contract 
+    pub dual_reward_index: Decimal256,
 }
 
 

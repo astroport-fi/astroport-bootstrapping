@@ -2,7 +2,7 @@ use cosmwasm_std::Addr;
 use cw_storage_plus::{Item, Map};
 
 use cosmwasm_bignumber::{Decimal256, Uint256};
-
+use astroport_periphery::helpers::zero_address;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -42,6 +42,25 @@ pub struct Config {
 }
 
 
+
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct State {
+    /// ASTRO Tokens delegated to the bootstrap auction contract
+    pub total_astro_delegated: Uint256,
+    /// ASTRO returned to forcefully unlock Lockup positions
+    pub total_astro_returned: Uint256,
+    /// Boolean value indicating if the user can withdraw thier ASTRO rewards or not
+    pub are_claims_allowed: bool,
+    /// Vector containing LP addresses for all the supported LP Pools
+    pub supported_lp_tokens: Vec<String>,
+}
+
+
+
+
+
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct PoolInfo {
     /// LP Token Address
@@ -76,25 +95,21 @@ impl Default for PoolInfo {
         PoolInfo {
             lp_token_addr: zero_address(),
             pool_addr: zero_address(),
-            delegated_astro_reward: Uint256::zero(),
-            lockup_positions: vec![]
+            dual_reward_addr: zero_address(),
+            incentives_percent: Decimal256::zero(),
+            total_lp_units_before_migration: Uint256::zero(),
+            total_lp_units_after_migration: Uint256::zero(),
+            is_staked: false,
+            pool_type: "terraswap".to_string(),
+            is_migrated: false,
+            weighted_amount: Uint256::zero(),
+            astro_global_reward_index: Decimal256::zero(),
+            asset_global_reward_index: Decimal256::zero()
         }
     }
 }
 
 
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct State {
-    /// ASTRO Tokens delegated to the bootstrap auction contract
-    pub total_astro_delegated: Uint256,
-    /// ASTRO returned to forcefully unlock Lockup positions
-    pub total_astro_returned: Uint256,
-    /// Boolean value indicating if the user can withdraw thier ASTRO rewards or not
-    pub are_claims_allowed: bool,
-    /// Vector containing LP addresses for all the supported LP Pools
-    pub supported_lp_tokens: Vec<String>,
-}
 
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -155,6 +170,8 @@ impl Default for LockupInfo {
             is_migrated: false,
             withdrawal_counter: false,
             unlock_timestamp: 0 as u64,
+            astro_reward_index: Decimal256::zero(),
+            dual_reward_index: Decimal256::zero(),
         }
     }
 }
