@@ -77,11 +77,11 @@ pub enum ExecuteMsg {
     },
 
     // ADMIN Function ::: To Migrate liquidity from terraswap to astroport
-    // MigrateLiquidity {
-    //     lp_token_address: String,
-    //     astroport_pool_address: String,
-    //     astroport_lp_address: String
-    // },
+    MigrateLiquidity {
+        lp_token_address: String,
+        astroport_pool_address: String,
+        astroport_lp_address: String
+    },
     // ADMIN Function ::: To stake LP Tokens with the guage generator contract
     StakeLpTokens { 
         lp_token_address: String,
@@ -122,10 +122,7 @@ pub enum ExecuteMsg {
 #[serde(rename_all = "snake_case")]
 pub enum Cw20HookMsg {
     /// Open a new user position or add to an existing position (Cw20ReceiveMsg)
-    IncreaseLockup { user_address: Addr,
-                    lp_token_addr: String,
-                    duration: u64 
-                }
+    IncreaseLockup {   duration: u64  }
 }
  
 
