@@ -94,17 +94,17 @@ pub enum ExecuteMsg {
         pool_identifer: String,
         duration: u64
     },
-    // // Unlocks a lockup position whose lockup duration has concluded
-    // UnlockPosition { 
-    //     pool_identifer: String,
-    //     duration: u64
-    //  },
-    // // Unlocks a lockup position whose lockup duration has not concluded. user needs to approve ASTRO Token to
-    // // be transferred by the lockdrop contract before calling this function
-    // ForceUnlockPosition { 
-    //     pool_identifer: String,
-    //     duration: u64
-    //  },
+    // Unlocks a lockup position whose lockup duration has concluded
+    UnlockPosition { 
+        pool_identifer: String,
+        duration: u64
+     },
+    // Unlocks a lockup position whose lockup duration has not concluded. user needs to approve ASTRO Token to
+    // be transferred by the lockdrop contract before calling this function
+    ForceUnlockPosition { 
+        pool_identifer: String,
+        duration: u64
+     },
     /// Callbacks; only callable by the contract itself.
     Callback(CallbackMsg)
 }
@@ -133,7 +133,8 @@ pub enum CallbackMsg {
         user_address: Addr,
         pool_identifer: String,
         duration: u64,
-        withdraw_lp_stake: bool
+        withdraw_lp_stake: bool,
+        force_unlock: bool
     },
     WithdrawLiquidityFromTerraswapCallback {
         pool_identifer: String,
@@ -166,16 +167,16 @@ impl CallbackMsg {
 
 
 
-// #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-// #[serde(rename_all = "snake_case")]
-// pub enum QueryMsg {
-//     Config {},
-//     State {},
-//     Pool { pool_identifier: String },
-//     UserInfo { address: String },
-//     LockUpInfo { user_address: String, pool_identifier: String, duration: u64 },
-//     LockUpInfoWithId { lockup_id: String },
-// }
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum QueryMsg {
+    Config {},
+    State {},
+    Pool { pool_identifier: String },
+    UserInfo { address: String },
+    LockUpInfo { user_address: String, pool_identifier: String, duration: u64 },
+    LockUpInfoWithId { lockup_id: String },
+}
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct ConfigResponse {
