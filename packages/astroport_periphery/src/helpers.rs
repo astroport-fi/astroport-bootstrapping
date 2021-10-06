@@ -1,8 +1,8 @@
-use cosmwasm_std::{Coin, Addr, QuerierWrapper, QueryRequest, BankMsg, Deps, Api, WasmQuery, Binary, CosmosMsg, StdResult, Uint128, WasmMsg, to_binary};
+use cosmwasm_std::{Coin, BankQuery, BalanceResponse, Addr, QuerierWrapper, QueryRequest, BankMsg, Deps, Api, WasmQuery, Binary, CosmosMsg, StdResult, Uint128, WasmMsg, to_binary};
 use cw20_base::msg::{ExecuteMsg as CW20ExecuteMsg, QueryMsg as Cw20QueryMsg};
 use cosmwasm_bignumber::{Decimal256, Uint256};
 use crate::tax::{deduct_tax};
-use cw20::BalanceResponse;
+use cw20::BalanceResponse as CW20BalanceResponse;
 
 
 /// @dev Helper function which returns a cosmos wasm msg to transfer cw20 tokens to a recepient address 
@@ -94,11 +94,11 @@ pub fn get_denom_amount_from_coins(coins: &[Coin], denom: &str) -> Uint256 {
 }
 
 // CW20
-pub fn cw20_get_balance(querier: &QuerierWrapper, token_address: Addr, balance_address: Addr) -> StdResult<Uint128> {
-    let query: BalanceResponse = querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
+pub fn cw20_get_balance(querier: &QuerierWrapper, token_address: Addr, account_addr: Addr) -> StdResult<Uint128> {
+    let query: CW20BalanceResponse = querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
         contract_addr: token_address.into(),
         msg: to_binary(&Cw20QueryMsg::Balance {
-            address: balance_address.into(),
+            address: account_addr.into(),
         })?,
     }))?;
 
@@ -126,3 +126,23 @@ pub fn zero_address() -> Addr {
     Addr::unchecked("")
 }
 
+pub fn query_balance(
+    querier: &QuerierWrapper,
+    account_addr: Addr,
+    denom: String,
+) -> StdResult<Uint128> {
+    let balance: BalanceResponse = querier.query(&QueryRequest::Bank(BankQuery::Balance {
+        address: String::from(account_addr),
+        denom,
+    }))?;
+    Ok(balance.amount.amount)
+}
+
+
+// Returns true if the user_info stuct's lockup_positions vector contains the lockup_id
+pub fn is_str_present_in_vec(vector_struct: Vec<String>, string_: String) -> bool {
+    if vector_struct.iter().any(|id| id == &string_) {
+        return true;
+    }
+    false
+}

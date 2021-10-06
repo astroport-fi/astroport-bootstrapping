@@ -18,7 +18,6 @@ use crate::state::{Config, State,UserInfo, CONFIG, STATE, USERS};
 use astroport_periphery::airdrop::ExecuteMsg::{EnableClaims as AirdropEnableClaims};
 use astroport_periphery::lockdrop::ExecuteMsg::{EnableClaims as LockdropEnableClaims};
 
-use cw20_base::msg::{ExecuteMsg as CW20ExecuteMsg };
 use cw20::Cw20ReceiveMsg;
 
 //----------------------------------------------------------------------------------------
