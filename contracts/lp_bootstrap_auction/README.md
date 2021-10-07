@@ -24,8 +24,7 @@ The LP Bootstrap via auction contract facilitates ASTRO-UST Astroport pool initi
 | ----------------------------- | --------------------------------------------------------------------------------------------------- |
 | `ExecuteMsg::Receive`   |  ReceiveCW20 Hook which facilitates ASTRO tokens delegation by lockdrop participants / airdrop recepients               |
 | `ExecuteMsg::UpdateConfig`    | Admin function to update any of the configuration parameters.                                      |
-
-| `ExecuteMsg::DepositUst`    | Facilitates UST deposits by users                                                                     |
+| `ExecuteMsg::DepositUst`      | Facilitates UST deposits by users                                                                     |
 | `ExecuteMsg::WithdrawUst`    | Facilitates UST withdrawals by users. 100% amount can be withdrawn during deposit window, which is then limited to 50% during 1st half of deposit window which then decreases linearly during 2nd half of deposit window. Only 1 withdrawal can be made by a user during the withdrawal window                                                 |
 | `ExecuteMsg::AddLiquidityToAstroportPool` | Admin function which facilitates Liquidity addtion to the Astroport ASTRO-UST Pool. Uses CallbackMsg to update state post liquidity addition to the pool |
 | `ExecuteMsg::StakeLpTokens`          | Facilitates ASTRO withdrawal for airdrop recepients once claims are allowed      |
