@@ -615,7 +615,7 @@ pub fn handle_delegate_astro_to_auction(
     USER_INFO.save(deps.storage, &user_address, &user_info)?;
 
     // COSMOS_MSG ::Delegate ASTRO to the LP Bootstrapping via Auction contract
-    let msg_ = to_binary(&DelegateAstroTokens {   user_address: info.sender.to_string().clone()  })?;
+    let msg_ = to_binary(&DelegateAstroTokens {   user_address: info.sender.clone()  })?;
     let delegate_msg = build_send_cw20_token_msg(config.auction_contract_address.to_string() , config.astro_token_address.to_string(), amount.into(), msg_)?;
 
     Ok(Response::new()
@@ -1029,7 +1029,7 @@ pub fn callback_withdraw_user_rewards_for_lockup_optional_withdraw(
             let mut state = STATE.load(deps.storage)?;
             let transfer_astro_msg = build_transfer_cw20_from_user_msg(config.astro_token_address.clone().to_string(), user_address.clone().to_string(), env.contract.address.to_string(), lockup_info.astro_rewards )?;
             state.total_astro_returned += lockup_info.astro_rewards;
-            STATE.save(deps.storage, &state);
+            STATE.save(deps.storage, &state)?;
             cosmos_msgs.push(transfer_astro_msg);    
         }
 
@@ -1247,7 +1247,7 @@ pub fn query_pool(deps: Deps, pool_identifer:String) -> StdResult<PoolResponse> 
 
 
 /// @dev Returns summarized details regarding the user
-pub fn query_user_info(deps: Deps, env: Env, user: String) -> StdResult<UserInfoResponse> {
+pub fn query_user_info(deps: Deps, _env: Env, user: String) -> StdResult<UserInfoResponse> {
     let user_address = deps.api.addr_validate(&user)?;
     let user_info = USER_INFO.may_load(deps.storage, &user_address.clone())?.unwrap_or_default();
 

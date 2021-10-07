@@ -340,7 +340,7 @@ pub fn handle_delegate_astro_to_bootstrap_auction(
     
     // COSMOS MSG :: DELEGATE ASTRO TOKENS TO LP BOOTSTRAP AUCTION CONTRACT
     let msg_ = to_binary(&DelegateAstroTokens {
-                                        user_address: info.sender.to_string().clone()
+                                        user_address: info.sender.clone()
                                     })?;
     let delegate_msg = build_send_cw20_token_msg(config.boostrap_auction_address.to_string() , config.astro_token_address.to_string(), amount_to_delegate.into(), msg_)?;
 
