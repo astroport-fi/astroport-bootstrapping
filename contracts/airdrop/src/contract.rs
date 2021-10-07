@@ -45,7 +45,7 @@ pub fn instantiate(
 
     let state = State {
         total_airdrop_size: msg.total_airdrop_size,
-        tokens_used_for_auction: Uint128::zero(),
+        total_delegated_amount: Uint128::zero(),
         unclaimed_tokens: msg.total_airdrop_size
     };
 
@@ -142,7 +142,7 @@ pub fn handle_update_config( deps: DepsMut, info: MessageInfo, new_config: Insta
 }
 
 
-/// @dev Admin function to enable ASTRO Claims by users. Called along-with Bootstrap Auction contract's LP Pool provide liquidity tx 
+/// @dev Function to enable ASTRO Claims by users. Called along-with Bootstrap Auction contract's LP Pool provide liquidity tx 
 pub fn handle_enable_claims( deps: DepsMut,info: MessageInfo) -> StdResult<Response> { 
     let mut config = CONFIG.load(deps.storage)?;
     
@@ -207,8 +207,8 @@ pub fn handle_terra_user_claim(
 
     // TRANSFER ASTRO IF CLAIMS ARE ALLOWED (i.e LP Boostrap auction has concluded)
     if config.are_claims_allowed {
-        user_info.tokens_claimed = user_info.airdrop_amount - user_info.tokens_used_for_auction; 
-        messages_.push( build_transfer_cw20_token_msg(user_account.clone(), config.astro_token_address.to_string(), user_info.tokens_claimed.into())? );
+        let amount_to_withdraw= user_info.airdrop_amount - user_info.delegated_amount; 
+        messages_.push( build_transfer_cw20_token_msg(user_account.clone(), config.astro_token_address.to_string(), amount_to_withdraw.into())? );
     }
 
     // STATE UPDATE : SAVE UPDATED STATES
@@ -284,8 +284,8 @@ pub fn handle_evm_user_claim(
 
     // TRANSFER ASTRO IF CLAIMS ARE ALLOWED (i.e LP Boostrap auction has concluded)
     if config.are_claims_allowed {
-        user_info.tokens_claimed = user_info.airdrop_amount - user_info.tokens_used_for_auction; 
-        messages_.push( build_transfer_cw20_token_msg(recepient_account.clone(), config.astro_token_address.to_string(), user_info.tokens_claimed.into())? );
+        let amount_to_withdraw= user_info.airdrop_amount - user_info.delegated_amount; 
+        messages_.push( build_transfer_cw20_token_msg(recepient_account.clone(), config.astro_token_address.to_string(), amount_to_withdraw.into())? );
     }
 
     // STATE UPDATE : SAVE UPDATED STATES
@@ -315,19 +315,26 @@ pub fn handle_delegate_astro_to_bootstrap_auction(
     amount_to_delegate: Uint128
 ) -> Result<Response, StdError> {
     let config = CONFIG.load(deps.storage)?;
-    let mut state = STATE.load(deps.storage)?;
-    let mut user_info =  USERS.may_load(deps.storage, &info.sender.clone() )?.unwrap_or_default();
-
-    state.tokens_used_for_auction += amount_to_delegate;
-    user_info.tokens_used_for_auction += amount_to_delegate;
 
     // CHECK :: HAS THE BOOTSTRAP AUCTION CONCLUDED ? 
     if config.are_claims_allowed {
         return Err(StdError::generic_err("LP bootstrap auction has concluded"));        
     }
 
+    let mut state = STATE.load(deps.storage)?;
+    let mut user_info =  USERS.may_load(deps.storage, &info.sender.clone() )?.unwrap_or_default();
+
+    // CHECK :: HAS USER ALREADY WITHDRAWN THEIR REWARDS ? 
+    if user_info.are_claimed {
+        return Err(StdError::generic_err("Tokens have already been claimed"));        
+    }
+
+    state.total_delegated_amount += amount_to_delegate;
+    user_info.delegated_amount += amount_to_delegate;
+
+
     // CHECK :: TOKENS BEING DELEGATED SHOULD NOT EXCEED USER'S CLAIMABLE AIRDROP AMOUNT
-    if user_info.tokens_used_for_auction > user_info.airdrop_amount {
+    if user_info.delegated_amount > user_info.airdrop_amount {
         return Err(StdError::generic_err("Total amount being delegated for boostrap auction cannot exceed your claimable airdrop balance"));        
     }
     
@@ -354,7 +361,6 @@ pub fn handle_delegate_astro_to_bootstrap_auction(
 
 
 /// @dev Function to allow users to withdraw their undelegated ASTRO Tokens 
-/// @param amount_to_delegate Amount of ASTRO to be delegate
 pub fn handle_withdraw_airdrop_rewards( 
     deps: DepsMut, 
     _env: Env, 
@@ -369,13 +375,14 @@ pub fn handle_withdraw_airdrop_rewards(
     }
 
     // CHECK :: HAS USER ALREADY WITHDRAWN THEIR REWARDS ? 
-    if user_info.tokens_claimed > Uint128::zero() {
-        return Err(StdError::generic_err("Tokens have already been claimed"));        
+    if user_info.are_claimed {
+        return Err(StdError::generic_err("Already claimed"));        
     }
 
     // TRANSFER ASTRO IF CLAIMS ARE ALLOWED (i.e LP Boostrap auction has concluded)
-    user_info.tokens_claimed = user_info.airdrop_amount - user_info.tokens_used_for_auction;
-    let transfer_msg = build_transfer_cw20_token_msg(info.sender.clone(), config.astro_token_address.to_string(), user_info.tokens_claimed.into())? ;    
+    user_info.are_claimed = true;
+    let tokens_to_withdraw = user_info.airdrop_amount - user_info.delegated_amount;
+    let transfer_msg = build_transfer_cw20_token_msg(info.sender.clone(), config.astro_token_address.to_string(), tokens_to_withdraw .into())? ;    
 
     USERS.save(deps.storage, &info.sender , &user_info)?;  
 
@@ -384,7 +391,8 @@ pub fn handle_withdraw_airdrop_rewards(
     .add_attributes(vec![
         attr("action", "Airdrop::ExecuteMsg::WithdrawAirdropRewards"),
         attr("user", info.sender.to_string() ),
-        attr("amount", user_info.tokens_claimed ),
+        attr("claimed_amount", tokens_to_withdraw ),
+        attr("total_airdrop", user_info.airdrop_amount ),
     ]))
 }
 
@@ -414,10 +422,8 @@ pub fn handle_transfer_unclaimed_tokens(
     }
 
     if amount > state.unclaimed_tokens {
-        return Err(StdError::generic_err("Amount to transfer cannot exceed unclaimed token balance!"));       
+        return Err(StdError::generic_err("Amount cannot exceed unclaimed token balance"));       
     }
-
-
 
     // COSMOS MSG :: TRANSFER ASTRO TOKENS
     state.unclaimed_tokens = state.unclaimed_tokens - amount;
@@ -462,7 +468,7 @@ fn query_state(deps: Deps) -> StdResult<StateResponse> {
     let state = STATE.load(deps.storage)?;
     Ok(StateResponse { 
         total_airdrop_size: state.total_airdrop_size,
-        tokens_used_for_auction: state.tokens_used_for_auction,
+        total_delegated_amount: state.total_delegated_amount,
         unclaimed_tokens: state.unclaimed_tokens 
     })
 }
@@ -474,14 +480,10 @@ fn query_user_info(deps: Deps, user_address: String) -> StdResult<UserInfoRespon
     let user_info = USERS.may_load(deps.storage, &user_address )?.unwrap_or_default();
     Ok(UserInfoResponse { 
         airdrop_amount: user_info.airdrop_amount,
-        tokens_used_for_auction: user_info.tokens_used_for_auction,
-        tokens_claimed: user_info.tokens_claimed
+        delegated_amount: user_info.delegated_amount,
+        are_claimed: user_info.are_claimed
     })
 }
-
-
-
-
 
 
 

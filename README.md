@@ -1,9 +1,10 @@
 # Astroport Periphery 
 
-This repo contains the contract which facilitates ASTRO tokens airdrop, lockdrop and LP Bootstrapping via auction during the intital protocol launch. 
+This repo contains the contracts which facilitates ASTRO tokens airdrop, lockdrop and LP Bootstrapping via auction during the intital protocol launch. 
 
 
 ## Development
+
 
 ### Dependencies
 
@@ -45,34 +46,6 @@ docker run --rm -v "$(pwd)":/code \
   --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
   cosmwasm/rust-optimizer:0.11.3
 ```
-
-
-### Build schema and run unit-tests
-```
-cd contracts/airdrop
-cargo schema
-cargo test
-```
-
-
-### Integration Tests
-
-Start LocalTerra:
-
-```bash
-cd /path/to/LocalTerra
-git checkout main  
-git pull
-docker-compose up
-```
-
-Run test scripts: inside `scripts` folder,
-
-```bash
-cd scripts
-node  --experimental-json-modules  --loader ts-node/esm airdrop.spec.ts
-```
-
 
 
 ## License

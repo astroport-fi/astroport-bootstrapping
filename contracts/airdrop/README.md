@@ -3,19 +3,18 @@
 The Airdrop contract is for ASTRO tokens airdrop claim during the intital protocol launch. 
 
 
-### Selection Criteria 
-Refer to the blog here to understand how the ASTRO airdrop for Terra, Ethereum and BSC users were calculated, 
-
-
 ## Contract Design
 
 ### Handle Messages
 
 | Message                       | Description                                                                                         |
 | ----------------------------- | --------------------------------------------------------------------------------------------------- |
-| `ExecuteMsg::ClaimByTerraUser`   |  Executes an airdrop claim for the Terra User                                                           |
+| `ExecuteMsg::ClaimByTerraUser`   |  Executes an airdrop claim for the Terra User.                                                        |
 | `ExecuteMsg::ClaimByEvmUser`    | Executes an airdrop claim for the EVM User                                         |
-| `ExecuteMsg::TransferAstroTokens`          | Admin function. Transfers ASTRO tokens available with the contract to the recepient address.                                       |
+| `ExecuteMsg::DelegateAstroToBootstrapAuction`    | This function facilitates ASTRO tokens delegation to the Bootstrap auction contract after airdrop is claimed by the user during the bootstrap auction phase. Delegated ASTRO tokens are added to the user's position in the bootstrap auction contract                                          |
+| `ExecuteMsg::EnableClaims`          | Executed by the Bootstrap auction contract when liquidity is added to the ASTRO-UST pool. Enables ASTRO withdrawals by the airdrop recepients.                                    |
+| `ExecuteMsg::WithdrawAirdropReward`          | Facilitates ASTRO withdrawal for airdrop recepients once claims are allowed      |
+| `ExecuteMsg::TransferUnclaimedTokens`          | Admin function. Transfers unclaimed ASTRO tokens available with the contract to the recepient address once the claim window is over                                       |
 | `ExecuteMsg::UpdateConfig`    | Admin function to update any of the configuration parameters.                                      |
 
 ### Query Messages
@@ -23,7 +22,9 @@ Refer to the blog here to understand how the ASTRO airdrop for Terra, Ethereum a
 | Message              | Description                                                                        |
 | -------------------- | ---------------------------------------------------------------------------------- |
 | `QueryMsg::Config`   | Returns the config info                                                            |
-| `QueryMsg::IsClaimed`    |Returns a boolean value indicating if the corresponding address have yet claimed the airdrop or not                                                |
+| `QueryMsg::Config`   | Returns the contract's state info                                                            |
+| `QueryMsg::HasUserClaimed`    |Returns a boolean value indicating if the corresponding address (terra / evm) have yet claimed their airdrop or not                                                |
+| `QueryMsg::UserInfo`   | Returns user's airdrop claim state (total airdrop size and ASTRO delegated balances)                                                            |
 | `QueryMsg::IsValidSignature` | Returns the recovered public key, corresponding evm address (lower case without `0x` prefix) and a boolean value indicating if the message was indeed signed by the provided address or not                                           |
 
 

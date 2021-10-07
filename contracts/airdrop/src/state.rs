@@ -42,7 +42,7 @@ pub struct State {
     /// Total ASTRO issuance used as airdrop incentives
     pub total_airdrop_size: Uint128, 
     /// Total ASTRO tokens that have been delegated to the boostrap auction pool
-    pub tokens_used_for_auction: Uint128, 
+    pub total_delegated_amount: Uint128, 
     /// Total ASTRO tokens that are yet to be claimed by the users
     pub unclaimed_tokens: Uint128 
 }
@@ -52,7 +52,7 @@ impl Default for State {
     fn default() -> Self {
         State {
             total_airdrop_size: Uint128::zero(),
-            tokens_used_for_auction: Uint128::zero(),
+            total_delegated_amount: Uint128::zero(),
             unclaimed_tokens: Uint128::zero()
         }
     }
@@ -66,17 +66,17 @@ pub struct UserInfo {
     /// Total ASTRO airdrop tokens claimable by the user
     pub airdrop_amount: Uint128,
     /// ASTRO tokens delegated to the bootstrap auction contract to add to the user's position
-    pub tokens_used_for_auction: Uint128,
-    /// Boolean value indicating is the user has claimed the remaning ASTRO tokens or not
-    pub tokens_claimed: Uint128
+    pub delegated_amount: Uint128,
+    /// Boolean value indicating if the user has claimed the remaning ASTRO tokens or not
+    pub are_claimed: bool
 }
 
 impl Default for UserInfo {
     fn default() -> Self {
         UserInfo {
             airdrop_amount: Uint128::zero(),
-            tokens_used_for_auction: Uint128::zero(),
-            tokens_claimed: Uint128::zero()
+            delegated_amount: Uint128::zero(),
+            are_claimed: false
         }
     }
 }

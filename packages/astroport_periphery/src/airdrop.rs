@@ -91,7 +91,7 @@ pub struct ConfigResponse {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct StateResponse {
     pub total_airdrop_size: Uint128,
-    pub tokens_used_for_auction: Uint128,
+    pub total_delegated_amount: Uint128,
     pub unclaimed_tokens: Uint128,
 }
 
@@ -99,8 +99,8 @@ pub struct StateResponse {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct UserInfoResponse {
     pub airdrop_amount: Uint128,
-    pub tokens_used_for_auction: Uint128,
-    pub tokens_claimed: Uint128
+    pub delegated_amount: Uint128,
+    pub are_claimed: bool
 }
 
 
