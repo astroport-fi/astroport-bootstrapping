@@ -39,6 +39,10 @@ The LP Bootstrap via auction contract facilitates ASTRO-UST Astroport pool initi
 | `QueryMsg::State`    |Returns state of the contract                                               |
 | `QueryMsg::UserInfo` | Returns user position details                                         |
 
+### Callback Function flow
+
+![Alt text](../../AuctionContract_callbacks.png?raw=true "Lockdrop Callback Msgs")
+
 
 ## Build schema and run unit-tests
 ```
