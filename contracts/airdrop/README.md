@@ -17,15 +17,27 @@ The Airdrop contract is for ASTRO tokens airdrop claim during the intital protoc
 | `ExecuteMsg::TransferUnclaimedTokens`          | Admin function. Transfers unclaimed ASTRO tokens available with the contract to the recepient address once the claim window is over                                       |
 | `ExecuteMsg::UpdateConfig`    | Admin function to update any of the configuration parameters.                                      |
 
+
+ClaimByEvmUser & ClaimByTerraUser :: These functions facilitate airdrop claims by terra / evm users. 
+  Before the completion of LP boostrap via auction phase, airdrop claims create user position's within the contract via which users can choose how many ASTRO tokens they want to delegate for the LP bootstrap via auction, and withdraw the remaining ASTRO post the completion of LP bootstrap via auction phase
+
+  Post the completion of LP boostrap via auction phase, any airdrop claim by the user tranfers the user's max ASTRO airdrop amount to the user's wallet.
+
+
+
 ### Query Messages
 
 | Message              | Description                                                                        |
 | -------------------- | ---------------------------------------------------------------------------------- |
 | `QueryMsg::Config`   | Returns the config info                                                            |
-| `QueryMsg::Config`   | Returns the contract's state info                                                            |
+| `QueryMsg::State`   | Returns the contract's state info                                                            |
 | `QueryMsg::HasUserClaimed`    |Returns a boolean value indicating if the corresponding address (terra / evm) have yet claimed their airdrop or not                                                |
 | `QueryMsg::UserInfo`   | Returns user's airdrop claim state (total airdrop size and ASTRO delegated balances)                                                            |
 | `QueryMsg::IsValidSignature` | Returns the recovered public key, corresponding evm address (lower case without `0x` prefix) and a boolean value indicating if the message was indeed signed by the provided address or not                                           |
+
+
+
+
 
 
 ## How to Guide :: Get merkle proofs
