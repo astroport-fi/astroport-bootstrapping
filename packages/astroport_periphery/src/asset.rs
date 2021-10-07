@@ -1,10 +1,9 @@
+use cosmwasm_bignumber::Uint256;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::fmt;
-use cosmwasm_bignumber::{Uint256};
 
-
-use crate::helpers::{query_balance, cw20_get_balance};
+use crate::helpers::{cw20_get_balance, query_balance};
 use cosmwasm_std::{
     to_binary, Addr, BankMsg, Coin, CosmosMsg, Decimal, MessageInfo, QuerierWrapper, StdError,
     StdResult, Uint128, WasmMsg,
@@ -170,24 +169,19 @@ impl AssetInfo {
     }
 }
 
-
-
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Cw20Asset {
     pub contract_addr: String,
 }
-
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct NativeAsset {
     pub denom: String,
 }
 
-
-
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct LiquidityPool { 
+pub struct LiquidityPool {
     pub lp_token_addr: Addr,
     pub pair_addr: Addr,
-    pub amount: Uint256
+    pub amount: Uint256,
 }

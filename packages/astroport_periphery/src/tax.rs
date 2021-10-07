@@ -1,6 +1,5 @@
-
 // use crate::math::reverse_decimal;
-use cosmwasm_std::{Coin, Decimal, Deps, StdResult,Fraction, Uint128};
+use cosmwasm_std::{Coin, Decimal, Deps, Fraction, StdResult, Uint128};
 use terra_cosmwasm::TerraQuerier;
 
 pub fn deduct_tax(deps: Deps, coin: Coin) -> StdResult<Coin> {

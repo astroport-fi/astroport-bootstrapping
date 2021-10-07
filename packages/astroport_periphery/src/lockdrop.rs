@@ -1,10 +1,9 @@
-use cosmwasm_std::{Uint128, to_binary, Addr, CosmosMsg, StdResult, WasmMsg};
+use crate::asset::{Asset, AssetInfo, Cw20Asset, LiquidityPool, NativeAsset};
+use cosmwasm_bignumber::{Decimal256, Uint256};
+use cosmwasm_std::{to_binary, Addr, CosmosMsg, StdResult, Uint128, WasmMsg};
+use cw20::Cw20ReceiveMsg;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use cosmwasm_bignumber::{Decimal256, Uint256};
-use cw20::Cw20ReceiveMsg;
-use crate::asset::{Asset, AssetInfo, NativeAsset, Cw20Asset, LiquidityPool};
-
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InstantiateMsg {
@@ -26,14 +25,13 @@ pub struct InstantiateMsg {
     pub min_duration: u64,
     /// Max. no. of days allowed for lockup
     pub max_duration: u64,
-    /// Number of seconds per week 
+    /// Number of seconds per week
     pub seconds_per_week: u64,
     /// Lockdrop Reward multiplier
     pub weekly_multiplier: Decimal256,
     /// Total MARS lockdrop incentives to be distributed among the users
     pub lockdrop_incentives: Uint256,
 }
-
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct UpdateConfigMsg {
@@ -49,9 +47,6 @@ pub struct UpdateConfigMsg {
     pub lockdrop_incentives: Option<Uint256>,
 }
 
-
-
-
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
@@ -65,61 +60,56 @@ pub enum ExecuteMsg {
     // ADMIN Function ::: Add new Pool (Only Terraswap Pools)
     InitializePool {
         terraswap_pool: LiquidityPool,
-        incentives_percent: Option<Decimal256>
+        incentives_percent: Option<Decimal256>,
     },
 
     // Function to facilitate LP Token withdrawals from lockups
     WithdrawFromLockup {
         pool_identifer: String,
         duration: u64,
-        amount: Uint256
+        amount: Uint256,
     },
 
     // ADMIN Function ::: To Migrate liquidity from terraswap to astroport
     MigrateLiquidity {
         pool_identifer: String,
         astroport_pool_address: String,
-        astroport_lp_address: String
+        astroport_lp_address: String,
     },
     // // ADMIN Function ::: To stake LP Tokens with the guage generator contract
-    StakeLpTokens { 
+    StakeLpTokens {
         pool_identifer: String,
     },
     // Delegate ASTRO to Bootstrap via auction contract
     DelegateAstroToAuction {
-        amount: Uint256
+        amount: Uint256,
     },
     // Facilitates ASTRO reward withdrawal which have not been delegated to bootstrap auction
-    ClaimRewardsForLockup { 
+    ClaimRewardsForLockup {
         pool_identifer: String,
-        duration: u64
+        duration: u64,
     },
     // Unlocks a lockup position whose lockup duration has concluded
-    UnlockPosition { 
+    UnlockPosition {
         pool_identifer: String,
-        duration: u64
-     },
+        duration: u64,
+    },
     // Unlocks a lockup position whose lockup duration has not concluded. user needs to approve ASTRO Token to
     // be transferred by the lockdrop contract before calling this function
-    ForceUnlockPosition { 
+    ForceUnlockPosition {
         pool_identifer: String,
-        duration: u64
-     },
+        duration: u64,
+    },
     /// Callbacks; only callable by the contract itself.
-    Callback(CallbackMsg)
+    Callback(CallbackMsg),
 }
-
-
-
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Cw20HookMsg {
     /// Open a new user position or add to an existing position (Cw20ReceiveMsg)
-    IncreaseLockup {   duration: u64  }
+    IncreaseLockup { duration: u64 },
 }
- 
-
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -134,7 +124,7 @@ pub enum CallbackMsg {
         pool_identifer: String,
         duration: u64,
         withdraw_lp_stake: bool,
-        force_unlock: bool
+        force_unlock: bool,
     },
     WithdrawLiquidityFromTerraswapCallback {
         pool_identifer: String,
@@ -147,9 +137,8 @@ pub enum CallbackMsg {
     UpdateStateLiquidityMigrationCallback {
         pool_identifer: String,
         astroport_pool: LiquidityPool,
-        astroport_lp_balance: Uint128 
-    }
-
+        astroport_lp_balance: Uint128,
+    },
 }
 
 // Modified from
@@ -164,18 +153,25 @@ impl CallbackMsg {
     }
 }
 
-
-
-
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
     Config {},
     State {},
-    Pool { pool_identifier: String },
-    UserInfo { address: String },
-    LockUpInfo { user_address: String, pool_identifier: String, duration: u64 },
-    LockUpInfoWithId { lockup_id: String },
+    Pool {
+        pool_identifier: String,
+    },
+    UserInfo {
+        address: String,
+    },
+    LockUpInfo {
+        user_address: String,
+        pool_identifier: String,
+        duration: u64,
+    },
+    LockUpInfoWithId {
+        lockup_id: String,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -204,7 +200,6 @@ pub struct ConfigResponse {
     pub weekly_multiplier: Decimal256,
     /// Total ASTRO lockdrop incentives to be distributed among the users
     pub lockdrop_incentives: Uint256,
-
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -219,23 +214,21 @@ pub struct StateResponse {
     pub supported_pairs_list: Vec<String>,
 }
 
-
-
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct PoolResponse {
     /// Terraswap Pool Details
     pub terraswap_pair: LiquidityPool,
     /// Astroport Pool Details
     pub astroport_pair: LiquidityPool,
-    /// Pair's cw20 token 
+    /// Pair's cw20 token
     pub cw20_asset: Cw20Asset,
     /// Pair's Native token (uusd/uluna)
-    pub native_asset: NativeAsset,    
+    pub native_asset: NativeAsset,
     /// % of total ASTRO incentives allocated to this pool
     pub incentives_percent: Decimal256,
     /// Boolean value indicating if the LP Tokens are staked with the Generator contract or not
     pub is_staked: bool,
-    /// Boolean value indicating if the liquidity has been migrated or not 
+    /// Boolean value indicating if the liquidity has been migrated or not
     pub is_migrated: bool,
     /// Weighted LP Token balance used to calculate ASTRO rewards a particular user can claim
     pub weighted_amount: Uint256,
@@ -245,24 +238,19 @@ pub struct PoolResponse {
     pub asset_global_reward_index: Decimal256,
 }
 
-
-
-
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct UserInfoResponse {
     /// Total ASTRO tokens user received as rewards for participation in the lockdrop
     pub total_astro_rewards: Uint256,
-    /// Total ASTRO tokens user delegated to the LP bootstrap auction pool 
+    /// Total ASTRO tokens user delegated to the LP bootstrap auction pool
     pub delegated_astro_rewards: Uint256,
     /// Contains lockup Ids of the User's lockup positions with different pools having different durations / deposit amounts
     pub lockup_positions: Vec<String>,
 }
 
-
-
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct LockUpInfoResponse {
-    /// LP Pool identifer whose LP tokens this Lockdrop position accounts for 
+    /// LP Pool identifer whose LP tokens this Lockdrop position accounts for
     pub pool_identifier: String,
     /// Lockup Duration
     pub duration: u64,
@@ -276,27 +264,14 @@ pub struct LockUpInfoResponse {
     pub withdrawal_counter: bool,
     /// Timestamp beyond which this position can be unlocked
     pub unlock_timestamp: u64,
-    /// Used to calculate user's pending ASTRO rewards from the generator (staking) contract 
+    /// Used to calculate user's pending ASTRO rewards from the generator (staking) contract
     pub astro_reward_index: Decimal256,
-    /// Used to calculate user's pending DUAL rewards from the generator (staking) contract 
+    /// Used to calculate user's pending DUAL rewards from the generator (staking) contract
     pub dual_reward_index: Decimal256,
 }
-
-
-
-
-
-
-
-
-
-
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct WithdrawalStatus {
     pub max_withdrawal_percent: Decimal256,
     pub more_withdrawals_allowed: bool,
 }
-
-
-
