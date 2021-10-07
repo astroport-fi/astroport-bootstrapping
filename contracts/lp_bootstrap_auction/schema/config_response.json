@@ -1,0 +1,60 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ConfigResponse",
+  "type": "object",
+  "required": [
+    "airdrop_contract_address",
+    "astro_rewards",
+    "astro_token_address",
+    "deposit_window",
+    "generator_contract",
+    "init_timestamp",
+    "lockdrop_contract_address",
+    "lp_token_address",
+    "owner",
+    "withdrawal_window"
+  ],
+  "properties": {
+    "airdrop_contract_address": {
+      "type": "string"
+    },
+    "astro_rewards": {
+      "$ref": "#/definitions/Uint256"
+    },
+    "astro_token_address": {
+      "type": "string"
+    },
+    "deposit_window": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    },
+    "generator_contract": {
+      "type": "string"
+    },
+    "init_timestamp": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    },
+    "lockdrop_contract_address": {
+      "type": "string"
+    },
+    "lp_token_address": {
+      "type": "string"
+    },
+    "owner": {
+      "type": "string"
+    },
+    "withdrawal_window": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    }
+  },
+  "definitions": {
+    "Uint256": {
+      "type": "string"
+    }
+  }
+}

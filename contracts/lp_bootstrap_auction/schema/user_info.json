@@ -1,0 +1,50 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "UserInfo",
+  "type": "object",
+  "required": [
+    "astro_delegated",
+    "claimed_auction_incentives",
+    "claimed_lp_shares",
+    "lp_shares",
+    "total_auction_incentives",
+    "user_reward_index",
+    "ust_deposited",
+    "withdrawl_counter"
+  ],
+  "properties": {
+    "astro_delegated": {
+      "$ref": "#/definitions/Uint256"
+    },
+    "claimed_auction_incentives": {
+      "$ref": "#/definitions/Uint256"
+    },
+    "claimed_lp_shares": {
+      "$ref": "#/definitions/Uint256"
+    },
+    "lp_shares": {
+      "$ref": "#/definitions/Uint256"
+    },
+    "total_auction_incentives": {
+      "$ref": "#/definitions/Uint256"
+    },
+    "user_reward_index": {
+      "$ref": "#/definitions/Decimal256"
+    },
+    "ust_deposited": {
+      "$ref": "#/definitions/Uint256"
+    },
+    "withdrawl_counter": {
+      "type": "boolean"
+    }
+  },
+  "definitions": {
+    "Decimal256": {
+      "description": "A fixed-point decimal value with 18 fractional digits, i.e. Decimal256(1_000_000_000_000_000_000) == 1.0 The greatest possible value that can be represented is 115792089237316195423570985008687907853269984665640564039457.584007913129639935 (which is (2^128 - 1) / 10^18)",
+      "type": "string"
+    },
+    "Uint256": {
+      "type": "string"
+    }
+  }
+}

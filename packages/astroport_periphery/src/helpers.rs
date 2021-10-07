@@ -1,6 +1,6 @@
 use cosmwasm_std::{Coin, BankQuery, BalanceResponse, Addr, QuerierWrapper, QueryRequest, BankMsg, Deps, Api, WasmQuery, Binary, CosmosMsg, StdResult, Uint128, WasmMsg, to_binary};
 use cw20_base::msg::{ExecuteMsg as CW20ExecuteMsg, QueryMsg as Cw20QueryMsg};
-use cosmwasm_bignumber::{Decimal256, Uint256};
+use cosmwasm_bignumber::{Uint256};
 use crate::tax::{deduct_tax};
 use cw20::BalanceResponse as CW20BalanceResponse;
 

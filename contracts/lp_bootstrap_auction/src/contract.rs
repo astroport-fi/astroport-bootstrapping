@@ -7,18 +7,17 @@ use cosmwasm_std::{
     attr, Binary, Deps, DepsMut, MessageInfo, Env, Response, QueryRequest, WasmQuery,Coin,
     StdError, StdResult, WasmMsg, to_binary, from_binary, Addr, CosmosMsg, Uint128, Decimal
 };
+
 use astroport_periphery::helpers::{zero_address, build_approve_cw20_msg, build_send_native_asset_msg, cw20_get_balance, option_string_to_addr, build_transfer_cw20_token_msg, get_denom_amount_from_coins } ;
 use astroport_periphery::lp_bootstrap_auction::{Cw20HookMsg, UserInfoResponse, StateResponse, ConfigResponse, ExecuteMsg, InstantiateMsg,UpdateConfigMsg, QueryMsg , CallbackMsg } ;
-use astroport::generator::{ PendingTokenResponse, QueryMsg as GenQueryMsg};
-use astroport::asset:: {Asset, AssetInfo};
-
-use crate::state::{Config, State,UserInfo, CONFIG, STATE, USERS};
-
-// use astroport::pair::{  ExecuteMsg };
 use astroport_periphery::airdrop::ExecuteMsg::{EnableClaims as AirdropEnableClaims};
 use astroport_periphery::lockdrop::ExecuteMsg::{EnableClaims as LockdropEnableClaims};
 use astroport_periphery::tax::{compute_tax};
 
+use astroport::generator::{ PendingTokenResponse, QueryMsg as GenQueryMsg};
+use astroport::asset:: {Asset, AssetInfo};
+
+use crate::state::{Config, State,UserInfo, CONFIG, STATE, USERS};
 use cw20::Cw20ReceiveMsg;
 
 //----------------------------------------------------------------------------------------
