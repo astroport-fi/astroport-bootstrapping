@@ -295,7 +295,7 @@ pub struct LockUpInfoResponse {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct WithdrawalStatus {
     pub max_withdrawal_percent: Decimal256,
-    pub update_withdrawal_counter: bool,
+    pub more_withdrawals_allowed: bool,
 }
 
 

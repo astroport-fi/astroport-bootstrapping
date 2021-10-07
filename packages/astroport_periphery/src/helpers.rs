@@ -106,7 +106,7 @@ pub fn cw20_get_balance(querier: &QuerierWrapper, token_address: Addr, account_a
 }
 
 
-/// @dev Helper function which returns a cosmos wasm msg to approve held cs20 tokens to be transferrable by beneficiary address
+/// @dev Helper function which returns a cosmos wasm msg to approve held cw20 tokens to be transferrable by beneficiary address
 /// @param token_contract_address : Token contract address
 /// @param spender_address : Address to which allowance is being provided to, to allow it to transfer the tokens held by the contract 
 /// @param allowance_amount : Allowance amount

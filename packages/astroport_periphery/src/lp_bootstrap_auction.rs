@@ -6,14 +6,16 @@ use cw20::Cw20ReceiveMsg;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InstantiateMsg {
-    pub owner: Option<String>,
+    pub owner: String,
     pub astro_token_address: String,
     pub airdrop_contract_address: String,
     pub lockdrop_contract_address: String,
     pub astroport_lp_pool: Option<String>,
     pub lp_token_address : Option<String>,
-    pub lp_staking_contract: Option<String>,
+    pub generator_contract: Option<String>,
     pub astro_rewards: Uint256,
+    pub astro_vesting_schedule: u64,
+    pub lp_tokens_vesting_schedule: u64,
     pub init_timestamp: u64,
     pub deposit_window: u64,
     pub withdrawal_window: u64
@@ -24,7 +26,7 @@ pub struct UpdateConfigMsg {
     pub owner: Option<String>,
     pub astroport_lp_pool: Option<String>,
     pub lp_token_address : Option<String>,
-    pub lp_staking_contract: Option<String>,
+    pub generator_contract: Option<String>,
     pub astro_rewards: Option<Uint256>
 }
 
@@ -56,7 +58,7 @@ pub enum ExecuteMsg {
 #[serde(rename_all = "snake_case")]
 pub enum Cw20HookMsg {
     DelegateAstroTokens { 
-        user_address: String,
+        user_address: Addr,
     }
 }
  
@@ -104,7 +106,7 @@ pub struct ConfigResponse {
     pub airdrop_contract_address: String,
     pub lockdrop_contract_address: String,
     pub lp_token_address: String,
-    pub lp_staking_contract: String,
+    pub generator_contract: String,
     pub astro_rewards: Uint256,
     pub init_timestamp: u64,
     pub deposit_window: u64,
@@ -114,7 +116,7 @@ pub struct ConfigResponse {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct StateResponse {
-    pub total_astro_deposited: Uint256,
+    pub total_astro_delegated: Uint256,
     pub total_ust_deposited: Uint256,
     pub lp_shares_minted: Uint256,
     pub lp_shares_claimed: Uint256,
@@ -141,7 +143,7 @@ pub struct UserInfoResponse {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct WithdrawalStatus {
     pub max_withdrawal_percent: Decimal256,
-    pub update_withdrawal_counter: bool,
+    pub more_withdrawals_allowed: bool,
 }
 
 

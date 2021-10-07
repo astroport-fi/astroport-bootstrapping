@@ -1300,7 +1300,7 @@ fn calculate_max_withdrawal_percent_allowed(current_timestamp: u64, config: &Con
     // 100% withdrawals allowed
     if current_timestamp <= withdrawal_cutoff_init_point {
         return  WithdrawalStatus {  max_withdrawal_percent: Decimal256::from_ratio(100u32, 100u32),
-                                    update_withdrawal_counter: false
+                                    more_withdrawals_allowed: false
                                 }
     }
 
@@ -1308,7 +1308,7 @@ fn calculate_max_withdrawal_percent_allowed(current_timestamp: u64, config: &Con
     let withdrawal_cutoff_sec_point = withdrawal_cutoff_init_point + (config.withdrawal_window/2u64);
     if current_timestamp <= withdrawal_cutoff_sec_point {
         return  WithdrawalStatus {  max_withdrawal_percent: Decimal256::from_ratio(50u32, 100u32),
-                                    update_withdrawal_counter: true
+                                    more_withdrawals_allowed: true
                                 }
     }
 
@@ -1319,7 +1319,7 @@ fn calculate_max_withdrawal_percent_allowed(current_timestamp: u64, config: &Con
         let time_elapsed = current_timestamp - withdrawal_cutoff_sec_point;
         return  WithdrawalStatus {
             max_withdrawal_percent: Decimal256::from_ratio(time_elapsed, 1u64) * slope,
-            update_withdrawal_counter: true
+            more_withdrawals_allowed: true
         }
     }
 
@@ -1327,7 +1327,7 @@ fn calculate_max_withdrawal_percent_allowed(current_timestamp: u64, config: &Con
     else {
         return  WithdrawalStatus {
             max_withdrawal_percent: Decimal256::from_ratio(0u32, 100u32),
-            update_withdrawal_counter: true
+            more_withdrawals_allowed: true
         }
     }
 }
