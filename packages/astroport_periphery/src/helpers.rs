@@ -162,7 +162,7 @@ pub fn query_balance(
     Ok(balance.amount.amount)
 }
 
-// Returns true if the user_info stuct's lockup_positions vector contains the lockup_id
+// Returns true if the user_info stuct's lockup_positions vector contains the string_
 pub fn is_str_present_in_vec(vector_struct: Vec<String>, string_: String) -> bool {
     if vector_struct.iter().any(|id| id == &string_) {
         return true;

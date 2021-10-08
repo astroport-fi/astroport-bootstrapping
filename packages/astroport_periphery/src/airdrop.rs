@@ -21,6 +21,8 @@ pub enum ExecuteMsg {
     UpdateConfig {
         new_config: InstantiateMsg,
     },
+    // Called by the bootstrap auction contract when liquidity is added to the
+    // ASTRO-UST Pool to enable ASTRO withdrawals by users
     EnableClaims {},
     /// Allows Terra users to claim their ASTRO Airdrop
     ClaimByTerraUser {

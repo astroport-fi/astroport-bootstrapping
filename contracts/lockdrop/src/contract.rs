@@ -2,8 +2,8 @@ use std::vec;
 
 use cosmwasm_bignumber::{Decimal256, Uint256};
 use cosmwasm_std::{
-    entry_point, from_binary, to_binary, Addr, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut,
-    Env, MessageInfo, QueryRequest, Response, StdError, StdResult, Uint128, WasmMsg, WasmQuery,
+    entry_point, from_binary, to_binary, Addr, Binary, Coin, CosmosMsg, Deps, DepsMut, Env,
+    MessageInfo, QueryRequest, Response, StdError, StdResult, Uint128, WasmMsg, WasmQuery,
 };
 
 use astroport_periphery::helpers::{
@@ -17,12 +17,12 @@ use astroport_periphery::lockdrop::{
 };
 
 use astroport::generator::{PendingTokenResponse, QueryMsg as GenQueryMsg};
-use astroport_periphery::asset::{Asset, AssetInfo, Cw20Asset, LiquidityPool, NativeAsset};
+use astroport_periphery::asset::{Cw20Asset, LiquidityPool, NativeAsset};
 use astroport_periphery::lp_bootstrap_auction::Cw20HookMsg::DelegateAstroTokens;
 use astroport_periphery::tax::deduct_tax;
 
 use crate::state::{
-    self, Config, LockupInfo, PoolInfo, State, UserInfo, ASSET_POOLS, CONFIG, LOCKUP_INFO, STATE,
+    Config, LockupInfo, PoolInfo, State, UserInfo, ASSET_POOLS, CONFIG, LOCKUP_INFO, STATE,
     USER_INFO,
 };
 use cw20::Cw20ReceiveMsg;
@@ -73,7 +73,7 @@ pub fn instantiate(
 
     let state = State {
         total_astro_delegated: Uint256::zero(),
-        total_astro_returned: Uint256::zero(),
+        total_astro_returned_available: Uint256::zero(),
         are_claims_allowed: false,
         supported_pairs_list: vec![],
     };
@@ -98,6 +98,10 @@ pub fn execute(
             terraswap_pool,
             incentives_percent,
         } => handle_initialize_pool(deps, _env, info, terraswap_pool, incentives_percent),
+        ExecuteMsg::UpdatePool {
+            pool_identifier,
+            update_pool_config,
+        } => handle_update_pool(deps, _env, info, pool_identifier, update_pool_config),
 
         ExecuteMsg::MigrateLiquidity {
             pool_identifer,
@@ -116,6 +120,9 @@ pub fn execute(
             handle_stake_lp_tokens(deps, _env, info, pool_identifer)
         }
         ExecuteMsg::EnableClaims {} => handle_enable_claims(deps, info),
+        ExecuteMsg::TransferReturnedAstro { recepient } => {
+            handle_tranfer_returned_astro(deps, info, recepient)
+        }
 
         ExecuteMsg::WithdrawFromLockup {
             pool_identifer,
@@ -387,6 +394,106 @@ pub fn handle_initialize_pool(
         ),
         ("denom", pool_info.native_asset.denom.as_str()),
     ]))
+}
+
+/// Admin function to update LP Pool Configuration
+pub fn handle_update_pool(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    pool_identifier: String,
+    incentives_percent: Decimal256,
+) -> StdResult<Response> {
+    let config = CONFIG.load(deps.storage)?;
+    let state = STATE.load(deps.storage)?;
+
+    // CHECK ::: Only owner can call this function
+    if info.sender != config.owner {
+        return Err(StdError::generic_err("Unauthorized"));
+    }
+
+    if state.are_claims_allowed {
+        return Err(StdError::generic_err(
+            "ASTRO tokens are live. Incentives % cannot be updated now",
+        ));
+    }
+
+    // CHECK ::: Is LP Token Pool  initialized
+    if !is_str_present_in_vec(state.supported_pairs_list.clone(), pool_identifier.clone()) {
+        return Err(StdError::generic_err("Pool not supported"));
+    }
+
+    let mut total_incentives = Decimal256::from_ratio(0u64, 100u64);
+    for pool_identifier_ in state.supported_pairs_list {
+        if pool_identifier_ == pool_identifier {
+            total_incentives = total_incentives + incentives_percent;
+        } else {
+            let cur_pool_info =
+                ASSET_POOLS.load(deps.storage, &pool_identifier_.clone().as_bytes())?;
+            total_incentives = total_incentives + cur_pool_info.incentives_percent;
+        }
+    }
+
+    // CHECK ::: total_incentives % cannot exceed 100
+    if total_incentives > Decimal256::from_ratio(1u64, 1u64) {
+        return Err(StdError::generic_err(
+            "Total Incentives % cannot exceed 100",
+        ));
+    }
+
+    // Update Pool Incentives
+    let mut pool_info = ASSET_POOLS.load(deps.storage, &pool_identifier.clone().as_bytes())?;
+    pool_info.incentives_percent = incentives_percent;
+    ASSET_POOLS.save(deps.storage, &pool_identifier.as_bytes(), &pool_info)?;
+
+    Ok(Response::new().add_attributes(vec![
+        ("action", "lockdrop::ExecuteMsg::UpdatePool"),
+        ("pool_identifer", &pool_identifier.to_string()),
+        ("incentives_percent", &incentives_percent.to_string()),
+    ]))
+}
+
+/// Admin function to update LP Pool Configuration
+pub fn handle_tranfer_returned_astro(
+    deps: DepsMut,
+    info: MessageInfo,
+    recepient: String,
+    amount: Uint256,
+) -> StdResult<Response> {
+    let config = CONFIG.load(deps.storage)?;
+    let state = STATE.load(deps.storage)?;
+
+    // CHECK ::: Only owner can call this function
+    if info.sender != config.owner {
+        return Err(StdError::generic_err("Unauthorized"));
+    }
+
+    // CHECK ::: Amount needs to be less than returned ASTRO balance available with the contract
+    if state.total_astro_returned_available > amount {
+        return Err(StdError::generic_err(format!(
+            "Amount needs to be less than {}, which is the current returned ASTRO balance available with the contract",
+            state.total_astro_returned_available
+        )));
+    }
+
+    // COSMOS_MSG ::TRANSFER ASTRO Tokens
+    let send_cw20_msg = build_transfer_cw20_token_msg(
+        deps.api.addr_validate(&recepient.clone())?,
+        config.astro_token_address.to_string(),
+        amount.into(),
+    )?;
+
+    // Update State
+    state.total_astro_returned_available = state.total_astro_returned_available - amount;
+    STATE.save(deps.storage, &state)?;
+
+    Ok(Response::new()
+        .add_message(send_cw20_msg)
+        .add_attributes(vec![
+            ("action", "lockdrop::ExecuteMsg::TransferReturnedAstro"),
+            ("recepient", &recepient),
+            ("amount", &amount.to_string()),
+        ]))
 }
 
 /// @dev Admin function to enable ASTRO Claims by users. Called along-with Bootstrap Auction contract's LP Pool provide liquidity tx
@@ -1310,7 +1417,7 @@ pub fn callback_withdraw_user_rewards_for_lockup_optional_withdraw(
                 env.contract.address.to_string(),
                 lockup_info.astro_rewards,
             )?;
-            state.total_astro_returned += lockup_info.astro_rewards;
+            state.total_astro_returned_available += lockup_info.astro_rewards;
             STATE.save(deps.storage, &state)?;
             cosmos_msgs.push(transfer_astro_msg);
         }
@@ -1537,7 +1644,7 @@ pub fn query_state(deps: Deps) -> StdResult<StateResponse> {
     let state: State = STATE.load(deps.storage)?;
     Ok(StateResponse {
         total_astro_delegated: state.total_astro_delegated,
-        total_astro_returned: state.total_astro_returned,
+        total_astro_returned_available: state.total_astro_returned_available,
         are_claims_allowed: state.are_claims_allowed,
         supported_pairs_list: state.supported_pairs_list,
     })

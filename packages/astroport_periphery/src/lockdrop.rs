@@ -56,13 +56,22 @@ pub enum ExecuteMsg {
     UpdateConfig {
         new_config: UpdateConfigMsg,
     },
+    // Called by the bootstrap auction contract when liquidity is added to the
+    // ASTRO-UST Pool to enable ASTRO withdrawals by users
     EnableClaims {},
     // ADMIN Function ::: Add new Pool (Only Terraswap Pools)
     InitializePool {
         terraswap_pool: LiquidityPool,
         incentives_percent: Option<Decimal256>,
     },
-
+    // ADMIN Function ::: To set incentives_percent for the Pool
+    UpdatePool {
+        pool_identifier: String,
+        update_pool_config: Decimal256,
+    },
+    TransferReturnedAstro {
+        recepient: String,
+    },
     // Function to facilitate LP Token withdrawals from lockups
     WithdrawFromLockup {
         pool_identifer: String,
