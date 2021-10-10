@@ -295,9 +295,9 @@ pub fn handle_withdraw_ust(
         return Err(StdError::generic_err("Max 1 withdrawal allowed"));
     }
 
-    // Check :: Amount should be withing the allowed withdrawal limit bounds
+    // Check :: Amount should be within the allowed withdrawal limit bounds
     let max_withdrawal_percent =
-        calculate_max_withdrawals_allowed(_env.block.time.seconds(), &config);
+        calculate_max_withdrawal_percent_allowed(_env.block.time.seconds(), &config);
     let max_withdrawal_allowed = user_info.ust_deposited * max_withdrawal_percent;
     if amount > max_withdrawal_allowed {
         return Err(StdError::generic_err(
@@ -848,7 +848,7 @@ fn is_deposit_open(current_timestamp: u64, config: &Config) -> bool {
 ///  @dev Helper function to calculate maximum % of their total UST deposited that can be withdrawn
 /// Returns % UST that can be withdrawn and 'more_withdrawals_allowed' boolean which indicates whether more withdrawls by the user
 /// will be allowed or not
-fn calculate_max_withdrawals_allowed(current_timestamp: u64, config: &Config) -> Decimal256 {
+fn calculate_max_withdrawal_percent_allowed(current_timestamp: u64, config: &Config) -> Decimal256 {
     let withdrawal_cutoff_init_point = config.init_timestamp + config.deposit_window;
     // Deposit window :: 100% withdrawals allowed
     if current_timestamp <= withdrawal_cutoff_init_point {

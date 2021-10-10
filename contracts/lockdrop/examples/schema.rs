@@ -3,12 +3,12 @@ use std::fs::create_dir_all;
 
 use cosmwasm_schema::{export_schema, remove_schemas, schema_for};
 
-use mars_periphery::lockdrop::{
-    CallbackMsg, ConfigResponse, ExecuteMsg, InstantiateMsg, LockUpInfoResponse, QueryMsg,
-    UpdateConfigMsg, UserInfoResponse,
+use astroport_periphery::lockdrop::{
+    CallbackMsg, ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, LockUpInfoResponse,
+    PoolResponse, QueryMsg, StateResponse, UpdateConfigMsg, UserInfoResponse,
 };
 
-use terra_mars_lockdrop::state::{Config, LockupInfo, State, UserInfo};
+use astroport_lockdrop::state::{Config, LockupInfo, PoolInfo, State, UserInfo};
 
 fn main() {
     let mut out_dir = current_dir().unwrap();
@@ -19,6 +19,9 @@ fn main() {
     export_schema(&schema_for!(InstantiateMsg), &out_dir);
     export_schema(&schema_for!(UpdateConfigMsg), &out_dir);
     export_schema(&schema_for!(ExecuteMsg), &out_dir);
+    export_schema(&schema_for!(Cw20HookMsg), &out_dir);
+    export_schema(&schema_for!(PoolResponse), &out_dir);
+    export_schema(&schema_for!(StateResponse), &out_dir);
     export_schema(&schema_for!(CallbackMsg), &out_dir);
     export_schema(&schema_for!(QueryMsg), &out_dir);
     export_schema(&schema_for!(ConfigResponse), &out_dir);
@@ -27,6 +30,7 @@ fn main() {
 
     export_schema(&schema_for!(Config), &out_dir);
     export_schema(&schema_for!(State), &out_dir);
+    export_schema(&schema_for!(PoolInfo), &out_dir);
     export_schema(&schema_for!(UserInfo), &out_dir);
     export_schema(&schema_for!(LockupInfo), &out_dir);
 }

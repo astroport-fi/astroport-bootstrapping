@@ -2,6 +2,7 @@ use cosmwasm_std::Addr;
 use cw_storage_plus::{Item, Map};
 
 use astroport_periphery::asset::{Cw20Asset, LiquidityPool, NativeAsset};
+use astroport_periphery::helpers::zero_address;
 use cosmwasm_bignumber::{Decimal256, Uint256};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -75,6 +76,35 @@ pub struct PoolInfo {
     pub is_staked: bool,
     /// Boolean value indicating if the liquidity has been migrated or not
     pub is_migrated: bool,
+}
+
+impl Default for PoolInfo {
+    fn default() -> Self {
+        PoolInfo {
+            terraswap_pair: LiquidityPool {
+                lp_token_addr: zero_address(),
+                pair_addr: zero_address(),
+                amount: Uint256::zero(),
+            },
+            astroport_pair: LiquidityPool {
+                lp_token_addr: zero_address(),
+                pair_addr: zero_address(),
+                amount: Uint256::zero(),
+            },
+            cw20_asset: Cw20Asset {
+                contract_addr: "".to_string(),
+            },
+            native_asset: NativeAsset {
+                denom: "uuusd".to_string(),
+            },
+            incentives_percent: Decimal256::zero(),
+            weighted_amount: Uint256::zero(),
+            astro_global_reward_index: Decimal256::zero(),
+            asset_global_reward_index: Decimal256::zero(),
+            is_staked: false,
+            is_migrated: false,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

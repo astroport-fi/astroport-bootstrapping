@@ -122,9 +122,3 @@ pub struct UserInfoResponse {
     pub user_reward_index: Decimal256,
     pub claimable_staking_incentives: Uint256,
 }
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct WithdrawalStatus {
-    pub max_withdrawal_percent: Decimal256,
-    pub more_withdrawals_allowed: bool,
-}
