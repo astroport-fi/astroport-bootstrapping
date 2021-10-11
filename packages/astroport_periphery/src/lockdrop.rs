@@ -1,4 +1,4 @@
-use crate::asset::{Asset, AssetInfo, Cw20Asset, LiquidityPool, NativeAsset};
+use crate::asset::{Cw20Asset, LiquidityPool, NativeAsset};
 use cosmwasm_bignumber::{Decimal256, Uint256};
 use cosmwasm_std::{to_binary, Addr, CosmosMsg, StdResult, Uint128, WasmMsg};
 use cw20::Cw20ReceiveMsg;

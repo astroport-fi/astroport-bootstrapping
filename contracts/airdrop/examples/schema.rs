@@ -3,8 +3,11 @@ use std::fs::create_dir_all;
 
 use cosmwasm_schema::{export_schema, remove_schemas, schema_for};
 
-use astroport_periphery::airdrop::{UserInfoResponse, StateResponse, ConfigResponse, ClaimResponse, SignatureResponse, ExecuteMsg, InstantiateMsg, QueryMsg  } ;
 use astro_airdrop::state::{Config, State};
+use astroport_periphery::airdrop::{
+    ClaimResponse, ConfigResponse, ExecuteMsg, InstantiateMsg, QueryMsg, SignatureResponse,
+    StateResponse, UserInfoResponse,
+};
 
 fn main() {
     let mut out_dir = current_dir().unwrap();
@@ -21,8 +24,7 @@ fn main() {
     export_schema(&schema_for!(ConfigResponse), &out_dir);
     export_schema(&schema_for!(ClaimResponse), &out_dir);
     export_schema(&schema_for!(SignatureResponse), &out_dir);
-    
+
     export_schema(&schema_for!(Config), &out_dir);
     export_schema(&schema_for!(State), &out_dir);
-
 }

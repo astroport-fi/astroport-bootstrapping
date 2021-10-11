@@ -2,3 +2,4 @@ target
 /scripts/node_modules
 artifacts
 test
+.idea

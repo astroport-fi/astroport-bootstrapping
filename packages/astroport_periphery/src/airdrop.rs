@@ -1,16 +1,16 @@
-use cosmwasm_std::Uint128;
+use cosmwasm_std::{Addr, Uint128};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InstantiateMsg {
-    pub owner: Option<String>,
-    pub astro_token_address: Option<String>,
+    pub owner: Option<Addr>,
+    pub astro_token_address: Option<Addr>,
     pub terra_merkle_roots: Option<Vec<String>>,
     pub evm_merkle_roots: Option<Vec<String>>,
     pub from_timestamp: Option<u64>,
     pub till_timestamp: Option<u64>,
-    pub boostrap_auction_address: Option<String>,
+    pub boostrap_auction_address: Option<Addr>,
     pub total_airdrop_size: Uint128,
 }
 
@@ -93,7 +93,7 @@ pub struct StateResponse {
 pub struct UserInfoResponse {
     pub airdrop_amount: Uint128,
     pub delegated_amount: Uint128,
-    pub are_claimed: bool,
+    pub tokens_withdrawn: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
