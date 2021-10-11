@@ -102,8 +102,8 @@ pub fn execute(
         } => handle_initialize_pool(deps, _env, info, terraswap_pool, incentives_percent),
         ExecuteMsg::UpdatePool {
             pool_identifier,
-            update_pool_config,
-        } => handle_update_pool(deps, info, pool_identifier, update_pool_config),
+            incentives_percent,
+        } => handle_update_pool(deps, info, pool_identifier, incentives_percent),
 
         ExecuteMsg::MigrateLiquidity {
             pool_identifer,

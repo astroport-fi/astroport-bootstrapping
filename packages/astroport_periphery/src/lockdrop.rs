@@ -67,7 +67,7 @@ pub enum ExecuteMsg {
     // ADMIN Function ::: To set incentives_percent for the Pool
     UpdatePool {
         pool_identifier: String,
-        update_pool_config: Decimal256,
+        incentives_percent: Decimal256,
     },
     // ADMIN Function ::: To transfer ASTRO Tokens which have been returned to force unlock LP positions
     TransferReturnedAstro {
