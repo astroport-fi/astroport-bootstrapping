@@ -20,7 +20,7 @@ pub fn build_transfer_cw20_token_msg(
         contract_addr: token_contract_address,
         msg: to_binary(&CW20ExecuteMsg::Transfer {
             recipient: recipient.into(),
-            amount: amount.into(),
+            amount,
         })?,
         funds: vec![],
     }))
@@ -34,10 +34,10 @@ pub fn build_transfer_cw20_from_user_msg(
     amount: Uint256,
 ) -> StdResult<CosmosMsg> {
     Ok(CosmosMsg::Wasm(WasmMsg::Execute {
-        contract_addr: cw20_token_address.to_string(),
+        contract_addr: cw20_token_address,
         funds: vec![],
         msg: to_binary(&cw20::Cw20ExecuteMsg::TransferFrom {
-            owner: owner,
+            owner,
             recipient: recepient,
             amount: amount.into(),
         })?,
@@ -59,7 +59,7 @@ pub fn build_send_cw20_token_msg(
         contract_addr: token_contract_address,
         msg: to_binary(&CW20ExecuteMsg::Send {
             contract: recipient_contract_addr,
-            amount: amount.into(),
+            amount,
             msg: msg_,
         })?,
         funds: vec![],
@@ -139,7 +139,7 @@ pub fn build_approve_cw20_msg(
         contract_addr: token_contract_address,
         msg: to_binary(&CW20ExecuteMsg::IncreaseAllowance {
             spender: spender_address,
-            amount: allowance_amount.into(),
+            amount: allowance_amount,
             expires: None,
         })?,
         funds: vec![],

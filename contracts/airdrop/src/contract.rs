@@ -40,15 +40,17 @@ pub fn instantiate(
         owner: deps.api.addr_validate(&msg.owner.unwrap())?,
         astro_token_address: deps.api.addr_validate(
             &msg.astro_token_address
-                .unwrap_or(Addr::unchecked("").to_string()),
+                .unwrap_or_else(|| Addr::unchecked("").to_string()),
         )?,
         terra_merkle_roots: msg.terra_merkle_roots.unwrap_or(vec![]),
-        evm_merkle_roots: msg.evm_merkle_roots.unwrap_or(vec![]),
-        from_timestamp: msg.from_timestamp.unwrap_or(_env.block.time.seconds()),
+        evm_merkle_roots: msg.evm_merkle_roots.unwrap_or_default(),
+        from_timestamp: msg
+            .from_timestamp
+            .unwrap_or_else(|| _env.block.time.seconds()),
         till_timestamp: msg.till_timestamp.unwrap(),
         boostrap_auction_address: deps.api.addr_validate(
             &msg.boostrap_auction_address
-                .unwrap_or(Addr::unchecked("").to_string()),
+                .unwrap_or_else(|| Addr::unchecked("").to_string()),
         )?,
         are_claims_allowed: false,
     };
@@ -204,14 +206,14 @@ pub fn handle_terra_user_claim(
 ) -> Result<Response, StdError> {
     let config = CONFIG.load(deps.storage)?;
     let mut state = STATE.load(deps.storage)?;
-    let user_account = info.sender.clone();
+    let user_account = info.sender;
     let mut user_info = USERS
-        .may_load(deps.storage, &user_account.clone())?
+        .may_load(deps.storage, &user_account)?
         .unwrap_or_default();
 
     // CHECK :  HAS USER ALREADY CLAIMED THEIR AIRDROP ?
     let mut claim_check = CLAIMEES
-        .may_load(deps.storage, &user_account.to_string().as_bytes())?
+        .may_load(deps.storage, user_account.to_string().as_bytes())?
         .unwrap_or_default();
     if claim_check.is_claimed {
         return Err(StdError::generic_err("Already claimed"));
@@ -232,13 +234,13 @@ pub fn handle_terra_user_claim(
     if !verify_claim(
         user_account.to_string(),
         claim_amount,
-        merkle_proof.clone(),
+        merkle_proof,
         config.terra_merkle_roots[root_index as usize].clone(),
     ) {
         return Err(StdError::generic_err("Incorrect Merkle Proof"));
     }
 
-    state.unclaimed_tokens = state.unclaimed_tokens - claim_amount;
+    state.unclaimed_tokens -= claim_amount;
     user_info.airdrop_amount += claim_amount;
     let mut messages_ = vec![];
 
@@ -248,14 +250,14 @@ pub fn handle_terra_user_claim(
         messages_.push(build_transfer_cw20_token_msg(
             user_account.clone(),
             config.astro_token_address.to_string(),
-            amount_to_withdraw.into(),
+            amount_to_withdraw,
         )?);
     }
 
     // STATE UPDATE : SAVE UPDATED STATES
     CLAIMEES.save(
         deps.storage,
-        &user_account.to_string().as_bytes(),
+        user_account.to_string().as_bytes(),
         &claim_check,
     )?;
     USERS.save(deps.storage, &user_account, &user_info)?;
@@ -291,12 +293,12 @@ pub fn handle_evm_user_claim(
     let mut state = STATE.load(deps.storage)?;
     let recepient_account = info.sender;
     let mut user_info = USERS
-        .may_load(deps.storage, &recepient_account.clone())?
+        .may_load(deps.storage, &recepient_account)?
         .unwrap_or_default();
 
     // CHECK :  HAS USER ALREADY CLAIMED THEIR AIRDROP ?
     let mut claim_check = CLAIMEES
-        .may_load(deps.storage, &eth_address.as_bytes())?
+        .may_load(deps.storage, eth_address.as_bytes())?
         .unwrap_or_default();
     if claim_check.is_claimed {
         return Err(StdError::generic_err("Already claimed"));
@@ -317,24 +319,20 @@ pub fn handle_evm_user_claim(
     if !verify_claim(
         eth_address.clone(),
         claim_amount,
-        merkle_proof.clone(),
+        merkle_proof,
         config.evm_merkle_roots[root_index as usize].clone(),
     ) {
         return Err(StdError::generic_err("Incorrect Merkle Proof"));
     }
 
     // SIGNATURE VERIFICATION
-    let sig_verification_response = handle_verify_signature(
-        deps.api,
-        eth_address.clone(),
-        signature.clone(),
-        signed_msg_hash.clone(),
-    );
+    let sig_verification_response =
+        handle_verify_signature(deps.api, eth_address.clone(), signature, signed_msg_hash);
     if !sig_verification_response.is_valid {
         return Err(StdError::generic_err("Invalid Signature"));
     }
 
-    state.unclaimed_tokens = state.unclaimed_tokens - claim_amount;
+    state.unclaimed_tokens -= claim_amount;
     user_info.airdrop_amount += claim_amount;
     let mut messages_ = vec![];
 
@@ -344,18 +342,18 @@ pub fn handle_evm_user_claim(
         messages_.push(build_transfer_cw20_token_msg(
             recepient_account.clone(),
             config.astro_token_address.to_string(),
-            amount_to_withdraw.into(),
+            amount_to_withdraw,
         )?);
     }
 
     // STATE UPDATE : SAVE UPDATED STATES
-    CLAIMEES.save(deps.storage, &eth_address.as_bytes(), &claim_check)?;
+    CLAIMEES.save(deps.storage, eth_address.as_bytes(), &claim_check)?;
     USERS.save(deps.storage, &recepient_account, &user_info)?;
     STATE.save(deps.storage, &state)?;
 
     Ok(Response::new().add_messages(messages_).add_attributes(vec![
         attr("action", "Airdrop::ExecuteMsg::ClaimByEvmUser"),
-        attr("claimee", eth_address.to_string()),
+        attr("claimee", eth_address),
         attr("recepient", recepient_account.to_string()),
         attr("airdrop", claim_amount.to_string()),
     ]))
@@ -378,7 +376,7 @@ pub fn handle_delegate_astro_to_bootstrap_auction(
 
     let mut state = STATE.load(deps.storage)?;
     let mut user_info = USERS
-        .may_load(deps.storage, &info.sender.clone())?
+        .may_load(deps.storage, &info.sender)?
         .unwrap_or_default();
 
     // CHECK :: HAS USER ALREADY WITHDRAWN THEIR REWARDS ?
@@ -401,7 +399,7 @@ pub fn handle_delegate_astro_to_bootstrap_auction(
     let delegate_msg = build_send_cw20_token_msg(
         config.boostrap_auction_address.to_string(),
         config.astro_token_address.to_string(),
-        amount_to_delegate.into(),
+        amount_to_delegate,
         msg_,
     )?;
 
@@ -429,7 +427,7 @@ pub fn handle_withdraw_airdrop_rewards(
 ) -> Result<Response, StdError> {
     let config = CONFIG.load(deps.storage)?;
     let mut user_info = USERS
-        .may_load(deps.storage, &info.sender.clone())?
+        .may_load(deps.storage, &info.sender)?
         .unwrap_or_default();
 
     // CHECK :: HAS THE BOOTSTRAP AUCTION CONCLUDED ?
@@ -450,7 +448,7 @@ pub fn handle_withdraw_airdrop_rewards(
     let transfer_msg = build_transfer_cw20_token_msg(
         info.sender.clone(),
         config.astro_token_address.to_string(),
-        tokens_to_withdraw.into(),
+        tokens_to_withdraw,
     )?;
 
     USERS.save(deps.storage, &info.sender, &user_info)?;
@@ -497,18 +495,18 @@ pub fn handle_transfer_unclaimed_tokens(
     }
 
     // COSMOS MSG :: TRANSFER ASTRO TOKENS
-    state.unclaimed_tokens = state.unclaimed_tokens - amount;
+    state.unclaimed_tokens -= amount;
     let transfer_msg = build_transfer_cw20_token_msg(
-        deps.api.addr_validate(&recepient.clone())?,
+        deps.api.addr_validate(&recepient)?,
         config.astro_token_address.to_string(),
-        amount.into(),
+        amount,
     )?;
 
     Ok(Response::new()
         .add_message(transfer_msg)
         .add_attributes(vec![
             attr("action", "Airdrop::ExecuteMsg::TransferUnclaimedRewards"),
-            attr("recepient", recepient.to_string()),
+            attr("recepient", recepient),
             attr("amount", amount),
         ]))
 }
@@ -558,7 +556,7 @@ fn query_user_info(deps: Deps, user_address: String) -> StdResult<UserInfoRespon
 /// @dev Returns true if the user has claimed the airdrop [EVM addresses to be provided in lower-case without the '0x' prefix]
 fn query_user_claimed(deps: Deps, address: String) -> StdResult<ClaimResponse> {
     let res = CLAIMEES
-        .may_load(deps.storage, &address.as_bytes())?
+        .may_load(deps.storage, address.as_bytes())?
         .unwrap_or_default();
     Ok(ClaimResponse {
         is_claimed: res.is_claimed,
@@ -600,7 +598,7 @@ fn verify_claim(
     merkle_proof: Vec<String>,
     merkle_root: String,
 ) -> bool {
-    let leaf = account.clone() + &amount.to_string();
+    let leaf = account + &amount.to_string();
     let mut hash_buf = Keccak256::digest(leaf.as_bytes())
         .as_slice()
         .try_into()
@@ -648,7 +646,7 @@ pub fn handle_verify_signature(
     let mut recovered_public_key = vec![0; 64];
     recovered_public_key = api
         .secp256k1_recover_pubkey(&msg_hash, &signature, recovery_param)
-        .unwrap_or([].to_vec());
+        .unwrap_or_else(|_| [].to_vec());
     let recovered_public_key_string = hex::encode(&recovered_public_key);
 
     let recovered_address = evm_address_raw(&recovered_public_key).unwrap_or([0; 20]);
@@ -882,7 +880,7 @@ pub fn normalize_recovery_id(v: u8) -> u8 {
 //         // *** Test Transfer Msg ***
 //         let transfer_msg = TransferUnclaimedTokens {
 //             recepient: "terra17lmam6zguazs5q5u6z5mmx76uj63gldnse2pdp".to_string(),
-//             amount:  Uint128::from(1000 as u64)
+//             amount:  Uint128::from(1000_u64)
 //         };
 
 //         // should fail as only owner can Execute Transfer
@@ -906,7 +904,7 @@ pub fn normalize_recovery_id(v: u8) -> u8 {
 //                     funds: vec![],
 //                     msg: to_binary(&CW20ExecuteMsg::Transfer {
 //                         recipient: "terra17lmam6zguazs5q5u6z5mmx76uj63gldnse2pdp".to_string(),
-//                         amount: Uint128::from(1000 as u64),
+//                         amount: Uint128::from(1000_u64),
 //                     }).unwrap(),
 //             }))]
 //         );
@@ -944,19 +942,19 @@ pub fn normalize_recovery_id(v: u8) -> u8 {
 //         assert_eq!(config.till_timestamp, 1_771_797 );
 
 //         let mut claim_msg = ClaimByTerraUser {
-//                                             claim_amount : Uint128::from(250000000 as u64),
+//                                             claim_amount : Uint128::from(250000000_u64),
 //                                             merkle_proof : vec!["7719b79a65e5aa0bbfd144cf5373138402ab1c374d9049e490b5b61c23d90065".to_string(),
 //                                                                 "60368f2058e0fb961a7721a241f9b973c3dd6c57e10a627071cd81abca6aa490".to_string()],
 //                                             root_index : 0
 //                                         };
 //         let mut claim_msg_wrong_amount = ClaimByTerraUser {
-//                                             claim_amount : Uint128::from(210000000 as u64),
+//                                             claim_amount : Uint128::from(210000000_u64),
 //                                             merkle_proof : vec!["7719b79a65e5aa0bbfd144cf5373138402ab1c374d9049e490b5b61c23d90065".to_string(),
 //                                                                 "60368f2058e0fb961a7721a241f9b973c3dd6c57e10a627071cd81abca6aa490".to_string()],
 //                                             root_index : 0
 //                                         };
 //         let mut claim_msg_incorrect_proof = ClaimByTerraUser {
-//                                                         claim_amount : Uint128::from(250000000 as u64),
+//                                                         claim_amount : Uint128::from(250000000_u64),
 //                                                         merkle_proof : vec!["7719b79a65e4aa0bbfd144cf5373138402ab1c374d9049e490b5b61c23d90065".to_string(),
 //                                                                             "60368f2058e0fb961a7721a241f9b973c3dd6c57e10a627071cd81abca6aa490".to_string()],
 //                                                         root_index : 0
@@ -1012,7 +1010,7 @@ pub fn normalize_recovery_id(v: u8) -> u8 {
 //                     funds: vec![],
 //                     msg: to_binary(&CW20ExecuteMsg::Transfer {
 //                         recipient: "terra17lmam6zguazs5q5u6z5mmx76uj63gldnse2pdp".to_string(),
-//                         amount: Uint128::from(250000000 as u64),
+//                         amount: Uint128::from(250000000_u64),
 //                     }).unwrap(),
 //             }))]
 //         );
@@ -1129,7 +1127,7 @@ pub fn normalize_recovery_id(v: u8) -> u8 {
 //                                         };
 //         let claim_msg_wrong_amount = ClaimByEvmUser {
 //                                             eth_address : user_info_evm_address.to_string() ,
-//                                             claim_amount : Uint128::from(150000000 as u64),
+//                                             claim_amount : Uint128::from(150000000_u64),
 //                                             merkle_proof : vec!["0a3419fc5fa4cb0ecb878dc3aaf01fa00782e5d79b02fbb4097dc8df8f191c60".to_string(),
 //                                                                 "45cc757ac5eda8bcd1a45a7bd2cb23f4af5147683f120fa287b99617834b83aa".to_string()],
 //                                             root_index : 0,

@@ -155,13 +155,13 @@ impl Default for LockupInfo {
     fn default() -> Self {
         LockupInfo {
             pool_identifier: "".to_string(),
-            duration: 0 as u64,
+            duration: 0_u64,
             lp_units_locked: Uint256::zero(),
             astroport_lp_units: Uint256::zero(),
             astro_rewards: Uint256::zero(),
             is_migrated: false,
             withdrawal_counter: false,
-            unlock_timestamp: 0 as u64,
+            unlock_timestamp: 0_u64,
             astro_reward_index: Decimal256::zero(),
             dual_reward_index: Decimal256::zero(),
         }
