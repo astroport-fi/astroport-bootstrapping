@@ -1024,9 +1024,9 @@ fn build_claim_astro_rewards(
     Ok(CosmosMsg::Wasm(WasmMsg::Execute {
         contract_addr: generator_contract.to_string(),
         funds: vec![],
-        msg: to_binary(&astroport::generator::ExecuteMsg::SendOrphanReward {
+        msg: to_binary(&astroport::generator::ExecuteMsg::SendOrphanProxyReward {
             recipient: recepient_address.to_string(),
-            lp_token: Some(lp_token_contract.to_string()),
+            lp_token: lp_token_contract.to_string(),
         })?,
     }))
 }

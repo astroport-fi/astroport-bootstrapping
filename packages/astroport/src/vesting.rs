@@ -5,38 +5,48 @@ use cosmwasm_std::{Addr, Order, Timestamp, Uint128};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InstantiateMsg {
-    pub owner: Addr,
-    pub token_addr: Addr,
-    pub genesis_time: Timestamp,
+    pub owner: String,
+    pub token_addr: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
     UpdateConfig {
-        owner: Option<Addr>,
-        token_addr: Option<Addr>,
-        genesis_time: Option<Timestamp>,
+        owner: Option<String>,
     },
     RegisterVestingAccounts {
         vesting_accounts: Vec<VestingAccount>,
     },
-    Claim {},
+    Claim {
+        recipient: Option<String>,
+        amount: Option<Uint128>,
+    },
 }
 
-/// CONTRACT: end_time > start_time
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct VestingAccount {
-    pub address: Addr,
-    pub schedules: Vec<(Timestamp, Timestamp, Uint128)>,
+    pub address: String,
+    pub schedules: Vec<VestingSchedule>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct VestingInfo {
-    pub schedules: Vec<(Timestamp, Timestamp, Uint128)>,
-    pub last_claim_time: Timestamp,
+    pub schedules: Vec<VestingSchedule>,
+    pub released_amount: Uint128,
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct VestingSchedule {
+    pub start_point: VestingSchedulePoint,
+    pub end_point: Option<VestingSchedulePoint>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct VestingSchedulePoint {
+    pub time: Timestamp,
+    pub amount: Uint128,
+}
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
@@ -56,7 +66,6 @@ pub enum QueryMsg {
 pub struct ConfigResponse {
     pub owner: Addr,
     pub token_addr: Addr,
-    pub genesis_time: Timestamp,
 }
 
 // We define a custom struct for each query response
@@ -79,8 +88,8 @@ pub enum OrderBy {
     Desc,
 }
 
-// We supress this clippy warning because Order in cosmwasm doesn't implement Debug and
-// ParialEq for usage in QueryMsg, we need to use our own OrderBy and
+// We suppress this clippy warning because Order in cosmwasm doesn't implement Debug and
+// PartialEq for usage in QueryMsg, we need to use our own OrderBy and
 // convert it finally to cosmwasm's Order
 #[allow(clippy::from_over_into)]
 impl Into<Order> for OrderBy {
