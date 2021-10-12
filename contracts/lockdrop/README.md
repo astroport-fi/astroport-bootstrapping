@@ -39,7 +39,7 @@ Note - Users can open muliple lockup positions with different lockup duration fo
 
 ### Callback Function flow
 
-![Alt text](../../LockdropContract_callback.png?raw=true 'Lockdrop Callback Msgs')
+![Alt text](../../LockdropContract_callbacks.png?raw=true 'Lockdrop Callback Msgs')
 
 ### Query Messages
 
@@ -51,10 +51,6 @@ Note - Users can open muliple lockup positions with different lockup duration fo
 | `QueryMsg::UserInfo`         | Returns info regarding a user (total ASTRO rewards, list of lockup positions)                                    |
 | `QueryMsg::LockUpInfo`       | Returns info regarding a particular lockup position with a given duration and identifer for the LP tokens locked |
 | `QueryMsg::LockUpInfoWithId` | Returns info regarding a particular lockup position                                                              |
-
-### Callback Function flow
-
-![Alt text](../../LockdropContract_callbacks.png?raw=true 'Lockdrop Callback Msgs')
 
 ## Build schema and run unit-tests
 
