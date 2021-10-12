@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 pub const CONFIG: Item<Config> = Item::new("config");
 pub const STATE: Item<State> = Item::new("state");
 pub const USERS: Map<&Addr, UserInfo> = Map::new("users");
-pub const CLAIMEES: Map<&[u8], IsClaimed> = Map::new("claimed");
+pub const CLAIMS: Map<String, bool> = Map::new("claims");
 
 //----------------------------------------------------------------------------------------
 // Storage types
@@ -25,13 +25,13 @@ pub struct Config {
     pub evm_merkle_roots: Vec<String>,
     /// Timestamp since which ASTRO airdrops can be delegated to boostrap auction contract
     pub from_timestamp: u64,
-    /// Timestamp till which ASTRO airdrops can be claimed
-    pub till_timestamp: u64,
+    /// Timestamp to which ASTRO airdrops can be claimed
+    pub to_timestamp: u64,
     /// Boostrap auction contract address
     pub boostrap_auction_address: Addr,
     /// Boolean value indicating if the users can withdraw their ASTRO airdrop tokens or not
     /// This value is updated in the same Tx in which Liquidity is added to the LP Pool
-    pub are_claims_allowed: bool,
+    pub are_claims_enabled: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -45,24 +45,14 @@ pub struct State {
     pub unclaimed_tokens: Uint128,
 }
 
-impl Default for State {
-    fn default() -> Self {
-        State {
-            total_airdrop_size: Uint128::zero(),
-            total_delegated_amount: Uint128::zero(),
-            unclaimed_tokens: Uint128::zero(),
-        }
-    }
-}
-
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct UserInfo {
     /// Total ASTRO airdrop tokens claimable by the user
     pub airdrop_amount: Uint128,
     /// ASTRO tokens delegated to the bootstrap auction contract to add to the user's position
     pub delegated_amount: Uint128,
-    /// Boolean value indicating if the user has claimed the remaning ASTRO tokens or not
-    pub are_claimed: bool,
+    /// Boolean value indicating if the user has withdrawn the remaining ASTRO tokens
+    pub tokens_withdrawn: bool,
 }
 
 impl Default for UserInfo {
@@ -70,19 +60,7 @@ impl Default for UserInfo {
         UserInfo {
             airdrop_amount: Uint128::zero(),
             delegated_amount: Uint128::zero(),
-            are_claimed: false,
+            tokens_withdrawn: false,
         }
-    }
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub struct IsClaimed {
-    pub is_claimed: bool,
-}
-
-impl Default for IsClaimed {
-    fn default() -> Self {
-        IsClaimed { is_claimed: false }
     }
 }

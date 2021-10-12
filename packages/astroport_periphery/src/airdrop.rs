@@ -5,12 +5,12 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InstantiateMsg {
     pub owner: Option<String>,
-    pub astro_token_address: Option<String>,
+    pub astro_token_address: String,
     pub terra_merkle_roots: Option<Vec<String>>,
     pub evm_merkle_roots: Option<Vec<String>>,
     pub from_timestamp: Option<u64>,
-    pub till_timestamp: Option<u64>,
-    pub boostrap_auction_address: Option<String>,
+    pub to_timestamp: u64,
+    pub boostrap_auction_address: String,
     pub total_airdrop_size: Uint128,
 }
 
@@ -19,7 +19,11 @@ pub struct InstantiateMsg {
 pub enum ExecuteMsg {
     /// Admin function to update the configuration parameters
     UpdateConfig {
-        new_config: InstantiateMsg,
+        owner: Option<String>,
+        terra_merkle_roots: Option<Vec<String>>,
+        evm_merkle_roots: Option<Vec<String>>,
+        from_timestamp: Option<u64>,
+        to_timestamp: Option<u64>,
     },
     // Called by the bootstrap auction contract when liquidity is added to the
     // ASTRO-UST Pool to enable ASTRO withdrawals by users
@@ -77,7 +81,7 @@ pub struct ConfigResponse {
     pub terra_merkle_roots: Vec<String>,
     pub evm_merkle_roots: Vec<String>,
     pub from_timestamp: u64,
-    pub till_timestamp: u64,
+    pub to_timestamp: u64,
     pub boostrap_auction_address: String,
     pub are_claims_allowed: bool,
 }
@@ -93,7 +97,7 @@ pub struct StateResponse {
 pub struct UserInfoResponse {
     pub airdrop_amount: Uint128,
     pub delegated_amount: Uint128,
-    pub are_claimed: bool,
+    pub tokens_withdrawn: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
