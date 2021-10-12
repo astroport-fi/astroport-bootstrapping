@@ -1,16 +1,16 @@
-use cosmwasm_std::{Addr, Uint128};
+use cosmwasm_std::Uint128;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InstantiateMsg {
-    pub owner: Option<Addr>,
-    pub astro_token_address: Addr,
+    pub owner: Option<String>,
+    pub astro_token_address: String,
     pub terra_merkle_roots: Option<Vec<String>>,
     pub evm_merkle_roots: Option<Vec<String>>,
     pub from_timestamp: Option<u64>,
     pub to_timestamp: u64,
-    pub boostrap_auction_address: Addr,
+    pub boostrap_auction_address: String,
     pub total_airdrop_size: Uint128,
 }
 
@@ -19,7 +19,7 @@ pub struct InstantiateMsg {
 pub enum ExecuteMsg {
     /// Admin function to update the configuration parameters
     UpdateConfig {
-        owner: Option<Addr>,
+        owner: Option<String>,
         terra_merkle_roots: Option<Vec<String>>,
         evm_merkle_roots: Option<Vec<String>>,
         from_timestamp: Option<u64>,
