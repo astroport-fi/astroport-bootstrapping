@@ -361,13 +361,13 @@ pub fn handle_initialize_pool(
         query_terraswap_pair_assets(&deps.querier, terraswap_pool.pair_addr.to_string())?;
 
     // Update PoolInfo with the pool assets
-    for asset_info in pool_assets {
-        match asset_info.info {
+    for asset_info in &pool_assets {
+        match &asset_info.info {
             terraswap::asset::AssetInfo::NativeToken { denom } => {
-                pool_info.native_asset.denom = denom;
+                pool_info.native_asset.denom = denom.to_string();
             }
             terraswap::asset::AssetInfo::Token { contract_addr } => {
-                pool_info.cw20_asset.contract_addr = contract_addr;
+                pool_info.cw20_asset.contract_addr = contract_addr.to_string();
             }
         }
     }
@@ -562,6 +562,8 @@ pub fn handle_migrate_liquidity(
         return Err(StdError::generic_err("Liquidity already migrated"));
     }
 
+    let mut cosmos_msgs = vec![];
+
     // COSMOS MSG :: WITHDRAW LIQUIDITY FROM TERRASWAP
     let withdraw_msg_ = to_binary(&terraswap::pair::Cw20HookMsg::WithdrawLiquidity {})?;
     let withdraw_liquidity_msg = build_send_cw20_token_msg(
@@ -570,6 +572,7 @@ pub fn handle_migrate_liquidity(
         pool_info.terraswap_pair.amount.into(),
         withdraw_msg_,
     )?;
+    cosmos_msgs.push(withdraw_liquidity_msg);
 
     // QUERY :: Get current Asset and uusd balances, passed to callback function to be subtracted from asset balances post liquidity withdrawal from terraswap
     let asset_balance = cw20_get_balance(
@@ -601,9 +604,10 @@ pub fn handle_migrate_liquidity(
         },
     }
     .to_cosmos_msg(&env.contract.address)?;
+    cosmos_msgs.push(update_state_msg);
 
     Ok(Response::new()
-        .add_messages([withdraw_liquidity_msg, update_state_msg])
+        .add_messages(cosmos_msgs)
         .add_attributes(vec![
             ("action", "lockdrop::ExecuteMsg::MigrateLiquidity"),
             ("pool_identifer", &pool_identifer),
@@ -1437,6 +1441,8 @@ pub fn callback_deposit_liquidity_in_astroport(
     };
     let assets_ = [cw20_asset_, native_asset_];
 
+    let mut cosmos_msgs = vec![];
+
     // COSMOS MSGS
     // :: 1.  APPROVE CW20 Token WITH ASTROPORT POOL ADDRESS AS BENEFICIARY
     // :: 2.  ADD LIQUIDITY
@@ -1446,6 +1452,7 @@ pub fn callback_deposit_liquidity_in_astroport(
         astroport_pool.pair_addr.to_string(),
         asset_balance_withdrawn,
     )?;
+    cosmos_msgs.push(approve_cw20_msg);
     let add_liquidity_msg = build_provide_liquidity_to_lp_pool_msg(
         deps.as_ref(),
         assets_,
@@ -1453,15 +1460,17 @@ pub fn callback_deposit_liquidity_in_astroport(
         native_asset.denom,
         native_balance_withdrawn,
     )?;
+    cosmos_msgs.push(add_liquidity_msg);
     let update_state_msg = CallbackMsg::UpdateStateLiquidityMigrationCallback {
         pool_identifer: pool_identifer.clone(),
         astroport_pool,
         astroport_lp_balance,
     }
     .to_cosmos_msg(&env.contract.address)?;
+    cosmos_msgs.push(update_state_msg);
 
     Ok(Response::new()
-        .add_messages([approve_cw20_msg, add_liquidity_msg, update_state_msg])
+        .add_messages(cosmos_msgs)
         .add_attributes(vec![
             ("action", "lockdrop::CallbackMsg::AddLiquidityToAstroport"),
             ("pool_identifer", &pool_identifer),
@@ -1868,8 +1877,8 @@ fn prepare_cosmos_msgs_to_claim_dual_rewards(
     asset_token_addr: Addr,
     astroport_lp_token: Addr,
     contract_addr: Addr,
-) -> StdResult<[CosmosMsg; 2]> {
-    // let mut cosmos_msgs = [];
+) -> StdResult<Vec<CosmosMsg>> {
+    let mut cosmos_msgs = vec![];
 
     // Callback Cosmos Msg :: Add Cosmos Msg to claim rewards from the generator contract
     let dual_reward_claim_msg = build_claim_dual_rewards(
@@ -1877,6 +1886,8 @@ fn prepare_cosmos_msgs_to_claim_dual_rewards(
         astroport_lp_token,
         config.generator_address.clone(),
     )?;
+    cosmos_msgs.push(dual_reward_claim_msg);
+
     // QUERY :: Current ASTRO & ASSET Token Balance
     let astro_balance = cw20_get_balance(
         &querier,
@@ -1891,7 +1902,9 @@ fn prepare_cosmos_msgs_to_claim_dual_rewards(
         prev_dual_reward_balance: dual_reward_balance.into(),
     }
     .to_cosmos_msg(&contract_addr)?;
-    Ok([dual_reward_claim_msg, update_pool_state_msg])
+    cosmos_msgs.push(update_pool_state_msg);
+
+    Ok(cosmos_msgs)
 }
 
 /// @dev Returns CosmosMsg to unstake Astroport LP Tokens from the generator contract

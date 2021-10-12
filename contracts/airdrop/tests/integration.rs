@@ -44,13 +44,13 @@ fn init_contracts(app: &mut App, aidrop_instantiate_msg: &InstantiateMsg) -> Add
 fn airdrop_init_msg() -> InstantiateMsg {
     // Config with valid base params
     InstantiateMsg {
-        owner: Some(Addr::unchecked("contract_owner")),
-        astro_token_address: Addr::unchecked("astro_token_contract"),
+        owner: Some(String::from("contract_owner")),
+        astro_token_address: String::from("astro_token_contract"),
         terra_merkle_roots: Some(vec!["terra_merkle_roots".to_string()]),
         evm_merkle_roots: Some(vec!["evm_merkle_roots".to_string()]),
         from_timestamp: Some(1_000_000_000),
         to_timestamp: 100_000_000_000,
-        boostrap_auction_address: Addr::unchecked("boostrap_auction_address"),
+        boostrap_auction_address: String::from("boostrap_auction_address"),
         total_airdrop_size: Uint128::new(100_000_000_000),
     }
 }
@@ -121,7 +121,7 @@ fn update_config() {
         "Generic error: Only owner can update configuration"
     );
 
-    let new_owner = Addr::unchecked("new_owner");
+    let new_owner = String::from("new_owner");
     let terra_merkle_roots = vec!["new_terra_merkle_roots".to_string()];
     let evm_merkle_roots = vec!["new_evm_merkle_roots".to_string()];
     let from_timestamp = 2_000_000_000;
@@ -137,7 +137,7 @@ fn update_config() {
 
     // should be a success
     app.execute_contract(
-        init_msg.owner.unwrap(),
+        Addr::unchecked(init_msg.owner.unwrap()),
         airdrop_instance.clone(),
         &update_msg,
         &[],

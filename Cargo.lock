@@ -89,6 +89,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "autocfg"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cdb031dd78e28731d87d56cc8ffef4a8f36ca26c38fe2de700543e627f8a464a"
+
+[[package]]
 name = "base64"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -355,6 +361,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "cw20-legacy"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6d27b11827323369993519abb494f3ae9b6aac4d716d058bea5e181b9b0074b7"
+dependencies = [
+ "cosmwasm-std",
+ "cosmwasm-storage",
+ "cw-storage-plus",
+ "cw0",
+ "cw2",
+ "cw20",
+ "cw20-base",
+ "schemars",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "der"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -496,6 +520,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "integer-sqrt"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "276ec31bcb4a9ee45f58bec6f9ec700ae4cf4f4f8f2fa7e06cb406bd5ffdd770"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
 name = "itertools"
 version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -535,6 +568,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2a5ac8f984bfcf3a823267e5fde638acc3325f6496633a5da6bb6eb2171e103"
 
 [[package]]
+name = "num-traits"
+version = "0.2.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9a64b1ec5cda2586e284722486d802acf1f7dbdc623e2bfc57e65ca1cd099290"
+dependencies = [
+ "autocfg",
+]
+
+[[package]]
 name = "opaque-debug"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -557,6 +599,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b9f5105d4fdaab20335ca9565e106a5d9b82b6219b5ba735731124ac6711d23d"
 dependencies = [
  "unicode-xid",
+]
+
+[[package]]
+name = "protobuf"
+version = "2.25.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "23129d50f2c9355ced935fce8a08bd706ee2e7ce2b3b33bf61dace0e379ac63a"
+dependencies = [
+ "bytes",
 ]
 
 [[package]]
@@ -809,6 +860,74 @@ dependencies = [
  "schemars",
  "serde",
  "terra-cosmwasm",
+]
+
+[[package]]
+name = "terraswap-factory"
+version = "0.0.0"
+dependencies = [
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cosmwasm-storage",
+ "cw-storage-plus",
+ "protobuf",
+ "schemars",
+ "serde",
+ "terraswap",
+]
+
+[[package]]
+name = "terraswap-pair"
+version = "0.0.0"
+dependencies = [
+ "cosmwasm-bignumber",
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cosmwasm-storage",
+ "cw-storage-plus",
+ "cw2",
+ "cw20",
+ "integer-sqrt",
+ "protobuf",
+ "schemars",
+ "serde",
+ "terra-cosmwasm",
+ "terraswap",
+ "thiserror",
+]
+
+[[package]]
+name = "terraswap-router"
+version = "0.0.0"
+dependencies = [
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cosmwasm-storage",
+ "cw-storage-plus",
+ "cw20",
+ "integer-sqrt",
+ "schemars",
+ "serde",
+ "terra-cosmwasm",
+ "terraswap",
+]
+
+[[package]]
+name = "terraswap-token"
+version = "0.0.0"
+dependencies = [
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cosmwasm-storage",
+ "cw-storage-plus",
+ "cw0",
+ "cw2",
+ "cw20",
+ "cw20-legacy",
+ "schemars",
+ "serde",
+ "terraswap",
+ "thiserror",
 ]
 
 [[package]]

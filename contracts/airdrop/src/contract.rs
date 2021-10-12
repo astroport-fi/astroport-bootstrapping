@@ -34,7 +34,7 @@ pub fn instantiate(
     }
 
     let owner = if let Some(owner) = msg.owner {
-        deps.api.addr_validate(owner.as_str())?
+        deps.api.addr_validate(&owner)?
     } else {
         info.sender
     };
@@ -45,14 +45,12 @@ pub fn instantiate(
 
     let config = Config {
         owner,
-        astro_token_address: deps.api.addr_validate(msg.astro_token_address.as_str())?,
+        astro_token_address: deps.api.addr_validate(&msg.astro_token_address)?,
         terra_merkle_roots: msg.terra_merkle_roots.unwrap_or_default(),
         evm_merkle_roots: msg.evm_merkle_roots.unwrap_or_default(),
         from_timestamp,
         to_timestamp: msg.to_timestamp,
-        boostrap_auction_address: deps
-            .api
-            .addr_validate(msg.boostrap_auction_address.as_str())?,
+        boostrap_auction_address: deps.api.addr_validate(&msg.boostrap_auction_address)?,
         are_claims_enabled: false,
     };
 
@@ -154,7 +152,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 pub fn handle_update_config(
     deps: DepsMut,
     info: MessageInfo,
-    owner: Option<Addr>,
+    owner: Option<String>,
     terra_merkle_roots: Option<Vec<String>>,
     evm_merkle_roots: Option<Vec<String>>,
     from_timestamp: Option<u64>,
@@ -168,7 +166,7 @@ pub fn handle_update_config(
     }
 
     if let Some(owner) = owner {
-        config.owner = deps.api.addr_validate(owner.as_str())?;
+        config.owner = deps.api.addr_validate(&owner)?;
     }
 
     if let Some(terra_merkle_roots) = terra_merkle_roots {
