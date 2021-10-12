@@ -37,6 +37,10 @@ Note - Users can open muliple lockup positions with different lockup duration fo
 | `CallbackMsg::WithdrawLiquidityFromTerraswapCallback` | Callback function used during liquidity migration to update state after liquidity is removed from terraswap                                                                |
 | `CallbackMsg::UpdateStateLiquidityMigrationCallback`  | Callback function used during liquidity migration to update state after liquidity is added to astroport                                                                    |
 
+### Callback Function flow
+
+![Alt text](../../LockdropContract_callback.png?raw=true 'Lockdrop Callback Msgs')
+
 ### Query Messages
 
 | Message                      | Description                                                                                                      |
@@ -50,7 +54,7 @@ Note - Users can open muliple lockup positions with different lockup duration fo
 
 ### Callback Function flow
 
-![Alt text](../../Lockdrop_msg.png?raw=true 'Lockdrop Callback Msgs')
+![Alt text](../../LockdropContract_callbacks.png?raw=true 'Lockdrop Callback Msgs')
 
 ## Build schema and run unit-tests
 

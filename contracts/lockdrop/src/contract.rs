@@ -126,20 +126,18 @@ pub fn execute(
             handle_tranfer_returned_astro(deps, info, recepient, amount)
         }
 
+        ExecuteMsg::DelegateAstroToAuction { amount } => {
+            handle_delegate_astro_to_auction(deps, _env, info, amount)
+        }
         ExecuteMsg::WithdrawFromLockup {
             pool_identifer,
             duration,
             amount,
         } => handle_withdraw_from_lockup(deps, _env, info, pool_identifer, duration, amount),
-
-        ExecuteMsg::DelegateAstroToAuction { amount } => {
-            handle_delegate_astro_to_auction(deps, _env, info, amount)
-        }
         ExecuteMsg::ClaimRewardsForLockup {
             pool_identifer,
             duration,
         } => handle_claim_rewards_for_lockup(deps, _env, info, pool_identifer, duration),
-
         ExecuteMsg::UnlockPosition {
             pool_identifer,
             duration,
