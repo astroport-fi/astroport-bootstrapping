@@ -1,7 +1,7 @@
 use crate::tax::deduct_tax;
 use cosmwasm_bignumber::Uint256;
 use cosmwasm_std::{
-    to_binary, Addr, BalanceResponse, BankMsg, BankQuery, Binary, Coin, CosmosMsg, Deps,
+    to_binary, Addr, Api, BalanceResponse, BankMsg, BankQuery, Binary, Coin, CosmosMsg, Deps,
     QuerierWrapper, QueryRequest, StdResult, Uint128, WasmMsg, WasmQuery,
 };
 use cw20::BalanceResponse as CW20BalanceResponse;
@@ -20,7 +20,7 @@ pub fn build_transfer_cw20_token_msg(
         contract_addr: token_contract_address,
         msg: to_binary(&CW20ExecuteMsg::Transfer {
             recipient: recipient.into(),
-            amount: amount.into(),
+            amount,
         })?,
         funds: vec![],
     }))
@@ -34,10 +34,10 @@ pub fn build_transfer_cw20_from_user_msg(
     amount: Uint256,
 ) -> StdResult<CosmosMsg> {
     Ok(CosmosMsg::Wasm(WasmMsg::Execute {
-        contract_addr: cw20_token_address.to_string(),
+        contract_addr: cw20_token_address,
         funds: vec![],
         msg: to_binary(&cw20::Cw20ExecuteMsg::TransferFrom {
-            owner: owner,
+            owner,
             recipient: recepient,
             amount: amount.into(),
         })?,
@@ -59,7 +59,7 @@ pub fn build_send_cw20_token_msg(
         contract_addr: token_contract_address,
         msg: to_binary(&CW20ExecuteMsg::Send {
             contract: recipient_contract_addr,
-            amount: amount.into(),
+            amount,
             msg: msg_,
         })?,
         funds: vec![],
@@ -86,6 +86,19 @@ pub fn build_send_native_asset_msg(
             },
         )?],
     }))
+}
+
+/// Used when unwrapping an optional address sent in a contract call by a user.
+/// Validates addreess if present, otherwise uses a given default value.
+pub fn option_string_to_addr(
+    api: &dyn Api,
+    option_string: Option<String>,
+    default: Addr,
+) -> StdResult<Addr> {
+    match option_string {
+        Some(input_addr) => api.addr_validate(&input_addr),
+        None => Ok(default),
+    }
 }
 
 // native coins
@@ -126,7 +139,7 @@ pub fn build_approve_cw20_msg(
         contract_addr: token_contract_address,
         msg: to_binary(&CW20ExecuteMsg::IncreaseAllowance {
             spender: spender_address,
-            amount: allowance_amount.into(),
+            amount: allowance_amount,
             expires: None,
         })?,
         funds: vec![],

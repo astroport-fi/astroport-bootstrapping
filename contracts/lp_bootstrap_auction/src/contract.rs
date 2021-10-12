@@ -220,7 +220,7 @@ pub fn handle_delegate_astro_tokens(
 
     let mut state = STATE.load(deps.storage)?;
     let mut user_info = USERS
-        .may_load(deps.storage, &user_address.clone())?
+        .may_load(deps.storage, &user_address)?
         .unwrap_or_default();
 
     // UPDATE STATE
@@ -252,9 +252,9 @@ pub fn handle_deposit_ust(
     }
 
     let mut state = STATE.load(deps.storage)?;
-    let depositor_address = info.sender.clone();
+    let depositor_address = info.sender;
     let mut user_info = USERS
-        .may_load(deps.storage, &depositor_address.clone())?
+        .may_load(deps.storage, &depositor_address)?
         .unwrap_or_default();
 
     // Retrieve UST sent by the user
@@ -285,9 +285,9 @@ pub fn handle_withdraw_ust(
 ) -> Result<Response, StdError> {
     let config = CONFIG.load(deps.storage)?;
     let mut state = STATE.load(deps.storage)?;
-    let user_address = info.sender.clone();
+    let user_address = info.sender;
     let mut user_info = USERS
-        .may_load(deps.storage, &user_address.clone())?
+        .may_load(deps.storage, &user_address)?
         .unwrap_or_default();
 
     // CHECK :: Has the user already withdrawn during the current window
@@ -295,9 +295,9 @@ pub fn handle_withdraw_ust(
         return Err(StdError::generic_err("Max 1 withdrawal allowed"));
     }
 
-    // Check :: Amount should be withing the allowed withdrawal limit bounds
+    // Check :: Amount should be within the allowed withdrawal limit bounds
     let max_withdrawal_percent =
-        calculate_max_withdrawals_allowed(_env.block.time.seconds(), &config);
+        calculate_max_withdrawal_percent_allowed(_env.block.time.seconds(), &config);
     let max_withdrawal_allowed = user_info.ust_deposited * max_withdrawal_percent;
     if amount > max_withdrawal_allowed {
         return Err(StdError::generic_err(
@@ -319,7 +319,7 @@ pub fn handle_withdraw_ust(
 
     // COSMOSMSG :: Transfer UST to the user
     let ust_transfer_msg =
-        build_send_native_asset_msg(deps.as_ref(), user_address.clone(), &"uusd", amount)?;
+        build_send_native_asset_msg(deps.as_ref(), user_address.clone(), "uusd", amount)?;
 
     Ok(Response::new()
         .add_message(ust_transfer_msg)
@@ -427,9 +427,9 @@ pub fn handle_claim_rewards(
 ) -> Result<Response, StdError> {
     let config = CONFIG.load(deps.storage)?;
     let state = STATE.load(deps.storage)?;
-    let depositor_address = info.sender.clone();
+    let depositor_address = info.sender;
     let user_info = USERS
-        .may_load(deps.storage, &depositor_address.clone())?
+        .may_load(deps.storage, &depositor_address)?
         .unwrap_or_default();
 
     // CHECK :: Deposit / withdrawal windows need to be over
@@ -462,7 +462,7 @@ pub fn handle_claim_rewards(
     // -->add CallbackMsg::UpdateStateOnRewardClaim{} msg to the cosmos msg array
     let astro_balance = cw20_get_balance(
         &deps.querier,
-        config.astro_token_address.clone(),
+        config.astro_token_address,
         _env.contract.address.clone(),
     )?;
     let update_state_msg = CallbackMsg::UpdateStateOnRewardClaim {
@@ -488,9 +488,9 @@ pub fn handle_withdraw_unlocked_lp_shares(
 ) -> Result<Response, StdError> {
     let config = CONFIG.load(deps.storage)?;
     let mut state = STATE.load(deps.storage)?;
-    let user_address = info.sender.clone();
+    let user_address = info.sender;
     let mut user_info = USERS
-        .may_load(deps.storage, &user_address.clone())?
+        .may_load(deps.storage, &user_address)?
         .unwrap_or_default();
 
     // CHECK :: Deposit / withdrawal windows need to be over
@@ -622,7 +622,7 @@ pub fn update_state_on_reward_claim(
     let config = CONFIG.load(deps.storage)?;
     let mut state = STATE.load(deps.storage)?;
     let mut user_info = USERS
-        .may_load(deps.storage, &user_address.clone())?
+        .may_load(deps.storage, &user_address)?
         .unwrap_or_default();
 
     // QUERY CURRENT LP TOKEN BALANCE :: NEWLY MINTED LP TOKENS
@@ -639,7 +639,7 @@ pub fn update_state_on_reward_claim(
     let mut staking_reward = Uint256::zero();
     if user_info.total_auction_incentives == Uint256::zero() {
         user_info.total_auction_incentives =
-            calculate_auction_reward_for_user(&state, &mut user_info, config.astro_rewards);
+            calculate_auction_reward_for_user(&state, &user_info, config.astro_rewards);
     }
 
     // ASTRO Incentives :: Calculate the unvested amount which can be claimed by the user
@@ -664,7 +664,7 @@ pub fn update_state_on_reward_claim(
     if user_astro_rewards > Uint256::zero() {
         let transfer_astro_rewards = build_transfer_cw20_token_msg(
             user_address.clone(),
-            config.astro_token_address.clone().to_string(),
+            config.astro_token_address.to_string(),
             user_astro_rewards.into(),
         )?;
         cosmos_msgs.push(transfer_astro_rewards);
@@ -732,7 +732,7 @@ fn query_user_info(deps: Deps, _env: Env, user_address: String) -> StdResult<Use
 
     if user_info.total_auction_incentives == Uint256::zero() {
         user_info.total_auction_incentives =
-            calculate_auction_reward_for_user(&state, &mut user_info, config.astro_rewards);
+            calculate_auction_reward_for_user(&state, &user_info, config.astro_rewards);
     }
     let claimable_lp_shares =
         calculate_withdrawable_lp_shares(_env.block.time.seconds(), &config, &state, &user_info);
@@ -767,7 +767,7 @@ fn query_user_info(deps: Deps, _env: Env, user_address: String) -> StdResult<Use
         ust_deposited: user_info.ust_deposited,
         lp_shares: user_info.lp_shares,
         claimed_lp_shares: user_info.claimed_lp_shares,
-        claimable_lp_shares: claimable_lp_shares,
+        claimable_lp_shares,
         total_auction_incentives: user_info.total_auction_incentives,
         claimed_auction_incentives: user_info.claimed_auction_incentives,
         claimable_auction_incentives: claimable_auction_reward,
@@ -815,11 +815,9 @@ fn update_astro_rewards_index(state: &mut State, astro_accured: Uint256) {
     if !state.are_staked {
         return;
     }
-    let astro_rewards_index_increment = Decimal256::from_ratio(
-        Uint256::from(astro_accured),
-        Uint256::from(state.lp_shares_minted),
-    );
-    state.global_reward_index = state.global_reward_index + astro_rewards_index_increment;
+    let astro_rewards_index_increment =
+        Decimal256::from_ratio(astro_accured, state.lp_shares_minted);
+    state.global_reward_index += astro_rewards_index_increment;
 }
 
 // Accrue ASTRO reward for the user by updating the user reward index and adding rewards to the pending rewards
@@ -848,7 +846,7 @@ fn is_deposit_open(current_timestamp: u64, config: &Config) -> bool {
 ///  @dev Helper function to calculate maximum % of their total UST deposited that can be withdrawn
 /// Returns % UST that can be withdrawn and 'more_withdrawals_allowed' boolean which indicates whether more withdrawls by the user
 /// will be allowed or not
-fn calculate_max_withdrawals_allowed(current_timestamp: u64, config: &Config) -> Decimal256 {
+fn calculate_max_withdrawal_percent_allowed(current_timestamp: u64, config: &Config) -> Decimal256 {
     let withdrawal_cutoff_init_point = config.init_timestamp + config.deposit_window;
     // Deposit window :: 100% withdrawals allowed
     if current_timestamp <= withdrawal_cutoff_init_point {
@@ -866,11 +864,11 @@ fn calculate_max_withdrawals_allowed(current_timestamp: u64, config: &Config) ->
     if current_timestamp < withdrawal_cutoff_final {
         let slope = Decimal256::from_ratio(50u64, config.withdrawal_window / 2u64);
         let time_elapsed = current_timestamp - withdrawal_cutoff_sec_point;
-        return Decimal256::from_ratio(time_elapsed, 1u64) * slope;
+        Decimal256::from_ratio(time_elapsed, 1u64) * slope
     }
     // Withdrawals not allowed
     else {
-        return Decimal256::from_ratio(0u32, 100u32);
+        Decimal256::from_ratio(0u32, 100u32)
     }
 }
 
@@ -917,7 +915,7 @@ pub fn build_stake_with_generator_msg(config: &Config, amount: Uint256) -> StdRe
     Ok(CosmosMsg::Wasm(WasmMsg::Execute {
         contract_addr: config.generator_contract.to_string(),
         msg: to_binary(&astroport::generator::ExecuteMsg::Deposit {
-            lp_token: config.lp_token_address.clone().into(),
+            lp_token: config.lp_token_address.clone(),
             amount: amount.into(),
         })?,
         funds: vec![],
@@ -932,7 +930,7 @@ pub fn build_unstake_from_generator_msg(
     Ok(CosmosMsg::Wasm(WasmMsg::Execute {
         contract_addr: config.generator_contract.to_string(),
         msg: to_binary(&astroport::generator::ExecuteMsg::Withdraw {
-            lp_token: config.lp_token_address.clone().into(),
+            lp_token: config.lp_token_address.clone(),
             amount: lp_shares_to_withdraw.into(),
         })?,
         funds: vec![],
@@ -966,7 +964,7 @@ fn build_provide_liquidity_to_lp_pool_msg(
     let uust_to_deposit = Uint128::from(state.total_ust_deposited);
     let uust = Coin {
         denom: uusd_denom.clone(),
-        amount: uust_to_deposit.clone(),
+        amount: uust_to_deposit,
     };
     let tax_amount = compute_tax(deps, &uust)?;
 
@@ -1225,7 +1223,7 @@ fn build_claim_astro_rewards(
 //         // *** Test Transfer Msg ***
 //         let transfer_msg = TransferUnclaimedTokens {
 //             recepient: "terra17lmam6zguazs5q5u6z5mmx76uj63gldnse2pdp".to_string(),
-//             amount:  Uint256::from(1000 as u64)
+//             amount:  Uint256::from(1000_u64)
 //         };
 
 //         // should fail as only owner can Execute Transfer
@@ -1249,7 +1247,7 @@ fn build_claim_astro_rewards(
 //                     funds: vec![],
 //                     msg: to_binary(&CW20ExecuteMsg::Transfer {
 //                         recipient: "terra17lmam6zguazs5q5u6z5mmx76uj63gldnse2pdp".to_string(),
-//                         amount: Uint256::from(1000 as u64),
+//                         amount: Uint256::from(1000_u64),
 //                     }).unwrap(),
 //             }))]
 //         );
@@ -1287,19 +1285,19 @@ fn build_claim_astro_rewards(
 //         assert_eq!(config.till_timestamp, 1_771_797 );
 
 //         let mut claim_msg = ClaimByTerraUser {
-//                                             claim_amount : Uint256::from(250000000 as u64),
+//                                             claim_amount : Uint256::from(250000000_u64),
 //                                             merkle_proof : vec!["7719b79a65e5aa0bbfd144cf5373138402ab1c374d9049e490b5b61c23d90065".to_string(),
 //                                                                 "60368f2058e0fb961a7721a241f9b973c3dd6c57e10a627071cd81abca6aa490".to_string()],
 //                                             root_index : 0
 //                                         };
 //         let mut claim_msg_wrong_amount = ClaimByTerraUser {
-//                                             claim_amount : Uint256::from(210000000 as u64),
+//                                             claim_amount : Uint256::from(210000000_u64),
 //                                             merkle_proof : vec!["7719b79a65e5aa0bbfd144cf5373138402ab1c374d9049e490b5b61c23d90065".to_string(),
 //                                                                 "60368f2058e0fb961a7721a241f9b973c3dd6c57e10a627071cd81abca6aa490".to_string()],
 //                                             root_index : 0
 //                                         };
 //         let mut claim_msg_incorrect_proof = ClaimByTerraUser {
-//                                                         claim_amount : Uint256::from(250000000 as u64),
+//                                                         claim_amount : Uint256::from(250000000_u64),
 //                                                         merkle_proof : vec!["7719b79a65e4aa0bbfd144cf5373138402ab1c374d9049e490b5b61c23d90065".to_string(),
 //                                                                             "60368f2058e0fb961a7721a241f9b973c3dd6c57e10a627071cd81abca6aa490".to_string()],
 //                                                         root_index : 0
@@ -1355,7 +1353,7 @@ fn build_claim_astro_rewards(
 //                     funds: vec![],
 //                     msg: to_binary(&CW20ExecuteMsg::Transfer {
 //                         recipient: "terra17lmam6zguazs5q5u6z5mmx76uj63gldnse2pdp".to_string(),
-//                         amount: Uint256::from(250000000 as u64),
+//                         amount: Uint256::from(250000000_u64),
 //                     }).unwrap(),
 //             }))]
 //         );
@@ -1472,7 +1470,7 @@ fn build_claim_astro_rewards(
 //                                         };
 //         let claim_msg_wrong_amount = ClaimByEvmUser {
 //                                             eth_address : user_info_evm_address.to_string() ,
-//                                             claim_amount : Uint256::from(150000000 as u64),
+//                                             claim_amount : Uint256::from(150000000_u64),
 //                                             merkle_proof : vec!["0a3419fc5fa4cb0ecb878dc3aaf01fa00782e5d79b02fbb4097dc8df8f191c60".to_string(),
 //                                                                 "45cc757ac5eda8bcd1a45a7bd2cb23f4af5147683f120fa287b99617834b83aa".to_string()],
 //                                             root_index : 0,

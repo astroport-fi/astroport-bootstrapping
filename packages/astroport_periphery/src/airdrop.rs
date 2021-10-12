@@ -5,12 +5,12 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InstantiateMsg {
     pub owner: Option<Addr>,
-    pub astro_token_address: Option<Addr>,
+    pub astro_token_address: Addr,
     pub terra_merkle_roots: Option<Vec<String>>,
     pub evm_merkle_roots: Option<Vec<String>>,
     pub from_timestamp: Option<u64>,
-    pub till_timestamp: Option<u64>,
-    pub boostrap_auction_address: Option<Addr>,
+    pub to_timestamp: u64,
+    pub boostrap_auction_address: Addr,
     pub total_airdrop_size: Uint128,
 }
 
@@ -19,7 +19,11 @@ pub struct InstantiateMsg {
 pub enum ExecuteMsg {
     /// Admin function to update the configuration parameters
     UpdateConfig {
-        new_config: InstantiateMsg,
+        owner: Option<Addr>,
+        terra_merkle_roots: Option<Vec<String>>,
+        evm_merkle_roots: Option<Vec<String>>,
+        from_timestamp: Option<u64>,
+        to_timestamp: Option<u64>,
     },
     // Called by the bootstrap auction contract when liquidity is added to the
     // ASTRO-UST Pool to enable ASTRO withdrawals by users
@@ -77,7 +81,7 @@ pub struct ConfigResponse {
     pub terra_merkle_roots: Vec<String>,
     pub evm_merkle_roots: Vec<String>,
     pub from_timestamp: u64,
-    pub till_timestamp: u64,
+    pub to_timestamp: u64,
     pub boostrap_auction_address: String,
     pub are_claims_allowed: bool,
 }

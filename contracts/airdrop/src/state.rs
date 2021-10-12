@@ -25,8 +25,8 @@ pub struct Config {
     pub evm_merkle_roots: Vec<String>,
     /// Timestamp since which ASTRO airdrops can be delegated to boostrap auction contract
     pub from_timestamp: u64,
-    /// Timestamp till which ASTRO airdrops can be claimed
-    pub till_timestamp: u64,
+    /// Timestamp to which ASTRO airdrops can be claimed
+    pub to_timestamp: u64,
     /// Boostrap auction contract address
     pub boostrap_auction_address: Addr,
     /// Boolean value indicating if the users can withdraw their ASTRO airdrop tokens or not

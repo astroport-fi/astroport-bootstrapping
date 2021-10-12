@@ -2,6 +2,7 @@ use cosmwasm_std::Addr;
 use cw_storage_plus::{Item, Map};
 
 use astroport_periphery::asset::{Cw20Asset, LiquidityPool, NativeAsset};
+use astroport_periphery::helpers::zero_address;
 use cosmwasm_bignumber::{Decimal256, Uint256};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -77,6 +78,35 @@ pub struct PoolInfo {
     pub is_migrated: bool,
 }
 
+impl Default for PoolInfo {
+    fn default() -> Self {
+        PoolInfo {
+            terraswap_pair: LiquidityPool {
+                lp_token_addr: zero_address(),
+                pair_addr: zero_address(),
+                amount: Uint256::zero(),
+            },
+            astroport_pair: LiquidityPool {
+                lp_token_addr: zero_address(),
+                pair_addr: zero_address(),
+                amount: Uint256::zero(),
+            },
+            cw20_asset: Cw20Asset {
+                contract_addr: "".to_string(),
+            },
+            native_asset: NativeAsset {
+                denom: "uuusd".to_string(),
+            },
+            incentives_percent: Decimal256::zero(),
+            weighted_amount: Uint256::zero(),
+            astro_global_reward_index: Decimal256::zero(),
+            asset_global_reward_index: Decimal256::zero(),
+            is_staked: false,
+            is_migrated: false,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct UserInfo {
     /// Total ASTRO tokens user received as rewards for participation in the lockdrop
@@ -125,13 +155,13 @@ impl Default for LockupInfo {
     fn default() -> Self {
         LockupInfo {
             pool_identifier: "".to_string(),
-            duration: 0 as u64,
+            duration: 0_u64,
             lp_units_locked: Uint256::zero(),
             astroport_lp_units: Uint256::zero(),
             astro_rewards: Uint256::zero(),
             is_migrated: false,
             withdrawal_counter: false,
-            unlock_timestamp: 0 as u64,
+            unlock_timestamp: 0_u64,
             astro_reward_index: Decimal256::zero(),
             dual_reward_index: Decimal256::zero(),
         }

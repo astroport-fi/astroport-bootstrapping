@@ -1,59 +1,63 @@
 # Lockdrop
 
-The lockdrop contract allows users to lock their UST for selected duration against which they are given MARS tokens pro-rata to their wighted share to the total UST deposited in the contract.
+The lockdrop contract allows users to lock any of the supported Terraswap LP tokens locked for a selected duration against which they will receive ASTRO tokens pro-rata to their wighted share of the LP tokens to the total deposited LP tokens for that particular pool in the contract.
 
-Upon expiration of the deposit window, all the locked UST is deposited in the Red Bank and users are allowed to claim their MARS allocations. 
+- Upon lockup expiration, users will receive Astroport LP tokens on an equivalent weight basis as per their initial Terraswap LP token deposits.
 
-UST deposited in the Red Bank keeps accruing XMARS tokens which are claimable by the users.
+- Users can optionally unlock their lockup positions before the lockup duration completion by returning the ASTRO tokens which they received for participation in the lockup.
 
-Upon expiration of the lockup, users can withdraw their deposits as interest bearing maUST tokens, redeemable against UST via the Red Bank.
-
-Note - Users can open muliple lockup positions with different lockup periods with the lockdrop contract
-
+Note - Users can open muliple lockup positions with different lockup duration for each LP Token pool
 
 ## Contract Design
 
 ### Handle Messages
 
-| Message                       | Description                                                                                         |
-| ----------------------------- | --------------------------------------------------------------------------------------------------- |
-| `ExecuteMsg::UpdateConfig`          | Can only be called by the admin. Facilitates updating configuration parameters, for eq. red bank address, ma_ust address, lockup durations among others                                                                                                 |
-| `ExecuteMsg::DepositUst` | Increases user's deposited UST balance in the lockup position for the selected duration. Can only be called when deposit window is open                             |
-| `ExecuteMsg::WithdrawUst`   |  Decreases user's deposited UST balance in the lockup position for the selected duration. Can only be called when withdrawal window is open                                                           |
-| `ExecuteMsg::DepositUstInRedBank`    | Admin function to deposit net total locked UST into the Red Bank. Called after the deposit window is over.                                         |
-| `ExecuteMsg::ClaimRewards`    | Facilitates xMARS reward claim which accrue per block. Claim lockdrop reward (MARS) in-addition to xMars when called for the first time by the user   |
-| `ExecuteMsg::Unlock`    | Unlocks the selected lockup position and transfers maUST along with accrued rewards (xMars) back to the user    |
-
+| Message                              | Description                                                                                                                                                                                                                                                                                                                |
+| ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ExecuteMsg::UpdateConfig`           | Can only be called by the admin. Facilitates updating configuration parameters                                                                                                                                                                                                                                             |
+| `ExecuteMsg::EnableClaims`           | Executed by the Bootstrap auction contract when liquidity is added to the ASTRO-UST pool. Enables ASTRO withdrawals by the lockdrop recepients.                                                                                                                                                                            |
+| `ExecuteMsg::InitializePool`         | Admin function. Facilitates updating ASTRO incentives % to be distributed among a particular LP token depositors                                                                                                                                                                                                           |
+| `ExecuteMsg::UpdatePool`             | Admin function to deposit net total locked UST into the Red Bank. Called after the deposit window is over.                                                                                                                                                                                                                 |
+| `ExecuteMsg::TransferReturnedAstro`  | Admin function. Facilitates the transfer of ASTRO tokens which have been returned by the users to unlock their lockups early                                                                                                                                                                                               |
+| `ExecuteMsg::IncreaseLockup`         | Facilitates opening a new user position or adding to an existing position                                                                                                                                                                                                                                                  |
+| `ExecuteMsg::WithdrawFromLockup`     | Facilitates LP token withdrawals from lockup positions by users. 100% amount can be withdrawn during deposit window, which is then limited to 50% during 1st half of deposit window which then decreases linearly during 2nd half of deposit window. Only 1 withdrawal can be made by a user during the withdrawal windows |
+| `ExecuteMsg::MigrateLiquidity`       | Admin function. Facilitates migration of liquidity (locked LP tokens) from Terraswap to Astroport                                                                                                                                                                                                                          |
+| `ExecuteMsg::StakeLpTokens`          | Admin function. Facilitates staking of Astroport LP tokens for a particular LP pool with the generator contract                                                                                                                                                                                                            |
+| `ExecuteMsg::DelegateAstroToAuction` | This function facilitates ASTRO tokens delegation to the Bootstrap auction contract during the bootstrap auction phase. Delegated ASTRO tokens are added to the user's position in the bootstrap auction contract                                                                                                          |
+| `ExecuteMsg::ClaimRewardsForLockup`  | Facilitates rewards claim by users for a particular lockup position                                                                                                                                                                                                                                                        |
+| `ExecuteMsg::UnlockPosition`         | Facilitates Unlocking a lockup position whose lockup duration has concluded. Unclaimed rewards (if any) are claimed during this function call                                                                                                                                                                              |
+| `ExecuteMsg::ForceUnlockPosition`    | Unlocks a lockup position whose lockup duration has not concluded. user needs to approve ASTRO Token to be transferred by the lockdrop contract before calling this function                                                                                                                                               |
 
 ### Handle Messages :: Callback
 
-| Message                       | Description                                                                                         |
-| ----------------------------- | --------------------------------------------------------------------------------------------------- |
-| `CallbackMsg::UpdateStateOnRedBankDeposit`          | Callback function called by `DepositUstInRedBank` to update contract state after UST is deposited into the Red Bank                   |
-| `CallbackMsg::UpdateStateOnClaim` | Callback function called by `ClaimRewards` and `Unlock` to update state and transfer user's accrued rewards post Lockdrop contract's xMars claim call to the `incentives` contract |
-| `CallbackMsg::DissolvePosition`   |  Callback function called by `Unlock` to dissolve lockup position after user's accrued rewards have been claimed successfully               |
-
-### Query Messages
-
-| Message              | Description                                                                        |
-| -------------------- | ---------------------------------------------------------------------------------- |
-| `QueryMsg::Config`   | Returns the config info                                                            |
-| `QueryMsg::State`    | Returns the contract's global state. Can be used to estimate future cycle rewards by providing the corresponding timestamp                                                |
-| `QueryMsg::StakerInfo` | Returns info of a user's staked position. Can be used to estimate future rewards by providing the corresponding timestamp                                           |
-| `QueryMsg::Timestamp`   | Returns the current timestamp                       |
-
+| Message                                               | Description                                                                                                                                                                |
+| ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CallbackMsg::UpdatePoolOnDualRewardsClaim`           | Callback function to update contract state after pending dual staking rewards are claimed from the generator contract                                                      |
+| `CallbackMsg::WithdrawUserLockupRewardsCallback`      | Callback function to withdraw user rewards for a particular lokcup position along with optional LP tokens withdrawal, either forcefully or upon lockup duration expiration |
+| `CallbackMsg::WithdrawLiquidityFromTerraswapCallback` | Callback function used during liquidity migration to update state after liquidity is removed from terraswap                                                                |
+| `CallbackMsg::UpdateStateLiquidityMigrationCallback`  | Callback function used during liquidity migration to update state after liquidity is added to astroport                                                                    |
 
 ### Callback Function flow
 
-![Alt text](../../Lockdrop_msg.png?raw=true "Lockdrop Callback Msgs")
+![Alt text](../../LockdropContract_callbacks.png?raw=true 'Lockdrop Callback Msgs')
 
+### Query Messages
+
+| Message                      | Description                                                                                                      |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `QueryMsg::Config`           | Returns the config info                                                                                          |
+| `QueryMsg::State`            | Returns the contract's global state                                                                              |
+| `QueryMsg::Pool`             | Returns info regarding a certain supported LP token pool                                                         |
+| `QueryMsg::UserInfo`         | Returns info regarding a user (total ASTRO rewards, list of lockup positions)                                    |
+| `QueryMsg::LockUpInfo`       | Returns info regarding a particular lockup position with a given duration and identifer for the LP tokens locked |
+| `QueryMsg::LockUpInfoWithId` | Returns info regarding a particular lockup position                                                              |
 
 ## Build schema and run unit-tests
+
 ```
 cargo schema
 cargo test
 ```
-
 
 ## License
 

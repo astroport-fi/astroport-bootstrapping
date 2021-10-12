@@ -26,7 +26,8 @@ pub fn instantiate(
     let from_timestamp = msg
         .from_timestamp
         .unwrap_or_else(|| env.block.time.seconds());
-    if msg.till_timestamp.unwrap() <= from_timestamp {
+
+    if msg.to_timestamp <= from_timestamp {
         return Err(StdError::generic_err(
             "Invalid airdrop claim window closure timestamp",
         ));
@@ -44,16 +45,14 @@ pub fn instantiate(
 
     let config = Config {
         owner,
-        astro_token_address: deps
-            .api
-            .addr_validate(msg.astro_token_address.unwrap().as_str())?,
+        astro_token_address: deps.api.addr_validate(msg.astro_token_address.as_str())?,
         terra_merkle_roots: msg.terra_merkle_roots.unwrap_or_default(),
         evm_merkle_roots: msg.evm_merkle_roots.unwrap_or_default(),
         from_timestamp,
-        till_timestamp: msg.till_timestamp.unwrap(),
+        to_timestamp: msg.to_timestamp,
         boostrap_auction_address: deps
             .api
-            .addr_validate(msg.boostrap_auction_address.unwrap().as_str())?,
+            .addr_validate(msg.boostrap_auction_address.as_str())?,
         are_claims_enabled: false,
     };
 
@@ -77,7 +76,21 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, StdError> {
     match msg {
-        ExecuteMsg::UpdateConfig { new_config } => handle_update_config(deps, info, new_config),
+        ExecuteMsg::UpdateConfig {
+            owner,
+            terra_merkle_roots,
+            evm_merkle_roots,
+            from_timestamp,
+            to_timestamp,
+        } => handle_update_config(
+            deps,
+            info,
+            owner,
+            terra_merkle_roots,
+            evm_merkle_roots,
+            from_timestamp,
+            to_timestamp,
+        ),
         ExecuteMsg::ClaimByTerraUser {
             claim_amount,
             merkle_proof,
@@ -141,7 +154,11 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 pub fn handle_update_config(
     deps: DepsMut,
     info: MessageInfo,
-    new_config: InstantiateMsg,
+    owner: Option<Addr>,
+    terra_merkle_roots: Option<Vec<String>>,
+    evm_merkle_roots: Option<Vec<String>>,
+    from_timestamp: Option<u64>,
+    to_timestamp: Option<u64>,
 ) -> StdResult<Response> {
     let mut config = CONFIG.load(deps.storage)?;
 
@@ -150,39 +167,30 @@ pub fn handle_update_config(
         return Err(StdError::generic_err("Only owner can update configuration"));
     }
 
-    if let Some(owner) = new_config.owner {
+    if let Some(owner) = owner {
         config.owner = deps.api.addr_validate(owner.as_str())?;
     }
 
-    if let Some(astro_token_address) = new_config.astro_token_address {
-        config.astro_token_address = deps.api.addr_validate(astro_token_address.as_str())?;
-    }
-
-    if let Some(boostrap_auction_address) = new_config.boostrap_auction_address {
-        config.boostrap_auction_address =
-            deps.api.addr_validate(boostrap_auction_address.as_str())?;
-    }
-
-    if let Some(terra_merkle_roots) = new_config.terra_merkle_roots {
+    if let Some(terra_merkle_roots) = terra_merkle_roots {
         config.terra_merkle_roots = terra_merkle_roots
     }
 
-    if let Some(evm_merkle_roots) = new_config.evm_merkle_roots {
+    if let Some(evm_merkle_roots) = evm_merkle_roots {
         config.evm_merkle_roots = evm_merkle_roots
     }
 
-    if let Some(from_timestamp) = new_config.from_timestamp {
+    if let Some(from_timestamp) = from_timestamp {
         config.from_timestamp = from_timestamp
     }
 
-    if let Some(till_timestamp) = new_config.till_timestamp {
-        if till_timestamp <= config.from_timestamp {
+    if let Some(to_timestamp) = to_timestamp {
+        if to_timestamp <= config.from_timestamp {
             return Err(StdError::generic_err(
                 "Invalid airdrop claim window closure timestamp",
             ));
         }
 
-        config.till_timestamp = till_timestamp
+        config.to_timestamp = to_timestamp
     }
 
     CONFIG.save(deps.storage, &config)?;
@@ -235,7 +243,7 @@ pub fn handle_claim(
     }
 
     // CHECK :: IS AIRDROP CLAIM WINDOW OPEN ?
-    if config.till_timestamp < env.block.time.seconds() {
+    if config.to_timestamp < env.block.time.seconds() {
         return Err(StdError::generic_err("Claim period has concluded"));
     }
 
@@ -516,7 +524,7 @@ pub fn handle_transfer_unclaimed_tokens(
     }
 
     // CHECK :: CAN ONLY BE CALLED AFTER THE CLAIM PERIOD IS OVER
-    if config.till_timestamp > _env.block.time.seconds() {
+    if config.to_timestamp > _env.block.time.seconds() {
         return Err(StdError::generic_err(
             "Airdrop claim period has not concluded",
         ));
@@ -558,7 +566,7 @@ fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
         terra_merkle_roots: config.terra_merkle_roots,
         evm_merkle_roots: config.evm_merkle_roots,
         from_timestamp: config.from_timestamp,
-        till_timestamp: config.till_timestamp,
+        to_timestamp: config.to_timestamp,
         boostrap_auction_address: config.boostrap_auction_address.to_string(),
         are_claims_allowed: config.are_claims_enabled,
     })
@@ -619,165 +627,6 @@ fn verify_signature(
 //----------------------------------------------------------------------------------------
 
 // #[cfg(test)]
-// mod tests {
-//     use super::*;
-//     use cosmwasm_std::testing::{MockApi, MockQuerier, MockStorage, MOCK_CONTRACT_ADDR};
-//     use cosmwasm_std::{Timestamp,BlockInfo, ContractInfo, attr, Coin, from_binary, OwnedDeps, SubMsg};
-//     use crate::state::{CONFIG};
-//     use cw20_base::msg::{ExecuteMsg as CW20ExecuteMsg };
-//     use crate::msg::{ConfigResponse, InstantiateMsg, QueryMsg  } ;
-//     use crate::msg::ExecuteMsg::{UpdateConfig, ClaimByTerraUser , ClaimByEvmUser, TransferUnclaimedTokens};
-
-//     #[test]
-//     fn test_proper_initialization() {
-//         let mut deps = mock_dependencies(&[]);
-
-//         let terra_merkle_roots = vec!["terra_merkle_roots".to_string()];
-//         let evm_merkle_roots = vec![ "evm_merkle_roots".to_string() ];
-//         let till_timestamp = 1_000_000_00000;
-//         let from_timestamp = 1_000_000_000;
-
-//         // Config with valid base params
-//         let base_config = InstantiateMsg {
-//             owner: Some("owner_address".to_string()),
-//             astro_token_address: Some("astro_token_contract".to_string()),
-//             terra_merkle_roots: Some(terra_merkle_roots.clone()),
-//             evm_merkle_roots: Some(evm_merkle_roots.clone()),
-//             from_timestamp: Some(from_timestamp),
-//             till_timestamp: Some(till_timestamp)
-//         };
-
-//         let info = mock_info("creator");
-//         let env = mock_env(MockEnvParams {
-//             block_time: Timestamp::from_seconds(from_timestamp),
-//             ..Default::default()
-//         });
-
-//         // we can just call .unwrap() to assert this was a success
-//         let res = instantiate(deps.as_mut(), env.clone(), info, base_config).unwrap();
-//         assert_eq!(0, res.messages.len());
-
-//         // it worked, let's query the state
-//         let res = query(deps.as_ref(), env.clone(), QueryMsg::Config {}).unwrap();
-//         let value: ConfigResponse = from_binary(&res).unwrap();
-
-//         assert_eq!("astro_token_contract".to_string(), value.astro_token_address);
-//         assert_eq!("owner_address".to_string(), value.owner);
-//         assert_eq!(terra_merkle_roots.clone(), value.terra_merkle_roots);
-//         assert_eq!(evm_merkle_roots.clone(), value.evm_merkle_roots);
-//         assert_eq!(from_timestamp.clone(), value.from_timestamp);
-//         assert_eq!(till_timestamp.clone(), value.till_timestamp);
-//     }
-
-//     #[test]
-//     fn test_update_config() {
-//         let mut deps = mock_dependencies(&[]);
-//         let env = mock_env(MockEnvParams::default());
-//         let not_admin_info = mock_info("not_owner");
-//         let mut admin_info = mock_info("owner");
-
-//         // Config with valid base params
-//         let base_config = InstantiateMsg {
-//             owner: Some("owner".to_string()),
-//             astro_token_address: Some("astro_token_contract".to_string()),
-//             terra_merkle_roots: Some(vec!["".to_string()]),
-//             evm_merkle_roots: Some(vec!["".to_string()]),
-//             from_timestamp: Some(1000000000),
-//             till_timestamp: Some(1000000000000)
-//         };
-
-//         // we can just call .unwrap() to assert this was a success
-//         let res = instantiate(deps.as_mut(), env.clone(), admin_info.clone(), base_config).unwrap();
-//         assert_eq!(0, res.messages.len());
-
-//         // *** Test updating the owner and the astro token address ***
-//         let msg = InstantiateMsg {
-//             owner: Some("new_owner".to_string()),
-//             astro_token_address:  Some("new_astro_token".to_string()),
-//             terra_merkle_roots: None,
-//             evm_merkle_roots: None,
-//             from_timestamp: None,
-//             till_timestamp: None
-//         };
-//         let mut ex_msg = UpdateConfig {
-//             new_config: msg.clone(),
-//         };
-
-//         // should fail as only owner can update config
-//         let mut res_f = execute(deps.as_mut(), env.clone(), not_admin_info.clone(), ex_msg.clone() );
-//         assert_generic_error_message(res_f,"Only owner can update configuration");
-
-//         // should be a success
-//         let mut res_s = execute(deps.as_mut(), env.clone(), admin_info.clone(), ex_msg.clone()).unwrap();
-//         assert_eq!(0, res_s.messages.len());
-//         let mut new_config = CONFIG.load(&deps.storage).unwrap();
-//         assert_eq!(new_config.owner, Addr::unchecked("new_owner"));
-//         assert_eq!(new_config.astro_token_address, Addr::unchecked("new_astro_token"));
-//         assert_eq!( vec!["".to_string()] , new_config.terra_merkle_roots);
-//         assert_eq!( vec!["".to_string()] , new_config.evm_merkle_roots);
-//         assert_eq!(1000000000, new_config.from_timestamp);
-//         assert_eq!(1000000000000, new_config.till_timestamp);
-
-//         // update admin_info to new_owner
-//         admin_info = mock_info("new_owner");
-
-//         // // *** Test updating the merkle roots ***
-//         let update_roots_msg = InstantiateMsg {
-//             owner: None,
-//             astro_token_address: None,
-//             terra_merkle_roots: Some( vec!["new_terra_merkle_roots".to_string()] ),
-//             evm_merkle_roots: Some( vec!["new_evm_merkle_roots".to_string()] ),
-//             from_timestamp: None,
-//             till_timestamp: None
-//         };
-//         ex_msg = UpdateConfig {
-//             new_config: update_roots_msg.clone(),
-//         };
-
-//         // should fail as only owner can update config
-//         res_f = execute(deps.as_mut(), env.clone(), not_admin_info.clone(), ex_msg.clone() );
-//         assert_generic_error_message(res_f,"Only owner can update configuration");
-
-//         // should be a success
-//         res_s = execute(deps.as_mut(), env.clone(), admin_info.clone(), ex_msg.clone()).unwrap();
-//         assert_eq!(0, res_s.messages.len());
-//         new_config = CONFIG.load(&deps.storage).unwrap();
-//         assert_eq!(new_config.terra_merkle_roots, vec!["new_terra_merkle_roots".to_string()] );
-//         assert_eq!(new_config.evm_merkle_roots, vec!["new_evm_merkle_roots".to_string()] );
-//         assert_eq!(new_config.owner, Addr::unchecked("new_owner"));
-//         assert_eq!(new_config.astro_token_address, Addr::unchecked("new_astro_token"));
-//         assert_eq!(1000000000, new_config.from_timestamp);
-//         assert_eq!(1000000000000, new_config.till_timestamp);
-
-//         // *** Test updating timestamps ***
-//         let update_timestamps_msg = InstantiateMsg {
-//             owner: None,
-//             astro_token_address: None,
-//             terra_merkle_roots: None,
-//             evm_merkle_roots: None,
-//             from_timestamp: Some(1_040_000_00000),
-//             till_timestamp: Some(1_940_000_00000)
-//         };
-//         ex_msg = UpdateConfig {
-//             new_config: update_timestamps_msg.clone(),
-//         };
-
-//         // should fail as only owner can update config
-//         res_f = execute(deps.as_mut(), env.clone(), not_admin_info, ex_msg.clone() );
-//         assert_generic_error_message(res_f,"Only owner can update configuration");
-
-//         // should be a success
-//         res_s = execute(deps.as_mut(), env, admin_info, ex_msg.clone() ).unwrap();
-//         assert_eq!(0, res_s.messages.len());
-//         new_config = CONFIG.load(&deps.storage).unwrap();
-//         assert_eq!(new_config.owner, Addr::unchecked("new_owner"));
-//         assert_eq!(new_config.astro_token_address, Addr::unchecked("new_astro_token"));
-//         assert_eq!(new_config.from_timestamp, 1_040_000_00000 );
-//         assert_eq!(new_config.till_timestamp, 1_940_000_00000 );
-//         assert_eq!(new_config.terra_merkle_roots, vec!["new_terra_merkle_roots".to_string()] );
-//         assert_eq!(new_config.evm_merkle_roots, vec!["new_evm_merkle_roots".to_string()] );
-//     }
-
 //     #[test]
 //     fn test_transfer_astro_tokens() {
 //         let mut deps = mock_dependencies(&[]);

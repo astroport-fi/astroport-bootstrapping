@@ -67,10 +67,12 @@ pub enum ExecuteMsg {
     // ADMIN Function ::: To set incentives_percent for the Pool
     UpdatePool {
         pool_identifier: String,
-        update_pool_config: Decimal256,
+        incentives_percent: Decimal256,
     },
+    // ADMIN Function ::: To transfer ASTRO Tokens which have been returned to force unlock LP positions
     TransferReturnedAstro {
         recepient: String,
+        amount: Uint256,
     },
     // Function to facilitate LP Token withdrawals from lockups
     WithdrawFromLockup {
@@ -216,7 +218,7 @@ pub struct StateResponse {
     /// ASTRO Tokens delegated to the bootstrap auction contract
     pub total_astro_delegated: Uint256,
     /// ASTRO returned to forcefully unlock Lockup positions
-    pub total_astro_returned: Uint256,
+    pub total_astro_returned_available: Uint256,
     /// Boolean value indicating if the user can withdraw thier ASTRO rewards or not
     pub are_claims_allowed: bool,
     /// Vector containing LP addresses for all the supported LP Pools
@@ -277,10 +279,4 @@ pub struct LockUpInfoResponse {
     pub astro_reward_index: Decimal256,
     /// Used to calculate user's pending DUAL rewards from the generator (staking) contract
     pub dual_reward_index: Decimal256,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct WithdrawalStatus {
-    pub max_withdrawal_percent: Decimal256,
-    pub more_withdrawals_allowed: bool,
 }
