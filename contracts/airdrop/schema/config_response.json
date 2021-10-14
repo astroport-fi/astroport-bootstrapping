@@ -10,7 +10,7 @@
     "from_timestamp",
     "owner",
     "terra_merkle_roots",
-    "till_timestamp"
+    "to_timestamp"
   ],
   "properties": {
     "are_claims_allowed": {
@@ -42,7 +42,7 @@
         "type": "string"
       }
     },
-    "till_timestamp": {
+    "to_timestamp": {
       "type": "integer",
       "format": "uint64",
       "minimum": 0.0

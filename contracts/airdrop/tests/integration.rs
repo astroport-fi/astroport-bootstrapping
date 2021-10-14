@@ -1342,7 +1342,7 @@ fn test_enable_claims() {
             &[],
         )
         .unwrap_err();
-    assert_eq!(resp_f.to_string(), "Generic error: Claims already enabled");
+    assert_eq!(resp_f.to_string(), "Generic error: Unauthorized");
 
     // ###### Should successfully enable claims ######
 

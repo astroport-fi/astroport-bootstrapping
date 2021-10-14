@@ -3,17 +3,17 @@
   "title": "Config",
   "type": "object",
   "required": [
-    "are_claims_allowed",
+    "are_claims_enabled",
     "astro_token_address",
     "boostrap_auction_address",
     "evm_merkle_roots",
     "from_timestamp",
     "owner",
     "terra_merkle_roots",
-    "till_timestamp"
+    "to_timestamp"
   ],
   "properties": {
-    "are_claims_allowed": {
+    "are_claims_enabled": {
       "description": "Boolean value indicating if the users can withdraw their ASTRO airdrop tokens or not This value is updated in the same Tx in which Liquidity is added to the LP Pool",
       "type": "boolean"
     },
@@ -61,8 +61,8 @@
         "type": "string"
       }
     },
-    "till_timestamp": {
-      "description": "Timestamp till which ASTRO airdrops can be claimed",
+    "to_timestamp": {
+      "description": "Timestamp to which ASTRO airdrops can be claimed",
       "type": "integer",
       "format": "uint64",
       "minimum": 0.0
