@@ -107,15 +107,15 @@ pub fn receive_cw20(
     let config = CONFIG.load(deps.storage)?;
 
     // CHECK :: Delegation can happen only via airdrop / lockdrop contracts
-    if config.airdrop_contract_address != info.sender
-        && config.lockdrop_contract_address != info.sender
+    if config.airdrop_contract_address != cw20_msg.sender
+        && config.lockdrop_contract_address != cw20_msg.sender
     {
         return Err(StdError::generic_err("Unauthorized"));
     }
 
     let amount = cw20_msg.amount;
     // CHECK ::: Amount needs to be valid
-    if amount > Uint128::zero() {
+    if amount == Uint128::zero() {
         return Err(StdError::generic_err("Amount must be greater than 0"));
     }
 

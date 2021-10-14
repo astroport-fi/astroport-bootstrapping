@@ -76,6 +76,7 @@ pub fn execute(
     match msg {
         ExecuteMsg::UpdateConfig {
             owner,
+            boostrap_auction_address,
             terra_merkle_roots,
             evm_merkle_roots,
             from_timestamp,
@@ -84,6 +85,7 @@ pub fn execute(
             deps,
             info,
             owner,
+            boostrap_auction_address,
             terra_merkle_roots,
             evm_merkle_roots,
             from_timestamp,
@@ -153,6 +155,7 @@ pub fn handle_update_config(
     deps: DepsMut,
     info: MessageInfo,
     owner: Option<String>,
+    boostrap_auction_address: Option<String>,
     terra_merkle_roots: Option<Vec<String>>,
     evm_merkle_roots: Option<Vec<String>>,
     from_timestamp: Option<u64>,
@@ -167,6 +170,10 @@ pub fn handle_update_config(
 
     if let Some(owner) = owner {
         config.owner = deps.api.addr_validate(&owner)?;
+    }
+
+    if let Some(boostrap_auction_address) = boostrap_auction_address {
+        config.boostrap_auction_address = deps.api.addr_validate(&boostrap_auction_address)?;
     }
 
     if let Some(terra_merkle_roots) = terra_merkle_roots {
@@ -205,7 +212,7 @@ pub fn handle_enable_claims(deps: DepsMut, info: MessageInfo) -> StdResult<Respo
     }
 
     if config.are_claims_enabled {
-        return Err(StdError::generic_err("Already allowed"));
+        return Err(StdError::generic_err("Claims already enabled"));
     }
 
     config.are_claims_enabled = true;

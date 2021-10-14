@@ -20,6 +20,7 @@ pub enum ExecuteMsg {
     /// Admin function to update the configuration parameters
     UpdateConfig {
         owner: Option<String>,
+        boostrap_auction_address: Option<String>,
         terra_merkle_roots: Option<Vec<String>>,
         evm_merkle_roots: Option<Vec<String>>,
         from_timestamp: Option<u64>,
