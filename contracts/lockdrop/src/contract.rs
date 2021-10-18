@@ -19,7 +19,7 @@ use astroport_periphery::lockdrop::{
 
 use astroport::generator::{PendingTokenResponse, QueryMsg as GenQueryMsg};
 use astroport_periphery::asset::{Cw20Asset, LiquidityPool, NativeAsset};
-use astroport_periphery::lp_bootstrap_auction::Cw20HookMsg::DelegateAstroTokens;
+use astroport_periphery::auction::Cw20HookMsg::DelegateAstroTokens;
 use astroport_periphery::tax::deduct_tax;
 use terraswap::asset::Asset as terraswapAsset;
 

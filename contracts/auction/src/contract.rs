@@ -9,15 +9,15 @@ use cosmwasm_std::{
 };
 
 use astroport_periphery::airdrop::ExecuteMsg::EnableClaims as AirdropEnableClaims;
+use astroport_periphery::auction::{
+    CallbackMsg, ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, QueryMsg, StateResponse,
+    UpdateConfigMsg, UserInfoResponse,
+};
 use astroport_periphery::helpers::{
     build_approve_cw20_msg, build_send_native_asset_msg, build_transfer_cw20_token_msg,
     cw20_get_balance, get_denom_amount_from_coins, option_string_to_addr, zero_address,
 };
 use astroport_periphery::lockdrop::ExecuteMsg::EnableClaims as LockdropEnableClaims;
-use astroport_periphery::lp_bootstrap_auction::{
-    CallbackMsg, ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, QueryMsg, StateResponse,
-    UpdateConfigMsg, UserInfoResponse,
-};
 use astroport_periphery::tax::compute_tax;
 
 use astroport::asset::{Asset, AssetInfo};
@@ -50,8 +50,8 @@ pub fn instantiate(
             zero_address(),
         )?,
         astro_rewards: msg.astro_rewards,
-        astro_vesting_schedule: msg.astro_vesting_schedule,
-        lp_tokens_vesting_schedule: msg.lp_tokens_vesting_schedule,
+        astro_vesting_duration: msg.astro_vesting_duration,
+        lp_tokens_vesting_duration: msg.lp_tokens_vesting_duration,
         init_timestamp: msg.init_timestamp,
         deposit_window: msg.deposit_window,
         withdrawal_window: msg.withdrawal_window,
@@ -880,12 +880,12 @@ pub fn calculate_withdrawable_lp_shares(
     user_info: &UserInfo,
 ) -> Uint256 {
     let time_elapsed = cur_timestamp - state.pool_init_timestamp;
-    if time_elapsed >= config.lp_tokens_vesting_schedule {
+    if time_elapsed >= config.lp_tokens_vesting_duration {
         return user_info.lp_shares - user_info.claimed_lp_shares;
     }
 
     let withdrawable_lp_balance = user_info.lp_shares
-        * Decimal256::from_ratio(time_elapsed, config.lp_tokens_vesting_schedule);
+        * Decimal256::from_ratio(time_elapsed, config.lp_tokens_vesting_duration);
     withdrawable_lp_balance - user_info.claimed_lp_shares
 }
 
@@ -902,11 +902,11 @@ pub fn calculate_claimable_auction_reward_for_user(
         return Uint256::zero();
     }
     let time_elapsed = cur_timestamp - state.pool_init_timestamp;
-    if time_elapsed >= config.astro_vesting_schedule {
+    if time_elapsed >= config.astro_vesting_duration {
         return user_info.total_auction_incentives - user_info.claimed_auction_incentives;
     }
     let withdrawable_auction_incentives = user_info.total_auction_incentives
-        * Decimal256::from_ratio(time_elapsed, config.astro_vesting_schedule);
+        * Decimal256::from_ratio(time_elapsed, config.astro_vesting_duration);
     withdrawable_auction_incentives - user_info.claimed_auction_incentives
 }
 

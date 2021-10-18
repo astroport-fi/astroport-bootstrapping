@@ -1,13 +1,12 @@
+use cosmwasm_bignumber::{Decimal256, Uint256};
+use cosmwasm_std::Addr;
+use cw_storage_plus::{Item, Map};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use cosmwasm_bignumber::{Decimal256, Uint256};
-use cw_storage_plus::{Item, Map};
-use cosmwasm_std::{ Addr };
-
 
 pub const CONFIG: Item<Config> = Item::new("config");
 pub const STATE: Item<State> = Item::new("state");
-pub const USERS: Map< &Addr, UserInfo> = Map::new("users");
+pub const USERS: Map<&Addr, UserInfo> = Map::new("users");
 
 //----------------------------------------------------------------------------------------
 // Storage types
@@ -23,7 +22,7 @@ pub struct Config {
     /// Airdrop Contract address
     pub airdrop_contract_address: Addr,
     /// Lockdrop Contract address
-    pub lockdrop_contract_address: Addr,    
+    pub lockdrop_contract_address: Addr,
     ///  ASTRO-UST LP Pool address
     pub astroport_lp_pool: Addr,
     ///  ASTRO-UST LP Token address
@@ -31,40 +30,37 @@ pub struct Config {
     ///  Astroport Generator contract with which ASTRO-UST LP Tokens are staked
     pub generator_contract: Addr,
     /// Total ASTRO token rewards to be used to incentivize boostrap auction participants
-    pub astro_rewards: Uint256, 
+    pub astro_rewards: Uint256,
     /// Number of seconds over which ASTRO incentives are vested
-    pub astro_vesting_schedule: u64, 
+    pub astro_vesting_duration: u64,
     ///  Number of seconds over which LP Tokens are vested
-    pub lp_tokens_vesting_schedule: u64, 
-    /// Timestamp since which ASTRO / UST deposits will be allowrd 
-    pub init_timestamp: u64, 
-    /// Number of seconds post init_timestamp during which deposits / withdrawals will be allowed 
-    pub deposit_window: u64, 
-    /// Number of seconds post deposit_window completion during which only withdrawals are allowed 
-    pub withdrawal_window: u64  
+    pub lp_tokens_vesting_duration: u64,
+    /// Timestamp since which ASTRO / UST deposits will be allowrd
+    pub init_timestamp: u64,
+    /// Number of seconds post init_timestamp during which deposits / withdrawals will be allowed
+    pub deposit_window: u64,
+    /// Number of seconds post deposit_window completion during which only withdrawals are allowed
+    pub withdrawal_window: u64,
 }
-
-
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub struct State {
     /// Total ASTRO tokens delegated to the contract by lockdrop participants / airdrop recepients
-    pub total_astro_delegated: Uint256, 
+    pub total_astro_delegated: Uint256,
     /// Total UST deposited in the contract
-    pub total_ust_deposited: Uint256, 
+    pub total_ust_deposited: Uint256,
     /// Total LP shares minted post liquidity addition to the ASTRO-UST Pool
-    pub lp_shares_minted: Uint256, 
+    pub lp_shares_minted: Uint256,
     /// Number of LP shares that have been withdrawn as they unvest
-    pub lp_shares_claimed: Uint256, 
+    pub lp_shares_claimed: Uint256,
     /// ASTRO--UST LP Shares currently staked with the Staking contract
     pub are_staked: bool,
     /// Timestamp at which liquidity was added to the ASTRO-UST LP Pool
     pub pool_init_timestamp: u64,
     /// index used to keep track of LP staking rewards and distribute them proportionally among the auction participants
-    pub global_reward_index: Decimal256 
+    pub global_reward_index: Decimal256,
 }
-
 
 impl Default for State {
     fn default() -> Self {
@@ -75,13 +71,10 @@ impl Default for State {
             lp_shares_claimed: Uint256::zero(),
             pool_init_timestamp: 0u64,
             are_staked: false,
-            global_reward_index: Decimal256::zero()
+            global_reward_index: Decimal256::zero(),
         }
     }
 }
-
-
-
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct UserInfo {
@@ -95,7 +88,7 @@ pub struct UserInfo {
     pub lp_shares: Uint256,
     // LP shares withdrawn by the user
     pub claimed_lp_shares: Uint256,
-    // User's ASTRO rewards for participating in the auction 
+    // User's ASTRO rewards for participating in the auction
     pub total_auction_incentives: Uint256,
     // ASTRO rewards withdrawn by the user
     pub claimed_auction_incentives: Uint256,
@@ -117,5 +110,3 @@ impl Default for UserInfo {
         }
     }
 }
-
-

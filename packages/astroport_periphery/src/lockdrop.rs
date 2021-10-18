@@ -21,9 +21,9 @@ pub struct InstantiateMsg {
     pub deposit_window: u64,
     /// Withdrawal Window Length :: Post the deposit window
     pub withdrawal_window: u64,
-    /// Min. no. of days allowed for lockup
+    /// Min. no. of weeks allowed for lockup
     pub min_duration: u64,
-    /// Max. no. of days allowed for lockup
+    /// Max. no. of weeks allowed for lockup
     pub max_duration: u64,
     /// Number of seconds per week
     pub seconds_per_week: u64,

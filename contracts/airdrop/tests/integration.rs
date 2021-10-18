@@ -1695,7 +1695,7 @@ fn test_withdraw_airdrop_rewards() {
 #[cfg(test)]
 #[test]
 fn test_delegate_astro_to_bootstrap_auction() {
-    use astroport_periphery::lp_bootstrap_auction;
+    use astroport_periphery::auction;
 
     let mut app = mock_app();
     let (airdrop_instance, astro_instance, init_msg) = init_contracts(&mut app);
@@ -1711,12 +1711,12 @@ fn test_delegate_astro_to_bootstrap_auction() {
 
     // Initialize Bootstrap Auction contract
     let auction_contract = Box::new(ContractWrapper::new(
-        astro_bootstrap_auction::contract::execute,
-        astro_bootstrap_auction::contract::instantiate,
-        astro_bootstrap_auction::contract::query,
+        astro_auction::contract::execute,
+        astro_auction::contract::instantiate,
+        astro_auction::contract::query,
     ));
     let auction_contract_code_id = app.store_code(auction_contract);
-    let auction_init_msg = astroport_periphery::lp_bootstrap_auction::InstantiateMsg {
+    let auction_init_msg = astroport_periphery::auction::InstantiateMsg {
         owner: init_msg.owner.clone().unwrap(),
         astro_token_address: astro_instance.clone().to_string(),
         airdrop_contract_address: airdrop_instance.clone().to_string(),
@@ -1725,8 +1725,8 @@ fn test_delegate_astro_to_bootstrap_auction() {
         lp_token_address: None,
         generator_contract: None,
         astro_rewards: Uint256::from(10000000000000u64),
-        astro_vesting_schedule: 2592000u64,
-        lp_tokens_vesting_schedule: 2592000u64,
+        astro_vesting_duration: 2592000u64,
+        lp_tokens_vesting_duration: 2592000u64,
         init_timestamp: 100000u64,
         deposit_window: 2592000u64,
         withdrawal_window: 1592000u64,
