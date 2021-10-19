@@ -1,16 +1,16 @@
 use astroport_periphery::airdrop::{
-    ClaimResponse, ConfigResponse, ExecuteMsg, InstantiateMsg, QueryMsg, SignatureResponse,
-    StateResponse, UserInfoResponse,
+    ClaimResponse, ConfigResponse, ExecuteMsg, InstantiateMsg, QueryMsg, StateResponse,
+    UserInfoResponse,
 };
 use astroport_periphery::auction::Cw20HookMsg::DelegateAstroTokens;
 use astroport_periphery::helpers::{build_send_cw20_token_msg, build_transfer_cw20_token_msg};
 use cosmwasm_std::{
-    attr, entry_point, to_binary, Addr, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo,
-    Response, StdError, StdResult, Uint128,
+    attr, entry_point, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdError,
+    StdResult, Uint128,
 };
 
-use crate::crypto::{handle_verify_signature, verify_claim};
-use crate::state::{Config, State, CLAIMS, CONFIG, STATE, USERS};
+use crate::crypto::verify_claim;
+use crate::state::{Config, State, CONFIG, STATE, USERS};
 
 //----------------------------------------------------------------------------------------
 // Entry points
@@ -46,8 +46,7 @@ pub fn instantiate(
     let config = Config {
         owner,
         astro_token_address: deps.api.addr_validate(&msg.astro_token_address)?,
-        terra_merkle_roots: msg.terra_merkle_roots.unwrap_or_default(),
-        evm_merkle_roots: msg.evm_merkle_roots.unwrap_or_default(),
+        merkle_roots: msg.merkle_roots.unwrap_or_default(),
         from_timestamp,
         to_timestamp: msg.to_timestamp,
         boostrap_auction_address: deps.api.addr_validate(&msg.boostrap_auction_address)?,
@@ -77,8 +76,7 @@ pub fn execute(
         ExecuteMsg::UpdateConfig {
             owner,
             boostrap_auction_address,
-            terra_merkle_roots,
-            evm_merkle_roots,
+            merkle_roots,
             from_timestamp,
             to_timestamp,
         } => handle_update_config(
@@ -86,34 +84,15 @@ pub fn execute(
             info,
             owner,
             boostrap_auction_address,
-            terra_merkle_roots,
-            evm_merkle_roots,
+            merkle_roots,
             from_timestamp,
             to_timestamp,
         ),
-        ExecuteMsg::ClaimByTerraUser {
+        ExecuteMsg::Claim {
             claim_amount,
             merkle_proof,
             root_index,
-        } => handle_terra_user_claim(deps, env, info, claim_amount, merkle_proof, root_index),
-        ExecuteMsg::ClaimByEvmUser {
-            eth_address,
-            claim_amount,
-            merkle_proof,
-            root_index,
-            signature,
-            signed_msg_hash,
-        } => handle_evm_user_claim(
-            deps,
-            env,
-            info,
-            eth_address,
-            claim_amount,
-            merkle_proof,
-            root_index,
-            signature,
-            signed_msg_hash,
-        ),
+        } => handle_claim(deps, env, info, claim_amount, merkle_proof, root_index),
         ExecuteMsg::DelegateAstroToBootstrapAuction { amount_to_delegate } => {
             handle_delegate_astro_to_bootstrap_auction(deps, env, info, amount_to_delegate)
         }
@@ -132,16 +111,6 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::State {} => to_binary(&query_state(deps)?),
         QueryMsg::HasUserClaimed { address } => to_binary(&query_user_claimed(deps, address)?),
         QueryMsg::UserInfo { address } => to_binary(&query_user_info(deps, address)?),
-        QueryMsg::IsValidSignature {
-            evm_address,
-            evm_signature,
-            signed_msg_hash,
-        } => to_binary(&verify_signature(
-            deps,
-            evm_address,
-            evm_signature,
-            signed_msg_hash,
-        )?),
     }
 }
 
@@ -156,8 +125,7 @@ pub fn handle_update_config(
     info: MessageInfo,
     owner: Option<String>,
     boostrap_auction_address: Option<String>,
-    terra_merkle_roots: Option<Vec<String>>,
-    evm_merkle_roots: Option<Vec<String>>,
+    merkle_roots: Option<Vec<String>>,
     from_timestamp: Option<u64>,
     to_timestamp: Option<u64>,
 ) -> StdResult<Response> {
@@ -176,12 +144,8 @@ pub fn handle_update_config(
         config.boostrap_auction_address = deps.api.addr_validate(&boostrap_auction_address)?;
     }
 
-    if let Some(terra_merkle_roots) = terra_merkle_roots {
-        config.terra_merkle_roots = terra_merkle_roots
-    }
-
-    if let Some(evm_merkle_roots) = evm_merkle_roots {
-        config.evm_merkle_roots = evm_merkle_roots
+    if let Some(merkle_roots) = merkle_roots {
+        config.merkle_roots = merkle_roots
     }
 
     if let Some(from_timestamp) = from_timestamp {
@@ -221,24 +185,20 @@ pub fn handle_enable_claims(deps: DepsMut, info: MessageInfo) -> StdResult<Respo
     Ok(Response::new().add_attribute("action", "Airdrop::ExecuteMsg::EnableClaims"))
 }
 
-pub enum ClaimNetwork {
-    Terra {},
-    Eth {
-        signature: String,
-        signed_msg_hash: String,
-    },
-}
-
+/// @dev Executes an airdrop claim for a Terra User
+/// @param claim_amount : Airdrop to be claimed by the user
+/// @param merkle_proof : Array of hashes to prove the input is a leaf of the Merkle Tree
+/// @param root_index : Merkle Tree root identifier to be used for verification
 pub fn handle_claim(
     deps: DepsMut,
     env: Env,
-    claim_addr: String,
-    claim_network: ClaimNetwork,
+    info: MessageInfo,
     claim_amount: Uint128,
     merkle_proof: Vec<String>,
     root_index: u32,
-    recipient: Addr,
-) -> Result<Vec<CosmosMsg>, StdError> {
+) -> Result<Response, StdError> {
+    let recipient = info.sender;
+
     let config = CONFIG.load(deps.storage)?;
     let mut state = STATE.load(deps.storage)?;
 
@@ -252,156 +212,46 @@ pub fn handle_claim(
         return Err(StdError::generic_err("Claim period has concluded"));
     }
 
-    // CHECK :: HAS USER ALREADY CLAIMED THEIR AIRDROP ?
-    let claim_exists = CLAIMS
-        .load(deps.storage, claim_addr.clone())
-        .unwrap_or(false);
-    if claim_exists {
-        return Err(StdError::generic_err("Already claimed"));
+    let merkle_root = config.merkle_roots.get(root_index as usize);
+    if merkle_root.is_none() {
+        return Err(StdError::generic_err("Incorrect Merkle Root Index"));
     }
 
-    // MERKLE PROOF VERIFICATION
-    match claim_network {
-        ClaimNetwork::Terra {} => {
-            let merkle_root = config.terra_merkle_roots.get(root_index as usize);
-            if merkle_root.is_none() {
-                return Err(StdError::generic_err("Incorrect Merkle Root Index"));
-            }
-
-            if !verify_claim(
-                claim_addr.clone(),
-                claim_amount,
-                merkle_proof,
-                merkle_root.unwrap(),
-            ) {
-                return Err(StdError::generic_err("Incorrect Merkle Proof"));
-            }
-        }
-        ClaimNetwork::Eth {
-            signature,
-            signed_msg_hash,
-        } => {
-            let merkle_root = config.evm_merkle_roots.get(root_index as usize);
-            if merkle_root.is_none() {
-                return Err(StdError::generic_err("Incorrect Merkle Root Index"));
-            }
-
-            if !verify_claim(
-                claim_addr.clone(),
-                claim_amount,
-                merkle_proof,
-                merkle_root.unwrap(),
-            ) {
-                return Err(StdError::generic_err("Incorrect Merkle Proof"));
-            }
-
-            // SIGNATURE VERIFICATION
-            let sig =
-                handle_verify_signature(deps.api, claim_addr.clone(), signature, signed_msg_hash);
-            if !sig.is_valid {
-                return Err(StdError::generic_err("Invalid Signature"));
-            }
-        }
+    if !verify_claim(&recipient, claim_amount, merkle_proof, merkle_root.unwrap()) {
+        return Err(StdError::generic_err("Incorrect Merkle Proof"));
     }
 
     let mut user_info = USERS.load(deps.storage, &recipient).unwrap_or_default();
 
+    // Check if addr has already claimed the tokens
+    if !user_info.claimed_amount.is_zero() {
+        return Err(StdError::generic_err("Already claimed"));
+    }
+
+    // Update amounts
     state.unclaimed_tokens -= claim_amount;
-    user_info.airdrop_amount += claim_amount;
+    user_info.claimed_amount += claim_amount;
 
     let mut messages = vec![];
 
     // TRANSFER ASTRO IF CLAIMS ARE ALLOWED (i.e LP Boostrap auction has concluded)
     if config.are_claims_enabled {
-        let amount_to_withdraw = user_info.airdrop_amount - user_info.delegated_amount;
-        user_info.tokens_withdrawn = true;
         messages.push(build_transfer_cw20_token_msg(
             recipient.clone(),
             config.astro_token_address.to_string(),
-            amount_to_withdraw,
+            user_info.claimed_amount,
         )?);
+
+        user_info.tokens_withdrawn = true;
     }
 
     USERS.save(deps.storage, &recipient, &user_info)?;
     STATE.save(deps.storage, &state)?;
-    CLAIMS.save(deps.storage, claim_addr, &true)?;
-
-    Ok(messages)
-}
-
-/// @dev Executes an airdrop claim for a Terra User
-/// @param claim_amount : Airdrop to be claimed by the user
-/// @param merkle_proof : Array of hashes to prove the input is a leaf of the Merkle Tree
-/// @param root_index : Merkle Tree root identifier to be used for verification
-pub fn handle_terra_user_claim(
-    deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-    claim_amount: Uint128,
-    merkle_proof: Vec<String>,
-    root_index: u32,
-) -> Result<Response, StdError> {
-    let claimer = info.sender;
-
-    let messages = handle_claim(
-        deps,
-        env,
-        claimer.clone().into_string(),
-        ClaimNetwork::Terra {},
-        claim_amount,
-        merkle_proof,
-        root_index,
-        claimer.clone(),
-    )?;
 
     Ok(Response::new().add_messages(messages).add_attributes(vec![
-        attr("action", "Airdrop::ExecuteMsg::ClaimByTerraUser"),
-        attr("claimer", claimer),
+        attr("action", "Airdrop::ExecuteMsg::Claim"),
+        attr("addr", recipient),
         attr("airdrop", claim_amount),
-    ]))
-}
-
-/// @dev Executes an airdrop claim by an EVM User
-/// @param eth_address : EVM address claiming the airdop. Needs to be in lower case without the `0x` prefix
-/// @param claim_amount : Airdrop amount claimed by the user
-/// @param merkle_proof : Array of hashes to prove the input is a leaf of the Merkle Tree
-/// @param root_index : Merkle Tree root identifier to be used for verification
-/// @param signature : ECDSA Signature string generated by signing the message (without the `0x` prefix and the last 2 characters which originate from `v`)
-/// @param signed_msg_hash : Keccak256 hash of the signed message following the ethereum prefix standard.(without the `0x` prefix)
-/// https://web3js.readthedocs.io/en/v1.2.2/web3-eth-accounts.html#hashmessage
-pub fn handle_evm_user_claim(
-    deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-    eth_address: String,
-    claim_amount: Uint128,
-    merkle_proof: Vec<String>,
-    root_index: u32,
-    signature: String,
-    signed_msg_hash: String,
-) -> Result<Response, StdError> {
-    let claimer = eth_address;
-    let recipient = info.sender;
-
-    let messages = handle_claim(
-        deps,
-        env,
-        claimer.clone(),
-        ClaimNetwork::Eth {
-            signature,
-            signed_msg_hash,
-        },
-        claim_amount,
-        merkle_proof,
-        root_index,
-        recipient.clone(),
-    )?;
-
-    Ok(Response::new().add_messages(messages).add_attributes(vec![
-        attr("action", "Airdrop::ExecuteMsg::ClaimByEvmUser"),
-        attr("claimer", claimer),
-        attr("recipient", recipient.to_string()),
-        attr("airdrop", claim_amount.to_string()),
     ]))
 }
 
@@ -425,14 +275,14 @@ pub fn handle_delegate_astro_to_bootstrap_auction(
 
     // CHECK :: HAS USER ALREADY WITHDRAWN THEIR REWARDS ?
     if user_info.tokens_withdrawn {
-        return Err(StdError::generic_err("Tokens have already been claimed"));
+        return Err(StdError::generic_err("Tokens have already been withdrawn"));
     }
 
     state.total_delegated_amount += amount_to_delegate;
     user_info.delegated_amount += amount_to_delegate;
 
     // CHECK :: TOKENS BEING DELEGATED SHOULD NOT EXCEED USER'S CLAIMABLE AIRDROP AMOUNT
-    if user_info.delegated_amount > user_info.airdrop_amount {
+    if user_info.delegated_amount > user_info.claimed_amount {
         return Err(StdError::generic_err("Total amount being delegated for boostrap auction cannot exceed your claimable airdrop balance"));
     }
 
@@ -488,7 +338,7 @@ pub fn handle_withdraw_airdrop_rewards(
     // TRANSFER ASTRO IF CLAIMS ARE ALLOWED (i.e LP Boostrap auction has concluded)
     user_info.tokens_withdrawn = true;
 
-    let tokens_to_withdraw = user_info.airdrop_amount - user_info.delegated_amount;
+    let tokens_to_withdraw = user_info.claimed_amount - user_info.delegated_amount;
     if tokens_to_withdraw.is_zero() {
         return Err(StdError::generic_err("Nothing to withdraw"));
     }
@@ -507,7 +357,7 @@ pub fn handle_withdraw_airdrop_rewards(
             attr("action", "Airdrop::ExecuteMsg::WithdrawAirdropRewards"),
             attr("user", info.sender.to_string()),
             attr("claimed_amount", tokens_to_withdraw),
-            attr("total_airdrop", user_info.airdrop_amount),
+            attr("total_airdrop", user_info.claimed_amount),
         ]))
 }
 
@@ -572,8 +422,7 @@ fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
     Ok(ConfigResponse {
         astro_token_address: config.astro_token_address.to_string(),
         owner: config.owner.to_string(),
-        terra_merkle_roots: config.terra_merkle_roots,
-        evm_merkle_roots: config.evm_merkle_roots,
+        merkle_roots: config.merkle_roots,
         from_timestamp: config.from_timestamp,
         to_timestamp: config.to_timestamp,
         boostrap_auction_address: config.boostrap_auction_address.to_string(),
@@ -598,7 +447,7 @@ fn query_user_info(deps: Deps, user_address: String) -> StdResult<UserInfoRespon
         .may_load(deps.storage, &user_address)?
         .unwrap_or_default();
     Ok(UserInfoResponse {
-        airdrop_amount: user_info.airdrop_amount,
+        airdrop_amount: user_info.claimed_amount,
         delegated_amount: user_info.delegated_amount,
         tokens_withdrawn: user_info.tokens_withdrawn,
     })
@@ -606,27 +455,12 @@ fn query_user_info(deps: Deps, user_address: String) -> StdResult<UserInfoRespon
 
 /// @dev Returns true if the user has claimed the airdrop [EVM addresses to be provided in lower-case without the '0x' prefix]
 fn query_user_claimed(deps: Deps, address: String) -> StdResult<ClaimResponse> {
+    let user_address = deps.api.addr_validate(&address)?;
+    let user_info = USERS
+        .may_load(deps.storage, &user_address)?
+        .unwrap_or_default();
+
     Ok(ClaimResponse {
-        is_claimed: CLAIMS.may_load(deps.storage, address)?.unwrap_or(false),
-    })
-}
-
-/// @dev Returns the recovered public key, evm address and a boolean value which is true if the evm address provided was used for signing the message.
-/// @param evm_address : EVM address claiming the airdop. Needs to be in lower case without the `0x` prefix
-/// @param evm_signature : ECDSA Signature string generated by signing the message (without the `0x` prefix and the last 2 characters which originate from `v`)
-/// @param signed_msg_hash : Keccak256 hash of the signed message following the EIP-191 prefix standard.(without the `0x` prefix)
-fn verify_signature(
-    _deps: Deps,
-    evm_address: String,
-    evm_signature: String,
-    signed_msg_hash: String,
-) -> StdResult<SignatureResponse> {
-    let verification_response =
-        handle_verify_signature(_deps.api, evm_address, evm_signature, signed_msg_hash);
-
-    Ok(SignatureResponse {
-        is_valid: verification_response.is_valid,
-        public_key: verification_response.public_key,
-        recovered_address: verification_response.recovered_address,
+        is_claimed: !user_info.claimed_amount.is_zero(),
     })
 }
