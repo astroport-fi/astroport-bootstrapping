@@ -230,7 +230,7 @@ pub fn handle_claim(
 
     // Update amounts
     state.unclaimed_tokens -= claim_amount;
-    user_info.claimed_amount += claim_amount;
+    user_info.claimed_amount = claim_amount;
 
     let mut messages = vec![];
 
