@@ -2,7 +2,7 @@ use astroport_periphery::auction::{
     CallbackMsg, ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, QueryMsg, StateResponse,
     UpdateConfigMsg, UserInfoResponse,
 };
-use cosmwasm_bignumber::Uint256;
+use cosmwasm_bignumber::{Decimal256, Uint256};
 use cosmwasm_std::testing::{mock_env, MockApi, MockQuerier, MockStorage};
 use cosmwasm_std::{attr, Addr, Timestamp, Uint128};
 use terra_multi_test::{App, BankKeeper, ContractWrapper, Executor, TerraMockQuerier};
@@ -171,3 +171,73 @@ fn init_contracts(app: &mut App) -> (Addr, Addr, InstantiateMsg) {
         auction_instantiate_msg,
     )
 }
+
+#[test]
+fn proper_initialization() {
+    let mut app = mock_app();
+    let (auction_instance, astro_token_instance, auction_init_msg) = init_contracts(&mut app);
+
+    let resp: ConfigResponse = app
+        .wrap()
+        .query_wasm_smart(&auction_instance, &QueryMsg::Config {})
+        .unwrap();
+
+    // Check config
+    assert_eq!(auction_init_msg.owner, resp.owner);
+    assert_eq!(
+        auction_init_msg.astro_token_address,
+        resp.astro_token_address
+    );
+    assert_eq!(
+        auction_init_msg.airdrop_contract_address,
+        resp.airdrop_contract_address
+    );
+    assert_eq!(
+        auction_init_msg.lockdrop_contract_address,
+        resp.lockdrop_contract_address
+    );
+    assert_eq!(auction_init_msg.astro_rewards, resp.astro_rewards);
+    assert_eq!(auction_init_msg.init_timestamp, resp.init_timestamp);
+    assert_eq!(auction_init_msg.deposit_window, resp.deposit_window);
+    assert_eq!(auction_init_msg.withdrawal_window, resp.withdrawal_window);
+
+    // Check state
+    let resp: StateResponse = app
+        .wrap()
+        .query_wasm_smart(&auction_instance, &QueryMsg::State {})
+        .unwrap();
+
+    assert_eq!(Uint256::zero(), resp.total_astro_delegated);
+    assert_eq!(Uint256::zero(), resp.total_ust_deposited);
+    assert_eq!(Uint256::zero(), resp.lp_shares_minted);
+    assert_eq!(Uint256::zero(), resp.lp_shares_claimed);
+    assert_eq!(false, resp.are_staked);
+    assert_eq!(0u64, resp.pool_init_timestamp);
+    assert_eq!(Decimal256::zero(), resp.global_reward_index);
+}
+
+#[test]
+fn test_delegate_Astro_tokens() {
+    let mut app = mock_app();
+    let (airdrop_instance, _, init_msg) = init_contracts(&mut app);
+}
+
+#[test]
+fn test_update_config() {}
+
+#[test]
+fn test_deposit_ust() {}
+
+#[test]
+fn test_withdraw_ust() {}
+
+#[test]
+fn test_add_liquidity_to_astroport_pool() {}
+
+#[test]
+fn test_stake_lp_tokens() {}
+
+#[test]
+fn test_claim_rewards() {}
+#[test]
+fn test_withdraw_unlocked_lp_shares() {}

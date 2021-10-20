@@ -91,6 +91,7 @@ pub struct ConfigResponse {
     pub astro_token_address: String,
     pub airdrop_contract_address: String,
     pub lockdrop_contract_address: String,
+    pub astroport_lp_pool: String,
     pub lp_token_address: String,
     pub generator_contract: String,
     pub astro_rewards: Uint256,
@@ -106,6 +107,7 @@ pub struct StateResponse {
     pub lp_shares_minted: Uint256,
     pub lp_shares_claimed: Uint256,
     pub are_staked: bool,
+    pub pool_init_timestamp: u64,
     pub global_reward_index: Decimal256,
 }
 

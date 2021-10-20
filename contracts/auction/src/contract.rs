@@ -698,8 +698,9 @@ fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
         owner: config.owner.to_string(),
         astro_token_address: config.astro_token_address.to_string(),
         airdrop_contract_address: config.airdrop_contract_address.to_string(),
-        lp_token_address: config.lp_token_address.to_string(),
         lockdrop_contract_address: config.lockdrop_contract_address.to_string(),
+        astroport_lp_pool: config.astroport_lp_pool.to_string(),
+        lp_token_address: config.lp_token_address.to_string(),
         generator_contract: config.generator_contract.to_string(),
         astro_rewards: config.astro_rewards,
         init_timestamp: config.init_timestamp,
@@ -717,6 +718,7 @@ fn query_state(deps: Deps) -> StdResult<StateResponse> {
         lp_shares_minted: state.lp_shares_minted,
         lp_shares_claimed: state.lp_shares_claimed,
         are_staked: state.are_staked,
+        pool_init_timestamp: state.pool_init_timestamp,
         global_reward_index: state.global_reward_index,
     })
 }
