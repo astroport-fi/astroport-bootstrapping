@@ -1,0 +1,5 @@
+Reorganized interface to simplify usage of the contract
+Pool incentives percents replaced with shares for flexibility of setting them
+Set obvious key types for storage maps to improve readability
+Added validation of addresses to help users to understand whether error is in them or not
+Removed redundant dublicated code

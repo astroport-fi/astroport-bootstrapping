@@ -25,7 +25,7 @@ library = []
 
 
 [dependencies]
-astroport =  { path = "../../packages/astroport" }
+astroport = {git = "https://github.com/astroport-fi/astroport.git", tag = "v0.1-beta"}
 astroport-periphery =  { path = "../../packages/astroport_periphery" }
 terraswap = "2.4.0"
 
