@@ -130,12 +130,6 @@ pub enum CallbackMsg {
         astroport_pool: Addr,
         prev_assets: [terraswap::asset::Asset; 2],
     },
-    // not checked
-    UpdateStateLiquidityMigrationCallback {
-        pool_identifer: Addr,
-        astroport_pool: Addr,
-        astroport_lp_balance: Uint128,
-    },
 }
 
 // Modified from

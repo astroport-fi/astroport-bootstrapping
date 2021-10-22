@@ -616,13 +616,10 @@ pub fn handle_migrate_liquidity(
 
     pool_info.astroport_lp_token = Some(astroport_lp_token);
     pool_info.astroport_pool = Some(astroport_pool);
+    pool_info.is_migrated = true;
     ASSET_POOLS.save(deps.storage, &terraswap_lp_token, &pool_info)?;
 
-    Ok(Response::new()
-        .add_messages(cosmos_msgs)
-        .add_event(Event::new("Migrated liquidity"))
-        .add_attribute("terraswap_lp_token", terraswap_lp_token)
-        .add_attribute("astroport_pool", astroport_pool))
+    Ok(Response::new().add_messages(cosmos_msgs))
 }
 
 /// @dev Function to stake one of the supported LP Tokens with the Generator contract
@@ -1371,139 +1368,78 @@ pub fn callback_deposit_liquidity_in_astroport(
     astroport_pool: Addr,
     prev_assets: [terraswap::asset::Asset; 2],
 ) -> StdResult<Response> {
-    let mut pool_info = ASSET_POOLS.load(deps.storage, &terraswap_lp_token)?;
+    let mut cosmos_msgs = vec![];
 
-    let mut withdrawn_assets = vec![];
+    let mut assets = vec![];
+    let mut coins = vec![];
 
     for prev_asset in prev_assets {
-        withdrawn_assets.push(match prev_asset.info {
-            terraswap::asset::AssetInfo::NativeToken { denom } => astroport::asset::Asset {
-                info: astroport::asset::AssetInfo::NativeToken { denom },
-                amount: terraswap::querier::query_balance(
-                    &deps.querier,
-                    env.contract.address,
+        match prev_asset.info {
+            terraswap::asset::AssetInfo::NativeToken { denom } => {
+                let mut new_asset = astroport::asset::Asset {
+                    info: astroport::asset::AssetInfo::NativeToken { denom },
+                    amount: terraswap::querier::query_balance(
+                        &deps.querier,
+                        env.contract.address,
+                        denom,
+                    )?
+                    .checked_sub(prev_asset.amount)?,
+                };
+
+                new_asset.amount = new_asset.amount - new_asset.compute_tax(&deps.querier)?;
+
+                coins.push(Coin {
                     denom,
-                )?
-                .checked_sub(prev_asset.amount)?,
-            },
-            terraswap::asset::AssetInfo::Token { contract_addr } => astroport::asset::Asset {
-                info: astroport::asset::AssetInfo::Token {
-                    contract_addr: deps.api.addr_validate(&contract_addr)?,
-                },
-                amount: terraswap::querier::query_token_balance(
+                    amount: new_asset.amount,
+                });
+                assets.push(new_asset);
+            }
+            terraswap::asset::AssetInfo::Token { contract_addr } => {
+                let amount = terraswap::querier::query_token_balance(
                     &deps.querier,
                     deps.api.addr_validate(&contract_addr)?,
                     env.contract.address,
                 )?
-                .checked_sub(prev_asset.amount)?,
-            },
-        })
-    }
+                .checked_sub(prev_asset.amount)?;
 
-    let astroport_lp_balance = {
-        let br: BalanceResponse = deps.querier.query_wasm_smart(
-            &pool_info.astroport_lp_token.unwrap(),
-            &Cw20QueryMsg::Balance {
-                address: env.contract.address.to_string(),
-            },
-        )?;
-        br.balance
-    };
+                cosmos_msgs.push(
+                    WasmMsg::Execute {
+                        contract_addr: contract_addr.to_string(),
+                        funds: vec![],
+                        msg: to_binary(&Cw20ExecuteMsg::IncreaseAllowance {
+                            spender: astroport_pool.to_string(),
+                            expires: None,
+                            amount,
+                        })?,
+                    }
+                    .into(),
+                );
 
-    let mut cosmos_msgs = vec![];
-
-    // COSMOS MSGS
-    // :: 1.  APPROVE CW20 Token(s) WITH ASTROPORT POOL ADDRESS AS BENEFICIARY
-    // :: 2.  ADD LIQUIDITY
-    // :: 3. CallbackMsg :: Update state on liquidity addition to LP Pool
-
-    let mut coins = vec![];
-
-    for asset in &withdrawn_assets {
-        match asset.info {
-            astroport::asset::AssetInfo::Token { contract_addr } => cosmos_msgs.push(
-                WasmMsg::Execute {
-                    contract_addr: contract_addr.to_string(),
-                    funds: vec![],
-                    msg: to_binary(&Cw20ExecuteMsg::IncreaseAllowance {
-                        spender: astroport_pool.to_string(),
-                        expires: None,
-                        amount: asset.amount,
-                    })?,
-                }
-                .into(),
-            ),
-            astroport::asset::AssetInfo::NativeToken { denom } => {
-                coins.push(asset.deduct_tax(&deps.querier)?);
+                assets.push(astroport::asset::Asset {
+                    info: astroport::asset::AssetInfo::Token {
+                        contract_addr: deps.api.addr_validate(&contract_addr)?,
+                    },
+                    amount,
+                });
             }
         }
     }
-    cosmos_msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {contract_addr: astroport_pool.to_string(),
-    funds: coins,
-msg: to_binary(&astroport::pair::ExecuteMsg::ProvideLiquidity{assets: withdrawn_assets})?}))
 
+    cosmos_msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
+        contract_addr: astroport_pool.to_string(),
+        funds: coins,
+        msg: to_binary(&astroport::pair::ExecuteMsg::ProvideLiquidity {
+            assets: assets.try_into().unwrap(),
+            slippage_tolerance: None,
+        })?,
+    }));
 
-    let add_liquidity_msg = build_provide_liquidity_to_lp_pool_msg(
-        deps.as_ref(),
-        assets_,
-        astroport_pool.pair_addr.clone(),
-        native_asset.denom,
-        native_balance_withdrawn,
-    )?;
-    cosmos_msgs.push(add_liquidity_msg);
-    let update_state_msg = CallbackMsg::UpdateStateLiquidityMigrationCallback {
-        pool_identifer: pool_identifier.to_string(),
-        astroport_pool,
-        astroport_lp_balance,
-    }
-    .to_cosmos_msg(&env.contract.address)?;
-    cosmos_msgs.push(update_state_msg);
-
-    Ok(Response::new()
-        .add_messages(cosmos_msgs)
-        .add_attributes(vec![
-            ("action", "lockdrop::CallbackMsg::AddLiquidityToAstroport"),
-            ("pool_identifer", pool_identifier.as_str()),
-            ("asset_balance", &asset_balance.to_string()),
-            ("native_balance", &native_balance.to_string()),
-        ]))
-}
-
-/// @dev CALLBACK Function to update contract state after Liquidity in added to the Astroport Pool
-/// @param pool_identifer : Pool identifier to identify the LP pool
-/// @param astroport_pool : Astroport Pool details to which the liquidity is to be migrated
-/// @param prev_astroport_lp_balance : Contract's Astroport LP token balance before liquidity was added to the pool
-pub fn callback_update_pool_state_after_migration(
-    deps: DepsMut,
-    env: Env,
-    _info: MessageInfo,
-    pool_identifier: String,
-    astroport_pool: LiquidityPool,
-    prev_astroport_lp_balance: Uint128,
-) -> StdResult<Response> {
-    let pool_identifier = deps.api.addr_validate(&pool_identifier)?;
-    let mut pool_info = ASSET_POOLS.load(deps.storage, &pool_identifier)?;
-
-    // QUERY :: Get Astroport LP Balance to calculate how many were minted upon liquidity addition
-    let astroport_lp_balance = cw20_get_balance(
-        &deps.querier,
-        astroport_pool.lp_token_addr.clone(),
-        env.contract.address,
-    )?;
-    let astroport_lp_minted = astroport_lp_balance - prev_astroport_lp_balance;
-
-    // POOL INFO :: UPDATE STATE --> SAVE
-    pool_info.astroport_pair.lp_token_addr = astroport_pool.lp_token_addr.clone();
-    pool_info.astroport_pair.pair_addr = astroport_pool.pair_addr;
-    pool_info.astroport_pair.amount = astroport_lp_minted.into();
-    pool_info.is_migrated = true;
-    ASSET_POOLS.save(deps.storage, &pool_identifier, &pool_info)?;
-
-    Ok(Response::new().add_attributes(vec![
-        ("action", "lockdrop::CallbackMsg::UpdateStateAfterMigration"),
-        ("pool_identifer", pool_identifier.as_str()),
-        ("astroport_lp_minted", &astroport_lp_minted.to_string()),
-    ]))
+    Ok(Response::new().add_messages(cosmos_msgs).add_event(
+        Event::new("Liquidity has been migrated from terraswap to astroport")
+            .add_attribute("terraswap_lp_token", terraswap_lp_token)
+            .add_attribute("astroport_pool", astroport_pool)
+            .add_attribute("liquidity", format!("{}-{}", assets[0], assets[1])),
+    ))
 }
 
 // //----------------------------------------------------------------------------------------
@@ -1944,35 +1880,6 @@ fn build_claim_dual_rewards(
         msg: to_binary(&astroport::generator::ExecuteMsg::SendOrphanProxyReward {
             recipient: recepient_address.to_string(),
             lp_token: lp_token_contract.to_string(),
-        })?,
-    }))
-}
-
-// @dev  Helper function which returns a cosmos wasm msg to provide Liquidity to the Astroport pool
-// @param recipient : Astroport Asset definations defining the cw20 / native asset pair this pool will suppport
-// @param native_denom : Native token type (uusd / uluna)
-// @param native_amount : Native token amount to trasnfer to the astrport pool
-fn build_provide_liquidity_to_lp_pool_msg(
-    deps: Deps,
-    assets_: [astroport::asset::Asset; 2],
-    astroport_pool: Addr,
-    native_denom: String,
-    native_amount: Uint128,
-) -> StdResult<CosmosMsg> {
-    let native_coins_to_send = vec![deduct_tax(
-        deps,
-        Coin {
-            denom: native_denom,
-            amount: native_amount,
-        },
-    )?];
-
-    Ok(CosmosMsg::Wasm(WasmMsg::Execute {
-        contract_addr: astroport_pool.to_string(),
-        funds: native_coins_to_send,
-        msg: to_binary(&astroport::pair::ExecuteMsg::ProvideLiquidity {
-            assets: assets_,
-            slippage_tolerance: None,
         })?,
     }))
 }
