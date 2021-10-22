@@ -61,7 +61,6 @@ version = "1.0.0"
 dependencies = [
  "astroport",
  "astroport-periphery",
- "cosmwasm-bignumber",
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-storage-plus 0.8.1",

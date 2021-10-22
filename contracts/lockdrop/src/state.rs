@@ -1,7 +1,6 @@
-use cosmwasm_std::{Addr, Uint128};
+use cosmwasm_std::{Addr, Decimal256, Uint128, Uint256};
 use cw_storage_plus::{Item, Map, U64Key};
 
-use cosmwasm_bignumber::{Decimal256, Uint256};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -88,10 +87,8 @@ pub struct UserInfo {
 pub struct LockupInfo {
     /// Terraswap LP units locked by the user
     pub lp_units_locked: Uint128,
-    /// User's Astroport LP units, calculated as lp_units_locked (terraswap) / total LP units locked (terraswap) * Astroport LP units minted post migration
-    pub astroport_lp_units: Uint128,
     /// Boolean value indicating if the user's has withdrawn funds post the only 1 withdrawal limit cutoff
-    pub withdrawal_counter: bool,
+    pub withdrawal_flag: bool,
     /// Timestamp beyond which this position can be unlocked
     pub unlock_timestamp: u64,
 }
