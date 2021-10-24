@@ -11,6 +11,7 @@ use cosmwasm_std::{
 use astroport::asset::{Asset, AssetInfo, PairInfo};
 use astroport::factory::{FeeInfoResponse, PairType, QueryMsg as FactoryQueryMsg};
 use astroport::hook::InitHook;
+use astroport::pair::{generator_address, mint_liquidity_token_message};
 use astroport::pair::{
     CumulativePricesResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, MigrateMsg, PoolResponse,
     QueryMsg, ReverseSimulationResponse, SimulationResponse,
@@ -29,7 +30,7 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub fn instantiate(
     deps: DepsMut,
     env: Env,
-    _info: MessageInfo,
+    info: MessageInfo,
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
@@ -72,7 +73,7 @@ pub fn instantiate(
                 }),
             })?,
             funds: vec![],
-            admin: None,
+            admin: Some(info.sender.to_string()),
             label: String::from("Astroport LP token"),
         }
         .into(),
@@ -112,7 +113,8 @@ pub fn execute(
         ExecuteMsg::ProvideLiquidity {
             assets,
             slippage_tolerance,
-        } => provide_liquidity(deps, env, info, assets, slippage_tolerance),
+            auto_stack,
+        } => provide_liquidity(deps, env, info, assets, slippage_tolerance, auto_stack),
         ExecuteMsg::Swap {
             offer_asset,
             belief_price,
@@ -205,7 +207,7 @@ pub fn receive_cw20(
     }
 }
 
-// Must token contract execute it
+/// Token contract must execute it
 pub fn post_initialize(
     deps: DepsMut,
     _env: Env,
@@ -232,7 +234,9 @@ pub fn provide_liquidity(
     info: MessageInfo,
     assets: [Asset; 2],
     slippage_tolerance: Option<Decimal>,
+    auto_stack: Option<bool>,
 ) -> Result<Response, ContractError> {
+    let auto_stack = auto_stack.unwrap_or(false);
     for asset in assets.iter() {
         asset.assert_sent_native_token_balance(&info)?;
     }
@@ -307,21 +311,13 @@ pub fn provide_liquidity(
         )
     };
 
-    // mint LP token to sender
-    messages.push(SubMsg {
-        msg: WasmMsg::Execute {
-            contract_addr: config.pair_info.liquidity_token.to_string(),
-            msg: to_binary(&Cw20ExecuteMsg::Mint {
-                recipient: info.sender.to_string(),
-                amount: share,
-            })?,
-            funds: vec![],
-        }
-        .into(),
-        id: 0,
-        gas_limit: None,
-        reply_on: ReplyOn::Never,
-    });
+    messages.extend(mint_liquidity_token_message(
+        env.contract.address.clone(),
+        config.pair_info.liquidity_token.clone(),
+        info.sender,
+        share,
+        generator_address(auto_stack, config.factory_addr.clone(), &deps)?,
+    )?);
 
     // Accumulate prices for oracle
     if let Some((price0_cumulative_new, price1_cumulative_new, block_time)) =
@@ -670,7 +666,7 @@ pub fn query_simulation(deps: Deps, offer_asset: Asset) -> StdResult<SimulationR
         ask_pool = pools[0].clone();
     } else {
         return Err(StdError::generic_err(
-            "Given offer asset does not belong to pairs",
+            "Given offer asset doesn't belong to pairs",
         ));
     }
 
@@ -710,19 +706,21 @@ pub fn query_reverse_simulation(
         offer_pool = pools[0].clone();
     } else {
         return Err(StdError::generic_err(
-            "Given ask asset is not blong to pairs",
+            "Given ask asset doesn't belong to pairs",
         ));
     }
 
     // Get fee info from factory
     let fee_info = get_fee_info(deps, config)?;
 
-    let (offer_amount, spread_amount, commission_amount) = compute_offer_amount(
-        offer_pool.amount,
-        ask_pool.amount,
-        ask_asset.amount,
-        fee_info.total_fee_rate,
-    )?;
+    let (offer_amount, spread_amount, commission_amount) =
+        (Uint128::zero(), Uint128::zero(), Uint128::zero());
+    //  compute_offer_amount(
+    //     offer_pool.amount,
+    //     ask_pool.amount,
+    //     ask_asset.amount,
+    //     fee_info.total_fee_rate,
+    // )?;
 
     Ok(ReverseSimulationResponse {
         offer_amount,
@@ -788,31 +786,31 @@ fn compute_swap(
     Ok((return_amount, spread_amount, commission_amount))
 }
 
-fn compute_offer_amount(
-    offer_pool: Uint128,
-    ask_pool: Uint128,
-    ask_amount: Uint128,
-    commission_rate: Decimal,
-) -> StdResult<(Uint128, Uint128, Uint128)> {
-    // ask => offer
-    // offer_amount = cp / (ask_pool - ask_amount / (1 - commission_rate)) - offer_pool
-    let cp = Uint256::from(offer_pool) * Uint256::from(ask_pool);
-    let one_minus_commission = Decimal256::one() - Decimal256::from(commission_rate);
-    let inv_one_minus_commission: Uint128 = (Decimal256::one() / one_minus_commission).into();
+// fn compute_offer_amount(
+//     offer_pool: Uint128,
+//     ask_pool: Uint128,
+//     ask_amount: Uint128,
+//     commission_rate: Decimal,
+// ) -> StdResult<(Uint128, Uint128, Uint128)> {
+//     // ask => offer
+//     // offer_amount = cp / (ask_pool - ask_amount / (1 - commission_rate)) - offer_pool
+//     let cp = Uint256::from(offer_pool) * Uint256::from(ask_pool);
+//     let one_minus_commission = Decimal256::one() - Decimal256::from(commission_rate);
+//     let inv_one_minus_commission = (Decimal256::one() / one_minus_commission).into();
 
-    let offer_amount: Uint128 = Uint128::from(cp.multiply_ratio(
-        Uint256::one(),
-        Uint256::from(ask_pool.checked_sub(ask_amount * inv_one_minus_commission)?),
-    ))
-    .checked_sub(offer_pool)?;
+//     let offer_amount: Uint128 = Uint128::from(cp.multiply_ratio(
+//         Uint256::one(),
+//         Uint256::from(ask_pool.checked_sub(ask_amount * inv_one_minus_commission)?),
+//     ))
+//     .checked_sub(offer_pool)?;
 
-    let before_commission_deduction = ask_amount * inv_one_minus_commission;
-    let spread_amount = (offer_amount * Decimal::from_ratio(ask_pool, offer_pool))
-        .checked_sub(before_commission_deduction)
-        .unwrap_or_else(|_| Uint128::zero());
-    let commission_amount = before_commission_deduction * commission_rate;
-    Ok((offer_amount, spread_amount, commission_amount))
-}
+//     let before_commission_deduction = ask_amount * inv_one_minus_commission;
+//     let spread_amount = (offer_amount * Decimal::from_ratio(ask_pool, offer_pool))
+//         .checked_sub(before_commission_deduction)
+//         .unwrap_or_else(|_| Uint128::zero());
+//     let commission_amount = before_commission_deduction * commission_rate;
+//     Ok((offer_amount, spread_amount, commission_amount))
+// }
 
 /// If `belief_price` and `max_spread` both are given,
 /// we compute new spread else we just use swap

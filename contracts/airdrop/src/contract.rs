@@ -2,7 +2,7 @@ use astroport_periphery::airdrop::{
     ClaimResponse, ConfigResponse, ExecuteMsg, InstantiateMsg, QueryMsg, StateResponse,
     UserInfoResponse,
 };
-use astroport_periphery::auction::Cw20HookMsg::DelegateAstroTokens;
+use astroport_periphery::auction::Cw20HookMsg::DepositAstroTokens;
 use astroport_periphery::helpers::{build_send_cw20_token_msg, build_transfer_cw20_token_msg};
 use cosmwasm_std::{
     attr, entry_point, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdError,
@@ -49,7 +49,7 @@ pub fn instantiate(
         merkle_roots: msg.merkle_roots.unwrap_or_default(),
         from_timestamp,
         to_timestamp: msg.to_timestamp,
-        boostrap_auction_address: deps.api.addr_validate(&msg.boostrap_auction_address)?,
+        auction_contract_address: deps.api.addr_validate(&msg.auction_contract_address)?,
         are_claims_enabled: false,
     };
 
@@ -75,7 +75,7 @@ pub fn execute(
     match msg {
         ExecuteMsg::UpdateConfig {
             owner,
-            boostrap_auction_address,
+            auction_contract_address,
             merkle_roots,
             from_timestamp,
             to_timestamp,
@@ -83,7 +83,7 @@ pub fn execute(
             deps,
             info,
             owner,
-            boostrap_auction_address,
+            auction_contract_address,
             merkle_roots,
             from_timestamp,
             to_timestamp,
@@ -124,7 +124,7 @@ pub fn handle_update_config(
     deps: DepsMut,
     info: MessageInfo,
     owner: Option<String>,
-    boostrap_auction_address: Option<String>,
+    auction_contract_address: Option<String>,
     merkle_roots: Option<Vec<String>>,
     from_timestamp: Option<u64>,
     to_timestamp: Option<u64>,
@@ -140,8 +140,8 @@ pub fn handle_update_config(
         config.owner = deps.api.addr_validate(&owner)?;
     }
 
-    if let Some(boostrap_auction_address) = boostrap_auction_address {
-        config.boostrap_auction_address = deps.api.addr_validate(&boostrap_auction_address)?;
+    if let Some(auction_contract_address) = auction_contract_address {
+        config.auction_contract_address = deps.api.addr_validate(&auction_contract_address)?;
     }
 
     if let Some(merkle_roots) = merkle_roots {
@@ -171,7 +171,7 @@ pub fn handle_enable_claims(deps: DepsMut, info: MessageInfo) -> StdResult<Respo
     let mut config = CONFIG.load(deps.storage)?;
 
     // CHECK :: ONLY AUCTION CONTRACT CAN CALL THIS FUNCTION
-    if info.sender != config.boostrap_auction_address {
+    if info.sender != config.auction_contract_address {
         return Err(StdError::generic_err("Unauthorized"));
     }
 
@@ -271,7 +271,7 @@ pub fn handle_delegate_astro_to_bootstrap_auction(
     }
 
     let mut state = STATE.load(deps.storage)?;
-    let mut user_info = USERS.load(deps.storage, &info.sender.clone())?;
+    let mut user_info = USERS.load(deps.storage, &info.sender)?;
 
     // CHECK :: HAS USER ALREADY WITHDRAWN THEIR REWARDS ?
     if user_info.tokens_withdrawn {
@@ -287,12 +287,12 @@ pub fn handle_delegate_astro_to_bootstrap_auction(
     }
 
     // COSMOS MSG :: DELEGATE ASTRO TOKENS TO LP BOOTSTRAP AUCTION CONTRACT
-    let msg = to_binary(&DelegateAstroTokens {
+    let msg = to_binary(&DepositAstroTokens {
         user_address: info.sender.clone(),
     })?;
 
     let delegate_msg = build_send_cw20_token_msg(
-        config.boostrap_auction_address.to_string(),
+        config.auction_contract_address.to_string(),
         config.astro_token_address.to_string(),
         amount_to_delegate,
         msg,
@@ -321,7 +321,7 @@ pub fn handle_withdraw_airdrop_rewards(
     info: MessageInfo,
 ) -> Result<Response, StdError> {
     let config = CONFIG.load(deps.storage)?;
-    let mut user_info = USERS.load(deps.storage, &info.sender.clone())?;
+    let mut user_info = USERS.load(deps.storage, &info.sender)?;
 
     // CHECK :: HAS THE BOOTSTRAP AUCTION CONCLUDED ?
     if !config.are_claims_enabled {
@@ -425,7 +425,7 @@ fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
         merkle_roots: config.merkle_roots,
         from_timestamp: config.from_timestamp,
         to_timestamp: config.to_timestamp,
-        boostrap_auction_address: config.boostrap_auction_address.to_string(),
+        auction_contract_address: config.auction_contract_address.to_string(),
         are_claims_allowed: config.are_claims_enabled,
     })
 }

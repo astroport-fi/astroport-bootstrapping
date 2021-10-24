@@ -50,7 +50,7 @@ pub enum ExecuteMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Cw20HookMsg {
-    DelegateAstroTokens { user_address: Addr },
+    DepositAstroTokens { user_address: Addr },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -102,10 +102,10 @@ pub struct ConfigResponse {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct StateResponse {
-    pub total_astro_delegated: Uint256,
+    pub total_astro_deposited: Uint256,
     pub total_ust_deposited: Uint256,
     pub lp_shares_minted: Uint256,
-    pub lp_shares_claimed: Uint256,
+    pub lp_shares_withdrawn: Uint256,
     pub are_staked: bool,
     pub pool_init_timestamp: u64,
     pub global_reward_index: Decimal256,
@@ -113,14 +113,14 @@ pub struct StateResponse {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct UserInfoResponse {
-    pub astro_delegated: Uint256,
+    pub astro_deposited: Uint256,
     pub ust_deposited: Uint256,
     pub lp_shares: Uint256,
-    pub claimed_lp_shares: Uint256,
-    pub claimable_lp_shares: Uint256,
+    pub withdrawn_lp_shares: Uint256,
+    pub withdrawable_lp_shares: Uint256,
     pub total_auction_incentives: Uint256,
-    pub claimed_auction_incentives: Uint256,
-    pub claimable_auction_incentives: Uint256,
+    pub withdrawn_auction_incentives: Uint256,
+    pub withdrawable_auction_incentives: Uint256,
     pub user_reward_index: Decimal256,
     pub claimable_staking_incentives: Uint256,
 }

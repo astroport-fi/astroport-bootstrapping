@@ -25,8 +25,6 @@ library = []
 
 [dependencies]
 astroport-periphery =  { path = "../../packages/astroport_periphery" }
-astro-auction =  { path = "../auction" }
-
 cosmwasm-std = { version = "0.16.0" }
 cw-storage-plus = { version = "0.8.0" }
 serde = { version = "1.0.127", default-features = false, features = ["derive"] }
@@ -42,3 +40,5 @@ sha3 = "0.9.1"
 cosmwasm-schema = { version = "0.16.0" }
 cosmwasm-storage = { version = "0.16.0" }
 terra-multi-test = {git = "https://github.com/astroport-fi/terra-plus.git"}
+# for integration testing
+mock-astro-auction =  { path = "../mocks/mock_auction" }

@@ -19,7 +19,7 @@ use astroport_periphery::lockdrop::{
 
 use astroport::generator::{PendingTokenResponse, QueryMsg as GenQueryMsg};
 use astroport_periphery::asset::{Cw20Asset, LiquidityPool, NativeAsset};
-use astroport_periphery::auction::Cw20HookMsg::DelegateAstroTokens;
+use astroport_periphery::auction::Cw20HookMsg::DepositAstroTokens;
 use astroport_periphery::tax::deduct_tax;
 use terraswap::asset::Asset as terraswapAsset;
 
@@ -41,9 +41,9 @@ pub fn instantiate(
     msg: InstantiateMsg,
 ) -> StdResult<Response> {
     // CHECK :: init_timestamp needs to be valid
-    if msg.init_timestamp < _env.block.time.seconds() {
-        return Err(StdError::generic_err("Invalid timestamp"));
-    }
+    // if msg.init_timestamp < _env.block.time.seconds() {
+    //     return Err(StdError::generic_err("Invalid timestamp"));
+    // }
 
     // CHECK :: min_lock_duration , max_lock_duration need to be valid (min_lock_duration < max_lock_duration)
     if msg.max_duration <= msg.min_duration {
@@ -897,7 +897,7 @@ pub fn handle_delegate_astro_to_auction(
     USER_INFO.save(deps.storage, &user_address, &user_info)?;
 
     // COSMOS_MSG ::Delegate ASTRO to the LP Bootstrapping via Auction contract
-    let msg_ = to_binary(&DelegateAstroTokens {
+    let msg_ = to_binary(&DepositAstroTokens {
         user_address: info.sender,
     })?;
     let delegate_msg = build_send_cw20_token_msg(
@@ -1989,6 +1989,7 @@ fn build_provide_liquidity_to_lp_pool_msg(
         msg: to_binary(&astroport::pair::ExecuteMsg::ProvideLiquidity {
             assets: assets_,
             slippage_tolerance: None,
+            auto_stack: Some(false),
         })?,
     }))
 }

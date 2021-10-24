@@ -1,6 +1,6 @@
 use crate::asset::{AssetInfo, PairInfo};
 use crate::hook::InitHook;
-use cosmwasm_std::Addr;
+use cosmwasm_std::{to_binary, Addr, DepsMut, QueryRequest, StdResult, WasmQuery};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter, Result};
@@ -36,24 +36,26 @@ pub struct PairConfig {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InstantiateMsg {
-    /// Pair contract code IDs which are allowed for pair creation
+    /// Pair contract code IDs which are allowed to create pairs
     pub pair_configs: Vec<PairConfig>,
     pub token_code_id: u64,
     pub init_hook: Option<InitHook>,
     // Contract address to send fees to
     pub fee_address: Option<Addr>,
-    pub gov: Addr,
+    pub generator_address: Addr,
+    pub gov: Option<Addr>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
-    /// UpdateConfig update relevant code IDs
+    /// UpdateConfig updates relevant code IDs
     UpdateConfig {
         gov: Option<Addr>,
         owner: Option<Addr>,
         token_code_id: Option<u64>,
         fee_address: Option<Addr>,
+        generator_address: Option<Addr>,
     },
     UpdatePairConfig {
         config: PairConfig,
@@ -70,7 +72,7 @@ pub enum ExecuteMsg {
         /// Init hook for after works
         init_hook: Option<InitHook>,
     },
-    /// Register is invoked from created pair contract after initialzation
+    /// Register is invoked from created pair contract after initialization
     Register {
         asset_infos: [AssetInfo; 2],
     },
@@ -99,10 +101,11 @@ pub enum QueryMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct ConfigResponse {
     pub owner: Addr,
-    pub gov: Addr,
+    pub gov: Option<Addr>,
     pub pair_configs: Vec<PairConfig>,
     pub token_code_id: u64,
-    pub fee_address: Addr,
+    pub fee_address: Option<Addr>,
+    pub generator_address: Addr,
 }
 
 /// We currently take no arguments for migrations
@@ -121,4 +124,12 @@ pub struct FeeInfoResponse {
     pub fee_address: Option<Addr>,
     pub total_fee_bps: u16,
     pub maker_fee_bps: u16,
+}
+
+/// External query factory config
+pub fn factory_config(factory_addr: Addr, deps: &DepsMut) -> StdResult<ConfigResponse> {
+    deps.querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
+        contract_addr: factory_addr.to_string(),
+        msg: to_binary(&QueryMsg::Config {})?,
+    }))
 }

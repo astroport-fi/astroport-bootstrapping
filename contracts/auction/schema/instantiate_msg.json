@@ -6,11 +6,11 @@
     "airdrop_contract_address",
     "astro_rewards",
     "astro_token_address",
-    "astro_vesting_schedule",
+    "astro_vesting_duration",
     "deposit_window",
     "init_timestamp",
     "lockdrop_contract_address",
-    "lp_tokens_vesting_schedule",
+    "lp_tokens_vesting_duration",
     "owner",
     "withdrawal_window"
   ],
@@ -24,7 +24,7 @@
     "astro_token_address": {
       "type": "string"
     },
-    "astro_vesting_schedule": {
+    "astro_vesting_duration": {
       "type": "integer",
       "format": "uint64",
       "minimum": 0.0
@@ -60,7 +60,7 @@
         "null"
       ]
     },
-    "lp_tokens_vesting_schedule": {
+    "lp_tokens_vesting_duration": {
       "type": "integer",
       "format": "uint64",
       "minimum": 0.0

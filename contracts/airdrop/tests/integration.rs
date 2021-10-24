@@ -67,7 +67,7 @@ fn init_contracts(app: &mut App) -> (Addr, Addr, InstantiateMsg) {
         merkle_roots: Some(vec!["merkle_roots".to_string()]),
         from_timestamp: Some(1_000_00),
         to_timestamp: 100_000_00,
-        boostrap_auction_address: String::from("boostrap_auction_address"),
+        auction_contract_address: String::from("auction_contract_address"),
         total_airdrop_size: Uint128::new(100_000_000_000),
     };
 
@@ -110,10 +110,10 @@ fn mint_some_astro(
 }
 
 // Helper function. Enables claims (ASTRO Withdrawals) from the Airdrop contract
-fn enable_claims(app: &mut App, airdrop_instance: Addr, boostrap_auction_address: Addr) {
+fn enable_claims(app: &mut App, airdrop_instance: Addr, auction_contract_address: Addr) {
     let msg = ExecuteMsg::EnableClaims {};
     app.execute_contract(
-        boostrap_auction_address.clone(),
+        auction_contract_address.clone(),
         airdrop_instance.clone(),
         &msg,
         &[],
@@ -139,8 +139,8 @@ fn proper_initialization() {
     // Check config
     assert_eq!(init_msg.astro_token_address, resp.astro_token_address);
     assert_eq!(
-        init_msg.boostrap_auction_address,
-        resp.boostrap_auction_address
+        init_msg.auction_contract_address,
+        resp.auction_contract_address
     );
     assert_eq!(init_msg.owner.unwrap(), resp.owner);
     assert_eq!(init_msg.merkle_roots.unwrap(), resp.merkle_roots);
@@ -170,7 +170,7 @@ fn update_config() {
             airdrop_instance.clone(),
             &ExecuteMsg::UpdateConfig {
                 owner: None,
-                boostrap_auction_address: None,
+                auction_contract_address: None,
                 merkle_roots: None,
                 from_timestamp: None,
                 to_timestamp: None,
@@ -191,7 +191,7 @@ fn update_config() {
 
     let update_msg = ExecuteMsg::UpdateConfig {
         owner: Some(new_owner.clone()),
-        boostrap_auction_address: None,
+        auction_contract_address: None,
         merkle_roots: Some(merkle_roots.clone()),
         from_timestamp: Some(from_timestamp),
         to_timestamp: Some(to_timestamp),
@@ -365,7 +365,7 @@ fn test_claim_by_terra_user() {
         vec!["cdcdfad1c342f5f55a2639dcae7321a64cd000807fa24c2c4ddaa944fd52d34e".to_string()];
     let update_msg = ExecuteMsg::UpdateConfig {
         owner: None,
-        boostrap_auction_address: None,
+        auction_contract_address: None,
         merkle_roots: Some(merkle_roots.clone()),
         from_timestamp: None,
         to_timestamp: None,
@@ -586,7 +586,7 @@ fn test_claim_by_terra_user() {
     enable_claims(
         &mut app,
         Addr::unchecked(airdrop_instance.clone()),
-        Addr::unchecked(init_msg.boostrap_auction_address),
+        Addr::unchecked(init_msg.auction_contract_address),
     );
 
     // ################################
@@ -808,7 +808,7 @@ fn test_enable_claims() {
     // ###### Should successfully enable claims ######
 
     app.execute_contract(
-        Addr::unchecked(init_msg.boostrap_auction_address.clone()),
+        Addr::unchecked(init_msg.auction_contract_address.clone()),
         airdrop_instance.clone(),
         &msg,
         &[],
@@ -825,7 +825,7 @@ fn test_enable_claims() {
 
     resp_f = app
         .execute_contract(
-            Addr::unchecked(init_msg.boostrap_auction_address.clone()),
+            Addr::unchecked(init_msg.auction_contract_address.clone()),
             airdrop_instance.clone(),
             &msg,
             &[],
@@ -866,7 +866,7 @@ fn test_withdraw_airdrop_rewards() {
 
     let update_msg = ExecuteMsg::UpdateConfig {
         owner: None,
-        boostrap_auction_address: None,
+        auction_contract_address: None,
         merkle_roots: Some(merkle_roots.clone()),
         from_timestamp: None,
         to_timestamp: None,
@@ -1012,7 +1012,7 @@ fn test_withdraw_airdrop_rewards() {
     enable_claims(
         &mut app,
         Addr::unchecked(airdrop_instance.clone()),
-        Addr::unchecked(init_msg.boostrap_auction_address),
+        Addr::unchecked(init_msg.auction_contract_address),
     );
 
     // Should be a success
@@ -1059,9 +1059,9 @@ fn test_delegate_astro_to_bootstrap_auction() {
 
     // Initialize Bootstrap Auction contract
     let auction_contract = Box::new(ContractWrapper::new(
-        astro_auction::contract::execute,
-        astro_auction::contract::instantiate,
-        astro_auction::contract::query,
+        mock_astro_auction::contract::execute,
+        mock_astro_auction::contract::instantiate,
+        mock_astro_auction::contract::query,
     ));
     let auction_contract_code_id = app.store_code(auction_contract);
     let auction_init_msg = astroport_periphery::auction::InstantiateMsg {
@@ -1096,7 +1096,7 @@ fn test_delegate_astro_to_bootstrap_auction() {
 
     let update_msg = ExecuteMsg::UpdateConfig {
         owner: None,
-        boostrap_auction_address: Some(auction_contract_instance.to_string()),
+        auction_contract_address: Some(auction_contract_instance.to_string()),
         merkle_roots: Some(merkle_roots.clone()),
         from_timestamp: None,
         to_timestamp: None,

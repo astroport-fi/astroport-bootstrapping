@@ -5,11 +5,10 @@
   "required": [
     "are_claims_enabled",
     "astro_token_address",
-    "boostrap_auction_address",
-    "evm_merkle_roots",
+    "auction_contract_address",
     "from_timestamp",
+    "merkle_roots",
     "owner",
-    "terra_merkle_roots",
     "to_timestamp"
   ],
   "properties": {
@@ -25,7 +24,7 @@
         }
       ]
     },
-    "boostrap_auction_address": {
+    "auction_contract_address": {
       "description": "Boostrap auction contract address",
       "allOf": [
         {
@@ -33,18 +32,18 @@
         }
       ]
     },
-    "evm_merkle_roots": {
-      "description": "Merkle roots used to verify is an evm user is eligible for the airdrop",
-      "type": "array",
-      "items": {
-        "type": "string"
-      }
-    },
     "from_timestamp": {
       "description": "Timestamp since which ASTRO airdrops can be delegated to boostrap auction contract",
       "type": "integer",
       "format": "uint64",
       "minimum": 0.0
+    },
+    "merkle_roots": {
+      "description": "Merkle roots used to verify is a terra user is eligible for the airdrop",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
     },
     "owner": {
       "description": "Account who can update config",
@@ -53,13 +52,6 @@
           "$ref": "#/definitions/Addr"
         }
       ]
-    },
-    "terra_merkle_roots": {
-      "description": "Merkle roots used to verify is a terra user is eligible for the airdrop",
-      "type": "array",
-      "items": {
-        "type": "string"
-      }
     },
     "to_timestamp": {
       "description": "Timestamp to which ASTRO airdrops can be claimed",

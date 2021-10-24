@@ -3,6 +3,7 @@ members = [
     "contracts/airdrop", 
      "contracts/auction", 
      "contracts/lockdrop", 
+     "contracts/mocks/mock_astroport/*", 
     "packages/*"
 ]
 
@@ -24,6 +25,12 @@ incremental = false
 
 
 [profile.release]
+opt-level = 3
+debug = false
 rpath = false
 lto = true
+debug-assertions = false
+codegen-units = 1
+panic = 'abort'
+incremental = false
 overflow-checks = true
