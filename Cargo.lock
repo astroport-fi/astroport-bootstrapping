@@ -12,11 +12,15 @@ checksum = "61604a8f862e1d5c3229fdd78f8b02c68dcf73a4c4b05fd636d12240aaa242c1"
 name = "astro-airdrop"
 version = "1.0.0"
 dependencies = [
+ "astro-auction",
+ "astroport",
  "astroport-periphery",
+ "astroport-token",
  "cosmwasm-bignumber",
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-storage-plus 0.8.1",
+ "cw20",
  "hex",
  "schemars",
  "serde",
