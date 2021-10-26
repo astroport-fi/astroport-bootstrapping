@@ -6,14 +6,14 @@
     "airdrop_contract_address",
     "astro_rewards",
     "astro_token_address",
-    "astro_vesting_schedule",
+    "astro_vesting_duration",
     "astroport_lp_pool",
     "deposit_window",
     "generator_contract",
     "init_timestamp",
     "lockdrop_contract_address",
     "lp_token_address",
-    "lp_tokens_vesting_schedule",
+    "lp_tokens_vesting_duration",
     "owner",
     "withdrawal_window"
   ],
@@ -42,7 +42,7 @@
         }
       ]
     },
-    "astro_vesting_schedule": {
+    "astro_vesting_duration": {
       "description": "Number of seconds over which ASTRO incentives are vested",
       "type": "integer",
       "format": "uint64",
@@ -71,7 +71,7 @@
       ]
     },
     "init_timestamp": {
-      "description": "Timestamp since which ASTRO / UST deposits will be allowrd",
+      "description": "Timestamp since which ASTRO / UST deposits will be allowed",
       "type": "integer",
       "format": "uint64",
       "minimum": 0.0
@@ -92,7 +92,7 @@
         }
       ]
     },
-    "lp_tokens_vesting_schedule": {
+    "lp_tokens_vesting_duration": {
       "description": "Number of seconds over which LP Tokens are vested",
       "type": "integer",
       "format": "uint64",

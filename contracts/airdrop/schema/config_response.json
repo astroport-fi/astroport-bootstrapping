@@ -5,12 +5,11 @@
   "required": [
     "are_claims_allowed",
     "astro_token_address",
-    "boostrap_auction_address",
-    "evm_merkle_roots",
+    "auction_contract_address",
     "from_timestamp",
+    "merkle_roots",
     "owner",
-    "terra_merkle_roots",
-    "till_timestamp"
+    "to_timestamp"
   ],
   "properties": {
     "are_claims_allowed": {
@@ -19,30 +18,24 @@
     "astro_token_address": {
       "type": "string"
     },
-    "boostrap_auction_address": {
+    "auction_contract_address": {
       "type": "string"
-    },
-    "evm_merkle_roots": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      }
     },
     "from_timestamp": {
       "type": "integer",
       "format": "uint64",
       "minimum": 0.0
     },
-    "owner": {
-      "type": "string"
-    },
-    "terra_merkle_roots": {
+    "merkle_roots": {
       "type": "array",
       "items": {
         "type": "string"
       }
     },
-    "till_timestamp": {
+    "owner": {
+      "type": "string"
+    },
+    "to_timestamp": {
       "type": "integer",
       "format": "uint64",
       "minimum": 0.0

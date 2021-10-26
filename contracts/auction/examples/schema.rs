@@ -3,8 +3,11 @@ use std::fs::create_dir_all;
 
 use cosmwasm_schema::{export_schema, remove_schemas, schema_for};
 
-use astroport_periphery::lp_bootstrap_auction::{Cw20HookMsg, UserInfoResponse, StateResponse, ConfigResponse, ExecuteMsg, InstantiateMsg,UpdateConfigMsg, QueryMsg , CallbackMsg };
-use astro_bootstrap_auction::state::{Config, State, UserInfo};
+use astro_auction::state::{Config, State, UserInfo};
+use astroport_periphery::auction::{
+    CallbackMsg, ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, QueryMsg, StateResponse,
+    UpdateConfigMsg, UserInfoResponse,
+};
 
 fn main() {
     let mut out_dir = current_dir().unwrap();
@@ -22,7 +25,7 @@ fn main() {
     export_schema(&schema_for!(UserInfoResponse), &out_dir);
     export_schema(&schema_for!(StateResponse), &out_dir);
     export_schema(&schema_for!(UpdateConfigMsg), &out_dir);
-    
+
     export_schema(&schema_for!(Config), &out_dir);
     export_schema(&schema_for!(State), &out_dir);
     export_schema(&schema_for!(UserInfo), &out_dir);

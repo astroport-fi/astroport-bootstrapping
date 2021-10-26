@@ -6,11 +6,10 @@ use serde::{Deserialize, Serialize};
 pub struct InstantiateMsg {
     pub owner: Option<String>,
     pub astro_token_address: String,
-    pub terra_merkle_roots: Option<Vec<String>>,
-    pub evm_merkle_roots: Option<Vec<String>>,
+    pub merkle_roots: Option<Vec<String>>,
     pub from_timestamp: Option<u64>,
     pub to_timestamp: u64,
-    pub boostrap_auction_address: String,
+    pub auction_contract_address: String,
     pub total_airdrop_size: Uint128,
 }
 
@@ -20,8 +19,8 @@ pub enum ExecuteMsg {
     /// Admin function to update the configuration parameters
     UpdateConfig {
         owner: Option<String>,
-        terra_merkle_roots: Option<Vec<String>>,
-        evm_merkle_roots: Option<Vec<String>>,
+        auction_contract_address: Option<String>,
+        merkle_roots: Option<Vec<String>>,
         from_timestamp: Option<u64>,
         to_timestamp: Option<u64>,
     },
@@ -29,19 +28,10 @@ pub enum ExecuteMsg {
     // ASTRO-UST Pool to enable ASTRO withdrawals by users
     EnableClaims {},
     /// Allows Terra users to claim their ASTRO Airdrop
-    ClaimByTerraUser {
+    Claim {
         claim_amount: Uint128,
         merkle_proof: Vec<String>,
         root_index: u32,
-    },
-    /// Allows EVM users to claim their ASTRO Airdrop
-    ClaimByEvmUser {
-        eth_address: String,
-        claim_amount: Uint128,
-        merkle_proof: Vec<String>,
-        root_index: u32,
-        signature: String,
-        signed_msg_hash: String,
     },
     /// Allows users to delegate their ASTRO tokens to the LP Bootstrap auction contract
     DelegateAstroToBootstrapAuction {
@@ -61,28 +51,18 @@ pub enum ExecuteMsg {
 pub enum QueryMsg {
     Config {},
     State {},
-    UserInfo {
-        address: String,
-    },
-    HasUserClaimed {
-        address: String,
-    },
-    IsValidSignature {
-        evm_address: String,
-        evm_signature: String,
-        signed_msg_hash: String,
-    },
+    UserInfo { address: String },
+    HasUserClaimed { address: String },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct ConfigResponse {
     pub owner: String,
     pub astro_token_address: String,
-    pub terra_merkle_roots: Vec<String>,
-    pub evm_merkle_roots: Vec<String>,
+    pub merkle_roots: Vec<String>,
     pub from_timestamp: u64,
     pub to_timestamp: u64,
-    pub boostrap_auction_address: String,
+    pub auction_contract_address: String,
     pub are_claims_allowed: bool,
 }
 

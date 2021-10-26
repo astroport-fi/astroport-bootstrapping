@@ -14,7 +14,7 @@ use astroport_periphery::lockdrop::{
 use astroport::generator::{
     ExecuteMsg as GenExecuteMsg, PendingTokenResponse, QueryMsg as GenQueryMsg, RewardInfoResponse,
 };
-use astroport_periphery::lp_bootstrap_auction::Cw20HookMsg::DelegateAstroTokens;
+use astroport_periphery::auction::Cw20HookMsg::DepositAstroTokens;
 use cw_storage_plus::U64Key;
 
 use crate::state::{
@@ -926,7 +926,7 @@ pub fn handle_delegate_astro_to_auction(
                 .auction_contract
                 .expect("Auction contract hasn't been set yet!")
                 .to_string(),
-            msg: to_binary(&DelegateAstroTokens {
+            msg: to_binary(&DepositAstroTokens {
                 user_address: user_address.clone(),
             })?,
             amount,

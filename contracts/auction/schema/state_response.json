@@ -1,41 +1,39 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "UserInfo",
+  "title": "StateResponse",
   "type": "object",
   "required": [
-    "astro_delegated",
-    "claimed_auction_incentives",
-    "claimed_lp_shares",
-    "lp_shares",
-    "total_auction_incentives",
-    "user_reward_index",
-    "ust_deposited",
-    "withdrawl_counter"
+    "are_staked",
+    "global_reward_index",
+    "lp_shares_minted",
+    "lp_shares_withdrawn",
+    "pool_init_timestamp",
+    "total_astro_deposited",
+    "total_ust_deposited"
   ],
   "properties": {
-    "astro_delegated": {
-      "$ref": "#/definitions/Uint256"
+    "are_staked": {
+      "type": "boolean"
     },
-    "claimed_auction_incentives": {
-      "$ref": "#/definitions/Uint256"
-    },
-    "claimed_lp_shares": {
-      "$ref": "#/definitions/Uint256"
-    },
-    "lp_shares": {
-      "$ref": "#/definitions/Uint256"
-    },
-    "total_auction_incentives": {
-      "$ref": "#/definitions/Uint256"
-    },
-    "user_reward_index": {
+    "global_reward_index": {
       "$ref": "#/definitions/Decimal256"
     },
-    "ust_deposited": {
+    "lp_shares_minted": {
       "$ref": "#/definitions/Uint256"
     },
-    "withdrawl_counter": {
-      "type": "boolean"
+    "lp_shares_withdrawn": {
+      "$ref": "#/definitions/Uint256"
+    },
+    "pool_init_timestamp": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    },
+    "total_astro_deposited": {
+      "$ref": "#/definitions/Uint256"
+    },
+    "total_ust_deposited": {
+      "$ref": "#/definitions/Uint256"
     }
   },
   "definitions": {

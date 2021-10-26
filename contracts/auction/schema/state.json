@@ -5,10 +5,10 @@
   "required": [
     "are_staked",
     "global_reward_index",
-    "lp_shares_claimed",
     "lp_shares_minted",
+    "lp_shares_withdrawn",
     "pool_init_timestamp",
-    "total_astro_delegated",
+    "total_astro_deposited",
     "total_ust_deposited"
   ],
   "properties": {
@@ -24,16 +24,16 @@
         }
       ]
     },
-    "lp_shares_claimed": {
-      "description": "Number of LP shares that have been withdrawn as they unvest",
+    "lp_shares_minted": {
+      "description": "Total LP shares minted post liquidity addition to the ASTRO-UST Pool",
       "allOf": [
         {
           "$ref": "#/definitions/Uint256"
         }
       ]
     },
-    "lp_shares_minted": {
-      "description": "Total LP shares minted post liquidity addition to the ASTRO-UST Pool",
+    "lp_shares_withdrawn": {
+      "description": "Number of LP shares that have been withdrawn as they unvest",
       "allOf": [
         {
           "$ref": "#/definitions/Uint256"
@@ -46,7 +46,7 @@
       "format": "uint64",
       "minimum": 0.0
     },
-    "total_astro_delegated": {
+    "total_astro_deposited": {
       "description": "Total ASTRO tokens delegated to the contract by lockdrop participants / airdrop recepients",
       "allOf": [
         {

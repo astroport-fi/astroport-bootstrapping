@@ -65,34 +65,6 @@
         }
       },
       "additionalProperties": false
-    },
-    {
-      "type": "object",
-      "required": [
-        "is_valid_signature"
-      ],
-      "properties": {
-        "is_valid_signature": {
-          "type": "object",
-          "required": [
-            "evm_address",
-            "evm_signature",
-            "signed_msg_hash"
-          ],
-          "properties": {
-            "evm_address": {
-              "type": "string"
-            },
-            "evm_signature": {
-              "type": "string"
-            },
-            "signed_msg_hash": {
-              "type": "string"
-            }
-          }
-        }
-      },
-      "additionalProperties": false
     }
   ]
 }

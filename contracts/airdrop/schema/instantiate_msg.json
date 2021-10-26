@@ -3,29 +3,17 @@
   "title": "InstantiateMsg",
   "type": "object",
   "required": [
+    "astro_token_address",
+    "auction_contract_address",
+    "to_timestamp",
     "total_airdrop_size"
   ],
   "properties": {
     "astro_token_address": {
-      "type": [
-        "string",
-        "null"
-      ]
+      "type": "string"
     },
-    "boostrap_auction_address": {
-      "type": [
-        "string",
-        "null"
-      ]
-    },
-    "evm_merkle_roots": {
-      "type": [
-        "array",
-        "null"
-      ],
-      "items": {
-        "type": "string"
-      }
+    "auction_contract_address": {
+      "type": "string"
     },
     "from_timestamp": {
       "type": [
@@ -35,13 +23,7 @@
       "format": "uint64",
       "minimum": 0.0
     },
-    "owner": {
-      "type": [
-        "string",
-        "null"
-      ]
-    },
-    "terra_merkle_roots": {
+    "merkle_roots": {
       "type": [
         "array",
         "null"
@@ -50,11 +32,14 @@
         "type": "string"
       }
     },
-    "till_timestamp": {
+    "owner": {
       "type": [
-        "integer",
+        "string",
         "null"
-      ],
+      ]
+    },
+    "to_timestamp": {
+      "type": "integer",
       "format": "uint64",
       "minimum": 0.0
     },

@@ -4,18 +4,18 @@
   "type": "object",
   "required": [
     "airdrop_amount",
-    "are_claimed",
-    "delegated_amount"
+    "delegated_amount",
+    "tokens_withdrawn"
   ],
   "properties": {
     "airdrop_amount": {
       "$ref": "#/definitions/Uint128"
     },
-    "are_claimed": {
-      "type": "boolean"
-    },
     "delegated_amount": {
       "$ref": "#/definitions/Uint128"
+    },
+    "tokens_withdrawn": {
+      "type": "boolean"
     }
   },
   "definitions": {
