@@ -35,10 +35,10 @@
         "pool": {
           "type": "object",
           "required": [
-            "pool_identifier"
+            "terraswap_lp_token"
           ],
           "properties": {
-            "pool_identifier": {
+            "terraswap_lp_token": {
               "type": "string"
             }
           }
@@ -76,7 +76,7 @@
           "type": "object",
           "required": [
             "duration",
-            "pool_identifier",
+            "terraswap_lp_token",
             "user_address"
           ],
           "properties": {
@@ -85,30 +85,10 @@
               "format": "uint64",
               "minimum": 0.0
             },
-            "pool_identifier": {
+            "terraswap_lp_token": {
               "type": "string"
             },
             "user_address": {
-              "type": "string"
-            }
-          }
-        }
-      },
-      "additionalProperties": false
-    },
-    {
-      "type": "object",
-      "required": [
-        "lock_up_info_with_id"
-      ],
-      "properties": {
-        "lock_up_info_with_id": {
-          "type": "object",
-          "required": [
-            "lockup_id"
-          ],
-          "properties": {
-            "lockup_id": {
               "type": "string"
             }
           }

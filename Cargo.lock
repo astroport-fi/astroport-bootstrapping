@@ -15,9 +15,7 @@ dependencies = [
  "astroport-periphery",
  "cosmwasm-schema",
  "cosmwasm-std",
- "cosmwasm-storage",
  "cw-storage-plus 0.8.1",
- "cw20-base",
  "hex",
  "schemars",
  "serde",
@@ -29,15 +27,13 @@ dependencies = [
 name = "astro-bootstrap-auction"
 version = "1.0.0"
 dependencies = [
- "astroport",
+ "astroport 2.4.0 (git+https://github.com/astroport-fi/astroport.git?tag=v0.1-beta)",
  "astroport-periphery",
  "cosmwasm-bignumber",
  "cosmwasm-schema",
  "cosmwasm-std",
- "cosmwasm-storage",
  "cw-storage-plus 0.8.1",
  "cw20",
- "cw20-base",
  "schemars",
  "serde",
 ]
@@ -56,10 +52,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "astroport"
+version = "2.4.0"
+source = "git+https://github.com/astroport-fi/astroport.git?branch=master#630bee85485d225ee8fbdc7f0e0ce712bfb06012"
+dependencies = [
+ "cosmwasm-std",
+ "cw20",
+ "schemars",
+ "serde",
+ "terra-cosmwasm",
+ "uint",
+]
+
+[[package]]
 name = "astroport-lockdrop"
 version = "1.0.0"
 dependencies = [
- "astroport",
+ "astroport 2.4.0 (git+https://github.com/astroport-fi/astroport.git?branch=master)",
  "astroport-periphery",
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -68,25 +77,20 @@ dependencies = [
  "schemars",
  "serde",
  "terraswap",
- "thiserror",
 ]
 
 [[package]]
 name = "astroport-periphery"
 version = "1.0.0"
 dependencies = [
- "astroport",
  "cosmwasm-bignumber",
  "cosmwasm-schema",
  "cosmwasm-std",
- "cosmwasm-storage",
  "cw20",
- "cw20-base",
  "schemars",
  "serde",
  "terra-cosmwasm",
  "terraswap",
- "uint",
 ]
 
 [[package]]
@@ -316,18 +320,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cw2"
-version = "0.8.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4d48454f96494aa1018556cd457977375cc8c57ef3e5c767cfa2ea5ec24b0258"
-dependencies = [
- "cosmwasm-std",
- "cw-storage-plus 0.8.1",
- "schemars",
- "serde",
-]
-
-[[package]]
 name = "cw20"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -337,22 +329,6 @@ dependencies = [
  "cw0 0.8.1",
  "schemars",
  "serde",
-]
-
-[[package]]
-name = "cw20-base"
-version = "0.8.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fe3791e0f6b4a0a82b86541d48dcc67c2d607da8e5691a91b40b2c06ddf09c52"
-dependencies = [
- "cosmwasm-std",
- "cw-storage-plus 0.8.1",
- "cw0 0.8.1",
- "cw2",
- "cw20",
- "schemars",
- "serde",
- "thiserror",
 ]
 
 [[package]]
