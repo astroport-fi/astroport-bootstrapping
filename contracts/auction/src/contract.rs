@@ -145,7 +145,14 @@ fn _handle_callback(
         CallbackMsg::UpdateStateOnRewardClaim {
             user_address,
             prev_astro_balance,
-        } => update_state_on_reward_claim(deps, env, user_address, prev_astro_balance),
+            withdraw_lp_shares,
+        } => update_state_on_reward_claim(
+            deps,
+            env,
+            user_address,
+            prev_astro_balance,
+            withdraw_lp_shares,
+        ),
     }
 }
 
@@ -366,7 +373,10 @@ pub fn handle_add_liquidity_to_astroport_pool(
         ));
     }
 
-    let mut msgs_ = vec![];
+    // Init response
+    let mut response =
+        Response::new().add_attribute("action", "Auction::ExecuteMsg::AddLiquidityToAstroportPool");
+
     // QUERY CURRENT LP TOKEN BALANCE (FOR SAFETY - IN ANY CASE)
     let cur_lp_balance = cw20_get_balance(
         &deps.querier,
@@ -378,8 +388,6 @@ pub fn handle_add_liquidity_to_astroport_pool(
     // :: 1.  APPROVE ASTRO WITH LP POOL ADDRESS AS BENEFICIARY
     // :: 2.  ADD LIQUIDITY
     // :: 3. CallbackMsg :: Update state on liquidity addition to LP Pool
-    // :: 4. Activate Claims on Lockdrop Contract
-    // :: 5. Activate Claims on Airdrop Contract
     let approve_astro_msg = build_approve_cw20_msg(
         config.astro_token_address.to_string(),
         config.astroport_lp_pool.to_string(),
@@ -391,15 +399,12 @@ pub fn handle_add_liquidity_to_astroport_pool(
         prev_lp_balance: cur_lp_balance.into(),
     }
     .to_cosmos_msg(&_env.contract.address)?;
-    msgs_.push(approve_astro_msg);
-    msgs_.push(add_liquidity_msg);
-    msgs_.push(update_state_msg);
+    response = response
+        .add_messages(vec![approve_astro_msg, add_liquidity_msg, update_state_msg])
+        .add_attribute("astro_deposited", state.total_astro_deposited)
+        .add_attribute("ust_deposited", state.total_ust_deposited);
 
-    Ok(Response::new().add_messages(msgs_).add_attributes(vec![
-        attr("action", "Auction::ExecuteMsg::AddLiquidityToAstroportPool"),
-        attr("astro_deposited", state.total_astro_deposited),
-        attr("ust_deposited", state.total_ust_deposited),
-    ]))
+    Ok(response)
 }
 
 /// @dev Admin function to stake Astroport LP tokens with the generator contract
@@ -421,29 +426,27 @@ pub fn handle_stake_lp_tokens(
         return Err(StdError::generic_err("Already staked"));
     }
 
+    // Init response
+    let mut response =
+        Response::new().add_attribute("action", "Auction::ExecuteMsg::StakeLPTokens");
+
     // COSMOS MSGs
     // :: Add increase allowance msg so generator contract can transfer tokens to itself
     // :: Add stake LP Tokens to the Astroport generator contract msg
-    let mut cosmos_msgs = vec![];
     let approve_msg = build_approve_cw20_msg(
         config.lp_token_address.to_string(),
         config.generator_contract.to_string(),
         state.lp_shares_minted.into(),
     )?;
-    cosmos_msgs.push(approve_msg);
-    cosmos_msgs.push(build_stake_with_generator_msg(
-        &config,
-        state.lp_shares_minted,
-    )?);
+    let stake_msg = build_stake_with_generator_msg(&config, state.lp_shares_minted)?;
+    response = response
+        .add_messages(vec![approve_msg, stake_msg])
+        .add_attribute("staked_amount", state.lp_shares_minted.to_string());
+
     state.are_staked = true;
     STATE.save(deps.storage, &state)?;
 
-    Ok(Response::new()
-        .add_messages(cosmos_msgs)
-        .add_attributes(vec![
-            attr("action", "Auction::ExecuteMsg::StakeLPTokens"),
-            attr("staked_amount", state.lp_shares_minted.to_string()),
-        ]))
+    Ok(response)
 }
 
 /// @dev Facilitates ASTRO Reward claim for users
@@ -469,29 +472,37 @@ pub fn handle_claim_rewards(
         return Err(StdError::generic_err("Invalid request"));
     }
 
+    // Init response
+    let mut response = Response::new()
+        .add_attribute("action", "Auction::ExecuteMsg::StakeLPTokens")
+        .add_attribute("user_address", user_address.to_string());
+
     // User's LP shares :: Calculate if not already calculated
     if user_info.lp_shares == Uint256::zero() {
         user_info.lp_shares = calculate_user_lp_share(&state, &user_info);
+        response = response.add_attribute("user_lp_share", user_info.lp_shares.to_string());
     }
     // ASTRO INCENTIVES :: Calculates ASTRO rewards for auction participation for a user if not already done
     if user_info.total_auction_incentives == Uint256::zero() {
         user_info.total_auction_incentives =
             calculate_auction_reward_for_user(&state, &user_info, config.astro_rewards);
+        response = response.add_attribute(
+            "user_total_auction_astro_incentive",
+            user_info.total_auction_incentives.to_string(),
+        );
     }
 
-    let mut cosmos_msgs = vec![];
-
     // QUERY :: ARE ASTRO REWARDS TO BE CLAIMED FOR LP STAKING > 0 ?
-    // --> If unclaimed rewards > 0, add claimReward {} msg to the cosmos msg array
+    // --> If unclaimed rewards > 0, add claim rewards from the generator contract
     if state.are_staked {
         let unclaimed_rewards_response =
             query_unclaimed_staking_rewards(deps.as_ref(), &config, _env.contract.address.clone());
         if unclaimed_rewards_response > Uint128::zero() {
-            cosmos_msgs.push(build_claim_astro_rewards(
-                _env.contract.address.clone(),
-                config.lp_token_address,
-                config.generator_contract.clone(),
-            )?);
+            let claim_reward_msg = build_unstake_from_generator_msg(&config, Uint256::zero())?;
+            response = response.add_message(claim_reward_msg).add_attribute(
+                "staking_incentive_to_claim",
+                unclaimed_rewards_response.to_string(),
+            );
         }
     }
 
@@ -505,18 +516,16 @@ pub fn handle_claim_rewards(
     let update_state_msg = CallbackMsg::UpdateStateOnRewardClaim {
         user_address: user_address.clone(),
         prev_astro_balance: astro_balance.into(),
+        withdraw_lp_shares: Uint256::zero(),
     }
     .to_cosmos_msg(&_env.contract.address)?;
-    cosmos_msgs.push(update_state_msg);
+    response = response
+        .add_message(update_state_msg)
+        .add_attribute("cur_astro_balance", astro_balance.to_string());
 
     USERS.save(deps.storage, &user_address, &user_info)?;
 
-    Ok(Response::new()
-        .add_messages(cosmos_msgs)
-        .add_attributes(vec![
-            attr("action", "Auction::ExecuteMsg::ClaimRewards"),
-            attr("user", user_address.to_string()),
-        ]))
+    Ok(response)
 }
 
 /// @dev Facilitates ASTRO Reward claim for users
@@ -526,7 +535,7 @@ pub fn handle_withdraw_unlocked_lp_shares(
     info: MessageInfo,
 ) -> Result<Response, StdError> {
     let config = CONFIG.load(deps.storage)?;
-    let mut state = STATE.load(deps.storage)?;
+    let state = STATE.load(deps.storage)?;
     let user_address = info.sender;
     let mut user_info = USERS
         .may_load(deps.storage, &user_address)?
@@ -544,30 +553,24 @@ pub fn handle_withdraw_unlocked_lp_shares(
         ));
     }
 
+    // Init response
+    let mut response = Response::new()
+        .add_attribute("action", "Auction::ExecuteMsg::WithdrawLPShares")
+        .add_attribute("user_address", user_address.to_string());
+
     // User's LP shares :: Calculate if not already calculated
     if user_info.lp_shares == Uint256::zero() {
         user_info.lp_shares = calculate_user_lp_share(&state, &user_info);
+        response = response.add_attribute("user_lp_share", user_info.lp_shares.to_string());
     }
     // ASTRO INCENTIVES :: Calculates ASTRO rewards for auction participation for a user if not already done
     if user_info.total_auction_incentives == Uint256::zero() {
         user_info.total_auction_incentives =
             calculate_auction_reward_for_user(&state, &user_info, config.astro_rewards);
-    }
-
-    let mut cosmos_msgs = vec![];
-
-    // QUERY :: ARE ASTRO REWARDS TO BE CLAIMED FOR LP STAKING > 0 ?
-    // --> If unclaimed rewards > 0, add claimReward {} msg to the cosmos msg array
-    if state.are_staked {
-        let unclaimed_rewards_response =
-            query_unclaimed_staking_rewards(deps.as_ref(), &config, _env.contract.address.clone());
-        if unclaimed_rewards_response > Uint128::zero() {
-            cosmos_msgs.push(build_claim_astro_rewards(
-                _env.contract.address.clone(),
-                config.lp_token_address.clone(),
-                config.generator_contract.clone(),
-            )?);
-        }
+        response = response.add_attribute(
+            "user_total_auction_astro_incentive",
+            user_info.total_auction_incentives.to_string(),
+        );
     }
 
     // QUERY :: Current ASTRO Token Balance
@@ -577,47 +580,38 @@ pub fn handle_withdraw_unlocked_lp_shares(
         config.astro_token_address.clone(),
         _env.contract.address.clone(),
     )?;
-    let update_state_msg = CallbackMsg::UpdateStateOnRewardClaim {
-        user_address: user_address.clone(),
-        prev_astro_balance: astro_balance.into(),
-    }
-    .to_cosmos_msg(&_env.contract.address)?;
-    cosmos_msgs.push(update_state_msg);
 
     // CALCULATE LP SHARES THAT THE USER CAN WITHDRAW (TO DO :: FIGURE THE LOGIC i.e cliff or vesting)
     let lp_shares_to_withdraw =
         calculate_withdrawable_lp_shares(_env.block.time.seconds(), &config, &state, &user_info);
+    response = response.add_attribute(
+        "user_lp_shares_to_withdraw",
+        lp_shares_to_withdraw.to_string(),
+    );
     if lp_shares_to_withdraw == Uint256::zero() {
         return Err(StdError::generic_err("No LP shares to withdraw"));
     }
 
     // COSMOS MSG's :: LP SHARES CLAIM
-    // --> 1. Withdraw LP shares
-    // --> 2. Transfer LP shares
+    // --> 1. Unstake LP shares
+    // --> 2. Update state on reward claim
     if state.are_staked {
         let unstake_lp_shares = build_unstake_from_generator_msg(&config, lp_shares_to_withdraw)?;
-        cosmos_msgs.push(unstake_lp_shares);
+        response = response.add_message(unstake_lp_shares);
     }
-    let transfer_lp_shares = build_transfer_cw20_token_msg(
-        user_address.clone(),
-        config.lp_token_address.to_string(),
-        lp_shares_to_withdraw.into(),
-    )?;
-    cosmos_msgs.push(transfer_lp_shares);
 
-    // STATE UPDATE --> SAVE
-    user_info.withdrawn_lp_shares += lp_shares_to_withdraw;
-    state.lp_shares_withdrawn += lp_shares_to_withdraw;
+    let update_state_msg = CallbackMsg::UpdateStateOnRewardClaim {
+        user_address: user_address.clone(),
+        prev_astro_balance: astro_balance.into(),
+        withdraw_lp_shares: lp_shares_to_withdraw,
+    }
+    .to_cosmos_msg(&_env.contract.address)?;
+    response = response.add_message(update_state_msg);
+
     USERS.save(deps.storage, &user_address, &user_info)?;
     STATE.save(deps.storage, &state)?;
 
-    Ok(Response::new()
-        .add_messages(cosmos_msgs)
-        .add_attributes(vec![
-            attr("action", "Auction::ExecuteMsg::WithdrawLPShares"),
-            attr("user", user_address.to_string()),
-            attr("LP_shares_withdrawn", lp_shares_to_withdraw),
-        ]))
+    Ok(response)
 }
 
 //----------------------------------------------------------------------------------------
@@ -673,12 +667,16 @@ pub fn update_state_on_reward_claim(
     _env: Env,
     user_address: Addr,
     prev_astro_balance: Uint256,
+    withdraw_lp_shares: Uint256,
 ) -> StdResult<Response> {
     let config = CONFIG.load(deps.storage)?;
     let mut state = STATE.load(deps.storage)?;
     let mut user_info = USERS
         .may_load(deps.storage, &user_address)?
         .unwrap_or_default();
+
+    // Init response
+    let mut response = Response::new();
 
     // QUERY ASTRO TOKEN BALANCE :: Claimed Rewards
     let cur_astro_balance = cw20_get_balance(
@@ -689,7 +687,7 @@ pub fn update_state_on_reward_claim(
     let astro_claimed = Uint256::from(cur_astro_balance) - prev_astro_balance;
 
     let mut user_astro_rewards = Uint256::zero();
-    let mut staking_reward = Uint256::zero();
+    let staking_reward: Uint256;
 
     // ASTRO Incentives :: Calculate the unvested amount which can be claimed by the user
     user_astro_rewards += calculate_withdrawable_auction_reward_for_user(
@@ -699,15 +697,20 @@ pub fn update_state_on_reward_claim(
         &user_info,
     );
     user_info.withdrawn_auction_incentives += user_astro_rewards;
+    response = response.add_attribute(
+        "withdrawn_auction_incentives",
+        user_astro_rewards.to_string(),
+    );
 
     // ASTRO Generator (Staking) rewards :: Calculate the astro amount (from LP staking incentives) which can be claimed by the user
     if astro_claimed > Uint256::zero() {
         update_astro_rewards_index(&mut state, astro_claimed);
         staking_reward = compute_user_accrued_reward(&state, &mut user_info);
+        user_info.withdrawn_staking_incentives += staking_reward;
         user_astro_rewards += staking_reward;
+        response =
+            response.add_attribute("withdrawn_staking_incentives", staking_reward.to_string());
     }
-
-    let mut cosmos_msgs = vec![];
 
     // COSMOS MSG :: Transfer Rewards to the user
     if user_astro_rewards > Uint256::zero() {
@@ -716,24 +719,26 @@ pub fn update_state_on_reward_claim(
             config.astro_token_address.to_string(),
             user_astro_rewards.into(),
         )?;
-        cosmos_msgs.push(transfer_astro_rewards);
+        response = response.add_message(transfer_astro_rewards);
+    }
+
+    if withdraw_lp_shares > Uint256::zero() {
+        let transfer_lp_shares = build_transfer_cw20_token_msg(
+            user_address.clone(),
+            config.lp_token_address.to_string(),
+            withdraw_lp_shares.into(),
+        )?;
+        response = response.add_message(transfer_lp_shares);
+
+        user_info.withdrawn_lp_shares += withdraw_lp_shares;
+        state.lp_shares_withdrawn += withdraw_lp_shares;
     }
 
     // SAVE UPDATED STATE
     STATE.save(deps.storage, &state)?;
     USERS.save(deps.storage, &user_address, &user_info)?;
 
-    Ok(Response::new()
-        .add_messages(cosmos_msgs)
-        .add_attributes(vec![
-            ("action", "Auction::CallbackMsg::UpdateStateOnRewardClaim"),
-            ("user_address", user_address.to_string().as_str()),
-            (
-                "auction_participation_reward",
-                &(user_astro_rewards - staking_reward).to_string(),
-            ),
-            ("staking_lp_reward", &staking_reward.to_string()),
-        ]))
+    Ok(response)
 }
 
 //----------------------------------------------------------------------------------------
@@ -818,7 +823,8 @@ fn query_user_info(deps: Deps, _env: Env, user_address: String) -> StdResult<Use
         withdrawn_auction_incentives: user_info.withdrawn_auction_incentives,
         withdrawable_auction_incentives: claimable_auction_reward,
         user_reward_index: user_info.user_reward_index,
-        claimable_staking_incentives: claimable_staking_reward,
+        withdrawable_staking_incentives: claimable_staking_reward,
+        withdrawn_staking_incentives: user_info.withdrawn_staking_incentives,
     })
 }
 
@@ -1131,24 +1137,5 @@ fn build_activate_claims_airdrop_msg(airdrop_contract_address: Addr) -> StdResul
         contract_addr: airdrop_contract_address.to_string(),
         msg: to_binary(&AirdropEnableClaims {})?,
         funds: vec![],
-    }))
-}
-
-/// @dev Helper function. Returns CosmosMsg struct to claim ASTRO tokens claim from the generator contract
-/// @param recepient_address : Address to which claimed rewards are to be sent
-/// @param lp_token_contract : LP token Address for which rewards are to be claimed
-/// @param generator_contract : Generator contract address
-fn build_claim_astro_rewards(
-    recepient_address: Addr,
-    lp_token_contract: Addr,
-    generator_contract: Addr,
-) -> StdResult<CosmosMsg> {
-    Ok(CosmosMsg::Wasm(WasmMsg::Execute {
-        contract_addr: generator_contract.to_string(),
-        funds: vec![],
-        msg: to_binary(&astroport::generator::ExecuteMsg::SendOrphanProxyReward {
-            recipient: recepient_address.to_string(),
-            lp_token: lp_token_contract.to_string(),
-        })?,
     }))
 }

@@ -345,7 +345,7 @@ fn instantiate_generator_and_vesting(
         &mut app,
         owner.clone(),
         astro_token_instance.clone(),
-        Uint128::new(100_000_000_000),
+        Uint128::new(900_000_000_000),
         owner.to_string(),
     );
 
@@ -399,7 +399,7 @@ fn instantiate_generator_and_vesting(
 
     let current_block = app.block_info();
 
-    let amount = Uint128::new(630720000);
+    let amount = Uint128::new(630720000000);
 
     let msg = CW20ExecuteMsg::IncreaseAllowance {
         spender: vesting_instance.clone().to_string(),
@@ -427,7 +427,7 @@ fn instantiate_generator_and_vesting(
         .unwrap();
 
     let msg = astroport::generator::ExecuteMsg::Add {
-        alloc_point: Uint64::from(100u64),
+        alloc_point: Uint64::from(10u64),
         reward_proxy: None,
         lp_token: lp_token_instance.clone(),
         with_update: true,
@@ -1654,7 +1654,7 @@ fn test_add_liquidity_to_astroport_pool() {
     assert_eq!(Decimal256::zero(), user1info_resp.user_reward_index);
     assert_eq!(
         Uint256::from(0u64),
-        user1info_resp.claimable_staking_incentives
+        user1info_resp.withdrawable_staking_incentives
     );
 
     // Auction :: Check user-2 state
@@ -1690,7 +1690,7 @@ fn test_add_liquidity_to_astroport_pool() {
     assert_eq!(Decimal256::zero(), user2info_resp.user_reward_index);
     assert_eq!(
         Uint256::from(0u64),
-        user2info_resp.claimable_staking_incentives
+        user2info_resp.withdrawable_staking_incentives
     );
 
     // Auction :: Check user-3 state
@@ -1726,7 +1726,7 @@ fn test_add_liquidity_to_astroport_pool() {
     assert_eq!(Decimal256::zero(), user3info_resp.user_reward_index);
     assert_eq!(
         Uint256::from(0u64),
-        user3info_resp.claimable_staking_incentives
+        user3info_resp.withdrawable_staking_incentives
     );
 
     // ######    ERROR :: Liquidity already added   ######
@@ -1889,7 +1889,7 @@ fn test_stake_lp_tokens() {
     // assert_eq!(Decimal256::zero(), user1info_resp.user_reward_index);
     assert_eq!(
         Uint256::from(41395684287u64),
-        user1info_resp.claimable_staking_incentives
+        user1info_resp.withdrawable_staking_incentives
     );
 
     // Auction :: Check user-2 state
@@ -1925,7 +1925,7 @@ fn test_stake_lp_tokens() {
     // assert_eq!(Decimal256::zero(), user2info_resp.user_reward_index);
     assert_eq!(
         Uint256::from(29355071064u64),
-        user2info_resp.claimable_staking_incentives
+        user2info_resp.withdrawable_staking_incentives
     );
 
     // Auction :: Check user-3 state
@@ -1961,7 +1961,7 @@ fn test_stake_lp_tokens() {
     // assert_eq!(Decimal256::zero(), user3info_resp.user_reward_index);
     assert_eq!(
         Uint256::from(102049240301u64),
-        user3info_resp.claimable_staking_incentives
+        user3info_resp.withdrawable_staking_incentives
     );
 
     // ######    ERROR :: Already staked   ######
@@ -2094,15 +2094,272 @@ fn test_claim_rewards() {
         b.time = Timestamp::from_seconds(10911001)
     });
 
-    // ######    SUCCESS :: Successfully claim staking rewards  ######
+    // ######    SUCCESS :: Successfully claim staking rewards for User-1 ######
 
-    // app.execute_contract(
-    //     user1_address,
-    //     auction_instance.clone(),
-    //     &claim_rewards_msg,
-    //     &[],
-    // )
-    // .unwrap();
+    // Auction :: Check user-1 state (before claim)
+    let user1info_before_claim: astroport_periphery::auction::UserInfoResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &auction_instance,
+            &astroport_periphery::auction::QueryMsg::UserInfo {
+                address: user1_address.to_string(),
+            },
+        )
+        .unwrap();
+    assert_eq!(
+        Uint256::from(0u64),
+        user1info_before_claim.withdrawn_auction_incentives
+    );
+    assert_eq!(
+        Uint256::from(0u64),
+        user1info_before_claim.withdrawn_staking_incentives
+    );
+
+    // Auction :: Claim rewards for the user
+    app.execute_contract(
+        user1_address.clone(),
+        auction_instance.clone(),
+        &claim_rewards_msg,
+        &[],
+    )
+    .unwrap();
+
+    // Auction :: Check user-1 state (After Claim)
+    let user1info_after_claim: astroport_periphery::auction::UserInfoResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &auction_instance,
+            &astroport_periphery::auction::QueryMsg::UserInfo {
+                address: user1_address.to_string(),
+            },
+        )
+        .unwrap();
+    assert_eq!(
+        user1info_before_claim.withdrawn_lp_shares,
+        user1info_after_claim.withdrawn_lp_shares
+    );
+    assert_eq!(
+        user1info_before_claim.withdrawable_lp_shares,
+        user1info_after_claim.withdrawable_lp_shares
+    );
+    assert_eq!(
+        user1info_before_claim.withdrawable_auction_incentives,
+        user1info_after_claim.withdrawn_auction_incentives
+    );
+    assert_eq!(
+        Uint256::from(0u64),
+        user1info_after_claim.withdrawable_auction_incentives
+    );
+    assert_eq!(
+        user1info_before_claim.withdrawable_staking_incentives,
+        user1info_after_claim.withdrawn_staking_incentives
+    );
+    assert_eq!(
+        Uint256::from(0u64),
+        user1info_after_claim.withdrawable_staking_incentives
+    );
+
+    // ######    SUCCESS :: Successfully claim staking rewards for User-2 ######
+
+    // Auction :: Check user-2 state (before claim)
+    let user2info_before_claim: astroport_periphery::auction::UserInfoResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &auction_instance,
+            &astroport_periphery::auction::QueryMsg::UserInfo {
+                address: user2_address.to_string(),
+            },
+        )
+        .unwrap();
+    assert_eq!(
+        Uint256::from(0u64),
+        user2info_before_claim.withdrawn_auction_incentives
+    );
+    assert_eq!(
+        Uint256::from(0u64),
+        user2info_before_claim.withdrawn_staking_incentives
+    );
+
+    // Auction :: Claim rewards for the user 2
+    app.execute_contract(
+        user2_address.clone(),
+        auction_instance.clone(),
+        &claim_rewards_msg,
+        &[],
+    )
+    .unwrap();
+
+    // Auction :: Check user-2 state (After Claim)
+    let user2info_after_claim: astroport_periphery::auction::UserInfoResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &auction_instance,
+            &astroport_periphery::auction::QueryMsg::UserInfo {
+                address: user2_address.to_string(),
+            },
+        )
+        .unwrap();
+    assert_eq!(
+        user2info_before_claim.withdrawn_lp_shares,
+        user2info_after_claim.withdrawn_lp_shares
+    );
+    assert_eq!(
+        user2info_before_claim.withdrawable_lp_shares,
+        user2info_after_claim.withdrawable_lp_shares
+    );
+    assert_eq!(
+        user2info_before_claim.withdrawable_auction_incentives,
+        user2info_after_claim.withdrawn_auction_incentives
+    );
+    assert_eq!(
+        Uint256::from(0u64),
+        user2info_after_claim.withdrawable_auction_incentives
+    );
+    assert_eq!(
+        user2info_before_claim.withdrawable_staking_incentives,
+        user2info_after_claim.withdrawn_staking_incentives
+    );
+    assert_eq!(
+        Uint256::from(0u64),
+        user2info_after_claim.withdrawable_staking_incentives
+    );
+
+    app.update_block(|b| {
+        b.height += 17280;
+        b.time = Timestamp::from_seconds(10991001)
+    });
+
+    // ######    SUCCESS :: Successfully claim staking rewards for User-3 ######
+
+    // Auction :: Check user-3 state (before claim)
+    let user3info_before_claim: astroport_periphery::auction::UserInfoResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &auction_instance,
+            &astroport_periphery::auction::QueryMsg::UserInfo {
+                address: user3_address.to_string(),
+            },
+        )
+        .unwrap();
+    assert_eq!(
+        Uint256::from(0u64),
+        user3info_before_claim.withdrawn_auction_incentives
+    );
+    assert_eq!(
+        Uint256::from(0u64),
+        user3info_before_claim.withdrawn_staking_incentives
+    );
+
+    // Auction :: Claim rewards for the user 3
+    app.execute_contract(
+        user3_address.clone(),
+        auction_instance.clone(),
+        &claim_rewards_msg,
+        &[],
+    )
+    .unwrap();
+
+    // Auction :: Check user-3 state (After Claim)
+    let user3info_after_claim: astroport_periphery::auction::UserInfoResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &auction_instance,
+            &astroport_periphery::auction::QueryMsg::UserInfo {
+                address: user3_address.to_string(),
+            },
+        )
+        .unwrap();
+    assert_eq!(
+        user3info_before_claim.withdrawn_lp_shares,
+        user3info_after_claim.withdrawn_lp_shares
+    );
+    assert_eq!(
+        user3info_before_claim.withdrawable_lp_shares,
+        user3info_after_claim.withdrawable_lp_shares
+    );
+    assert_eq!(
+        user3info_before_claim.withdrawable_auction_incentives,
+        user3info_after_claim.withdrawn_auction_incentives
+    );
+    assert_eq!(
+        Uint256::from(0u64),
+        user3info_after_claim.withdrawable_auction_incentives
+    );
+    assert_eq!(
+        user3info_before_claim.withdrawable_staking_incentives,
+        user3info_after_claim.withdrawn_staking_incentives
+    );
+    assert_eq!(
+        Uint256::from(0u64),
+        user3info_after_claim.withdrawable_staking_incentives
+    );
+
+    // ######    SUCCESS :: Successfully again claim staking rewards for User-1 ######
+
+    // Auction :: Check user-1 state (before claim)
+    let user1info_before_claim2: astroport_periphery::auction::UserInfoResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &auction_instance,
+            &astroport_periphery::auction::QueryMsg::UserInfo {
+                address: user1_address.to_string(),
+            },
+        )
+        .unwrap();
+    assert_eq!(
+        user1info_after_claim.withdrawn_auction_incentives,
+        user1info_before_claim2.withdrawn_auction_incentives
+    );
+    assert_eq!(
+        user1info_after_claim.withdrawn_staking_incentives,
+        user1info_before_claim2.withdrawn_staking_incentives
+    );
+
+    // Auction :: Claim rewards for the user
+    app.execute_contract(
+        user1_address.clone(),
+        auction_instance.clone(),
+        &claim_rewards_msg,
+        &[],
+    )
+    .unwrap();
+
+    // Auction :: Check user-1 state (After Claim)
+    let user1info_after_claim2: astroport_periphery::auction::UserInfoResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &auction_instance,
+            &astroport_periphery::auction::QueryMsg::UserInfo {
+                address: user1_address.to_string(),
+            },
+        )
+        .unwrap();
+    assert_eq!(
+        user1info_before_claim2.withdrawn_lp_shares,
+        user1info_after_claim2.withdrawn_lp_shares
+    );
+    assert_eq!(
+        user1info_before_claim2.withdrawable_lp_shares,
+        user1info_after_claim2.withdrawable_lp_shares
+    );
+    assert_eq!(
+        user1info_after_claim.withdrawn_auction_incentives
+            + user1info_before_claim2.withdrawable_auction_incentives,
+        user1info_after_claim2.withdrawn_auction_incentives
+    );
+    assert_eq!(
+        Uint256::from(0u64),
+        user1info_after_claim2.withdrawable_auction_incentives
+    );
+    assert_eq!(
+        user1info_after_claim.withdrawn_staking_incentives
+            + user1info_before_claim2.withdrawable_staking_incentives,
+        user1info_after_claim2.withdrawn_staking_incentives
+    );
+    assert_eq!(
+        Uint256::from(0u64),
+        user1info_after_claim2.withdrawable_staking_incentives
+    );
 }
 
 #[test]
@@ -2225,13 +2482,251 @@ fn test_withdraw_unlocked_lp_shares() {
         b.time = Timestamp::from_seconds(10911001)
     });
 
-    // ######    SUCCESS :: Successfully withdraw LP shares ######
+    // ######    SUCCESS :: Successfully withdraw LP shares (which also claims rewards) for User-1 ######
 
-    // app.execute_contract(
-    //     user1_address,
-    //     auction_instance.clone(),
-    //     &withdraw_lp_msg,
-    //     &[],
-    // )
-    // .unwrap();
+    // Auction :: Check user-1 state (before claim)
+    let user1info_before_claim: astroport_periphery::auction::UserInfoResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &auction_instance,
+            &astroport_periphery::auction::QueryMsg::UserInfo {
+                address: user1_address.to_string(),
+            },
+        )
+        .unwrap();
+    assert_eq!(
+        Uint256::from(0u64),
+        user1info_before_claim.withdrawn_lp_shares
+    );
+
+    // Auction :: Withdraw unvested LP shares for the user
+    app.execute_contract(
+        user1_address.clone(),
+        auction_instance.clone(),
+        &withdraw_lp_msg,
+        &[],
+    )
+    .unwrap();
+
+    // Auction :: Check user-1 state (After Claim)
+    let user1info_after_claim: astroport_periphery::auction::UserInfoResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &auction_instance,
+            &astroport_periphery::auction::QueryMsg::UserInfo {
+                address: user1_address.to_string(),
+            },
+        )
+        .unwrap();
+    assert_eq!(
+        user1info_before_claim.withdrawable_lp_shares,
+        user1info_after_claim.withdrawn_lp_shares
+    );
+    assert_eq!(
+        Uint256::from(0u64),
+        user1info_after_claim.withdrawable_lp_shares
+    );
+    assert_eq!(
+        user1info_before_claim.withdrawable_auction_incentives,
+        user1info_after_claim.withdrawn_auction_incentives
+    );
+    assert_eq!(
+        Uint256::from(0u64),
+        user1info_after_claim.withdrawable_auction_incentives
+    );
+    assert_eq!(
+        user1info_before_claim.withdrawable_staking_incentives,
+        user1info_after_claim.withdrawn_staking_incentives
+    );
+    assert_eq!(
+        Uint256::from(0u64),
+        user1info_after_claim.withdrawable_staking_incentives
+    );
+
+    // ######    SUCCESS :: Successfully withdraw LP shares (which also claims rewards) for User-2 ######
+
+    // Auction :: Check user-2 state (before claim)
+    let user2info_before_claim: astroport_periphery::auction::UserInfoResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &auction_instance,
+            &astroport_periphery::auction::QueryMsg::UserInfo {
+                address: user2_address.to_string(),
+            },
+        )
+        .unwrap();
+    assert_eq!(
+        Uint256::from(0u64),
+        user2info_before_claim.withdrawn_lp_shares
+    );
+
+    // Auction :: Withdraw unvested LP shares for the user
+    app.execute_contract(
+        user2_address.clone(),
+        auction_instance.clone(),
+        &withdraw_lp_msg,
+        &[],
+    )
+    .unwrap();
+
+    // Auction :: Check user-2 state (After Claim)
+    let user2info_after_claim: astroport_periphery::auction::UserInfoResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &auction_instance,
+            &astroport_periphery::auction::QueryMsg::UserInfo {
+                address: user2_address.to_string(),
+            },
+        )
+        .unwrap();
+    assert_eq!(
+        user2info_before_claim.withdrawable_lp_shares,
+        user2info_after_claim.withdrawn_lp_shares
+    );
+    assert_eq!(
+        Uint256::from(0u64),
+        user2info_after_claim.withdrawable_lp_shares
+    );
+    assert_eq!(
+        user2info_before_claim.withdrawable_auction_incentives,
+        user2info_after_claim.withdrawn_auction_incentives
+    );
+    assert_eq!(
+        Uint256::from(0u64),
+        user2info_after_claim.withdrawable_auction_incentives
+    );
+    assert_eq!(
+        user2info_before_claim.withdrawable_staking_incentives,
+        user2info_after_claim.withdrawn_staking_incentives
+    );
+    assert_eq!(
+        Uint256::from(0u64),
+        user2info_after_claim.withdrawable_staking_incentives
+    );
+
+    app.update_block(|b| {
+        b.height += 17280;
+        b.time = Timestamp::from_seconds(10991001)
+    });
+
+    // ######    SUCCESS :: Successfully withdraw LP shares (which also claims rewards) for User-3 ######
+
+    // Auction :: Check user-3 state (before claim)
+    let user3info_before_claim: astroport_periphery::auction::UserInfoResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &auction_instance,
+            &astroport_periphery::auction::QueryMsg::UserInfo {
+                address: user3_address.to_string(),
+            },
+        )
+        .unwrap();
+    assert_eq!(
+        Uint256::from(0u64),
+        user3info_before_claim.withdrawn_lp_shares
+    );
+
+    // Auction :: Withdraw unvested LP shares for the user
+    app.execute_contract(
+        user3_address.clone(),
+        auction_instance.clone(),
+        &withdraw_lp_msg,
+        &[],
+    )
+    .unwrap();
+
+    // Auction :: Check user-3 state (After Claim)
+    let user3info_after_claim: astroport_periphery::auction::UserInfoResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &auction_instance,
+            &astroport_periphery::auction::QueryMsg::UserInfo {
+                address: user3_address.to_string(),
+            },
+        )
+        .unwrap();
+    assert_eq!(
+        user3info_before_claim.withdrawable_lp_shares,
+        user3info_after_claim.withdrawn_lp_shares
+    );
+    assert_eq!(
+        Uint256::from(0u64),
+        user3info_after_claim.withdrawable_lp_shares
+    );
+    assert_eq!(
+        user3info_before_claim.withdrawable_auction_incentives,
+        user3info_after_claim.withdrawn_auction_incentives
+    );
+    assert_eq!(
+        Uint256::from(0u64),
+        user3info_after_claim.withdrawable_auction_incentives
+    );
+    assert_eq!(
+        user3info_before_claim.withdrawable_staking_incentives,
+        user3info_after_claim.withdrawn_staking_incentives
+    );
+    assert_eq!(
+        Uint256::from(0u64),
+        user3info_after_claim.withdrawable_staking_incentives
+    );
+
+    // ######    SUCCESS :: Successfully again withdraw LP shares (which also claims rewards) for User-1 ######
+
+    // Auction :: Check user-1 state (before claim)
+    let user1info_before_claim2: astroport_periphery::auction::UserInfoResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &auction_instance,
+            &astroport_periphery::auction::QueryMsg::UserInfo {
+                address: user1_address.to_string(),
+            },
+        )
+        .unwrap();
+
+    // Auction :: Withdraw LP for the user
+    app.execute_contract(
+        user1_address.clone(),
+        auction_instance.clone(),
+        &withdraw_lp_msg,
+        &[],
+    )
+    .unwrap();
+
+    // Auction :: Check user-1 state (After Claim)
+    let user1info_after_claim2: astroport_periphery::auction::UserInfoResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &auction_instance,
+            &astroport_periphery::auction::QueryMsg::UserInfo {
+                address: user1_address.to_string(),
+            },
+        )
+        .unwrap();
+    assert_eq!(
+        user1info_before_claim2.withdrawn_lp_shares
+            + user1info_before_claim2.withdrawable_lp_shares,
+        user1info_after_claim2.withdrawn_lp_shares
+    );
+    assert_eq!(
+        Uint256::zero(),
+        user1info_after_claim2.withdrawable_lp_shares
+    );
+    assert_eq!(
+        user1info_after_claim.withdrawn_auction_incentives
+            + user1info_before_claim2.withdrawable_auction_incentives,
+        user1info_after_claim2.withdrawn_auction_incentives
+    );
+    assert_eq!(
+        Uint256::from(0u64),
+        user1info_after_claim2.withdrawable_auction_incentives
+    );
+    assert_eq!(
+        user1info_after_claim.withdrawn_staking_incentives
+            + user1info_before_claim2.withdrawable_staking_incentives,
+        user1info_after_claim2.withdrawn_staking_incentives
+    );
+    assert_eq!(
+        Uint256::from(0u64),
+        user1info_after_claim2.withdrawable_staking_incentives
+    );
 }

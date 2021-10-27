@@ -4,7 +4,7 @@
   "type": "object",
   "required": [
     "astro_deposited",
-    "claimable_staking_incentives",
+    "withdrawable_staking_incentives",
     "lp_shares",
     "total_auction_incentives",
     "user_reward_index",
@@ -18,7 +18,7 @@
     "astro_deposited": {
       "$ref": "#/definitions/Uint256"
     },
-    "claimable_staking_incentives": {
+    "withdrawable_staking_incentives": {
       "$ref": "#/definitions/Uint256"
     },
     "lp_shares": {
