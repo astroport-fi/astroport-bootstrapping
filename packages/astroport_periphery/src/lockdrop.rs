@@ -198,11 +198,15 @@ pub struct StateResponse {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct MigrationInfo {
+    pub terraswap_migrated_amount: Uint128,
+    pub astroport_lp_token: Addr,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct PoolResponse {
     pub terraswap_pool: Addr,
-    pub terraswap_migrated_amount: Option<Uint128>,
-    pub astroport_lp_token: Option<Addr>,
-    pub astroport_pool: Option<Addr>,
+    pub migration_info: Option<MigrationInfo>,
     /// Share of total ASTRO incentives allocated to this pool
     pub incentives_share: u64,
     /// Weighted LP Token balance used to calculate ASTRO rewards a particular user can claim

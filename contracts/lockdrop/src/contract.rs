@@ -8,7 +8,7 @@ use cosmwasm_std::{
 
 use astroport_periphery::lockdrop::{
     CallbackMsg, ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, LockUpInfoResponse,
-    PoolResponse, QueryMsg, StateResponse, UpdateConfigMsg, UserInfoResponse,
+    MigrationInfo, PoolResponse, QueryMsg, StateResponse, UpdateConfigMsg, UserInfoResponse,
 };
 
 use astroport::generator::{
@@ -380,9 +380,7 @@ pub fn handle_initialize_pool(
     // POOL INFO :: Initialize new pool
     let pool_info = PoolInfo {
         terraswap_pool,
-        terraswap_migrated_amount: None,
-        astroport_lp_token: None,
-        astroport_pool: None,
+        migration_info: None,
         incentives_share,
         weighted_amount: Default::default(),
         generator_astro_per_share: Default::default(),
@@ -555,7 +553,7 @@ pub fn handle_migrate_liquidity(
     let mut pool_info = ASSET_POOLS.load(deps.storage, &terraswap_lp_token)?;
 
     // CHECK :: has the liquidity already been migrated or not ?
-    if pool_info.astroport_lp_token.is_some() {
+    if pool_info.migration_info.is_some() {
         return Err(StdError::generic_err("Liquidity already migrated"));
     }
 
@@ -625,9 +623,10 @@ pub fn handle_migrate_liquidity(
         res.liquidity_token
     };
 
-    pool_info.terraswap_migrated_amount = Some(lp_balance.balance);
-    pool_info.astroport_lp_token = Some(astroport_lp_token);
-    pool_info.astroport_pool = Some(astroport_pool);
+    pool_info.migration_info = Some(MigrationInfo {
+        astroport_lp_token,
+        terraswap_migrated_amount: lp_balance.balance,
+    });
     ASSET_POOLS.save(deps.storage, &terraswap_lp_token, &pool_info)?;
 
     Ok(Response::new().add_messages(cosmos_msgs))
@@ -655,8 +654,10 @@ pub fn handle_stake_lp_tokens(
     // CHECK ::: Is LP Token Pool supported or not ?
     let mut pool_info = ASSET_POOLS.load(deps.storage, &terraswap_lp_token)?;
 
-    let astroport_lp_token = pool_info
-        .astroport_lp_token
+    let MigrationInfo {
+        astroport_lp_token, ..
+    } = pool_info
+        .migration_info
         .as_ref()
         .expect("Terraswap liquidity isn't migrated yet!");
 
@@ -1001,7 +1002,10 @@ pub fn handle_claim_rewards_and_unlock_for_lockup(
 
     let mut cosmos_msgs = vec![];
 
-    if let Some(astroport_lp_token) = &pool_info.astroport_lp_token {
+    if let Some(MigrationInfo {
+        astroport_lp_token, ..
+    }) = &pool_info.migration_info
+    {
         if pool_info.is_staked {
             let generator = config
                 .generator
@@ -1011,10 +1015,7 @@ pub fn handle_claim_rewards_and_unlock_for_lockup(
             let pending_rewards: PendingTokenResponse = deps.querier.query_wasm_smart(
                 &generator,
                 &GenQueryMsg::PendingToken {
-                    lp_token: pool_info
-                        .astroport_lp_token
-                        .clone()
-                        .expect("Liuqidity hasn't been migrated yet!"),
+                    lp_token: astroport_lp_token.clone(),
                     user: user_address.clone(),
                 },
             )?;
@@ -1107,8 +1108,10 @@ pub fn update_pool_on_dual_rewards_claim(
     let mut pool_info = ASSET_POOLS.load(deps.storage, &terraswap_lp_token)?;
 
     let generator = config.generator.expect("Generator hasn't been set yet!");
-    let astroport_lp_token = pool_info
-        .astroport_lp_token
+    let MigrationInfo {
+        astroport_lp_token, ..
+    } = pool_info
+        .migration_info
         .as_ref()
         .expect("Pool should be migrated!");
 
@@ -1226,11 +1229,12 @@ pub fn callback_withdraw_user_rewards_for_lockup_optional_withdraw(
         }
     }
 
-    if let Some(astroport_lp_token) = pool_info.astroport_lp_token {
-        let terraswap_migrated_amount = pool_info
-            .terraswap_migrated_amount
-            .expect("Pool should be migrated!");
-
+    if let Some(MigrationInfo {
+        astroport_lp_token,
+        terraswap_migrated_amount,
+        ..
+    }) = pool_info.migration_info
+    {
         let astroport_lp_amount: Uint128 = {
             let res: BalanceResponse = deps.querier.query_wasm_smart(
                 &astroport_lp_token,
@@ -1479,9 +1483,7 @@ pub fn query_pool(deps: Deps, terraswap_lp_token: String) -> StdResult<PoolRespo
     let pool_info: PoolInfo = ASSET_POOLS.load(deps.storage, &terraswap_lp_token)?;
     Ok(PoolResponse {
         terraswap_pool: pool_info.terraswap_pool,
-        terraswap_migrated_amount: pool_info.terraswap_migrated_amount,
-        astroport_lp_token: pool_info.astroport_lp_token,
-        astroport_pool: pool_info.astroport_pool,
+        migration_info: pool_info.migration_info,
         incentives_share: pool_info.incentives_share,
         weighted_amount: pool_info.weighted_amount,
         generator_astro_per_share: pool_info.generator_astro_per_share,
@@ -1537,20 +1539,23 @@ pub fn query_lockup_info(
     let lockup_info = LOCKUP_INFO.load(deps.storage, lockup_key)?;
 
     let mut astroport_lp_units: Option<Uint128> = None;
-    if let Some(astroport_lp_token) = pool_info.astroport_lp_token {
-        if let Some(terraswap_migrated_amount) = pool_info.terraswap_migrated_amount {
-            astroport_lp_units = Some({
-                let res: BalanceResponse = deps.querier.query_wasm_smart(
-                    &astroport_lp_token.to_string(),
-                    &Cw20QueryMsg::Balance {
-                        address: env.contract.address.to_string(),
-                    },
-                )?;
-                (lockup_info.lp_units_locked.full_mul(res.balance)
-                    / Uint256::from(terraswap_migrated_amount))
-                .try_into()?
-            });
-        }
+    if let Some(MigrationInfo {
+        astroport_lp_token,
+        terraswap_migrated_amount,
+        ..
+    }) = pool_info.migration_info
+    {
+        astroport_lp_units = Some({
+            let res: BalanceResponse = deps.querier.query_wasm_smart(
+                &astroport_lp_token.to_string(),
+                &Cw20QueryMsg::Balance {
+                    address: env.contract.address.to_string(),
+                },
+            )?;
+            (lockup_info.lp_units_locked.full_mul(res.balance)
+                / Uint256::from(terraswap_migrated_amount))
+            .try_into()?
+        });
     }
 
     Ok(LockUpInfoResponse {

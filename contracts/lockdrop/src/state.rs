@@ -1,3 +1,4 @@
+use astroport_periphery::lockdrop::MigrationInfo;
 use cosmwasm_std::{Addr, Decimal, Uint128, Uint256};
 use cw_storage_plus::{Item, Map, U64Key};
 
@@ -53,9 +54,7 @@ pub struct State {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct PoolInfo {
     pub terraswap_pool: Addr,
-    pub terraswap_migrated_amount: Option<Uint128>,
-    pub astroport_lp_token: Option<Addr>,
-    pub astroport_pool: Option<Addr>,
+    pub migration_info: Option<MigrationInfo>,
     /// Share of total ASTRO incentives allocated to this pool
     pub incentives_share: u64,
     /// Weighted LP Token balance used to calculate ASTRO rewards a particular user can claim
