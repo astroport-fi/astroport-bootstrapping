@@ -196,7 +196,14 @@ pub fn claim(
 
     let claim_amount = if let Some(a) = amount {
         if a > available_amount {
-            return Err(ContractError::AmountIsNotAvailable {});
+            // return Err(StdError::generic_err(format!(
+            //     "Claim amount {} exceeds available amount {}",
+            //     a, available_amount
+            // )));
+            return Err(ContractError::AmountIsNotAvailable(
+                a.clone(),
+                available_amount.clone(),
+            ));
         };
         a
     } else {

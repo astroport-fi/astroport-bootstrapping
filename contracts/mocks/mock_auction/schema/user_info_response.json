@@ -6,7 +6,7 @@
     "astro_delegated",
     "withdrawable_auction_incentives",
     "withdrawable_lp_shares",
-    "claimable_staking_incentives",
+    "withdrawable_staking_incentives",
     "withdrawn_auction_incentives",
     "withdrawn_lp_shares",
     "lp_shares",
@@ -24,7 +24,7 @@
     "withdrawable_lp_shares": {
       "$ref": "#/definitions/Uint256"
     },
-    "claimable_staking_incentives": {
+    "withdrawable_staking_incentives": {
       "$ref": "#/definitions/Uint256"
     },
     "withdrawn_auction_incentives": {

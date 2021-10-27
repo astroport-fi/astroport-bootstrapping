@@ -1,4 +1,4 @@
-use cosmwasm_std::{Addr, OverflowError, StdError};
+use cosmwasm_std::{Addr, OverflowError, StdError, Uint128};
 use thiserror::Error;
 
 #[derive(Error, Debug, PartialEq)]
@@ -9,8 +9,8 @@ pub enum ContractError {
     #[error("Unauthorized")]
     Unauthorized {},
 
-    #[error("Amount is not available!")]
-    AmountIsNotAvailable {},
+    #[error("Claim amount {0} exceeds available amount {1}")]
+    AmountIsNotAvailable(Uint128, Uint128),
 
     #[error("Vesting schedule error on addr: {0}. Should satisfy: (start < end and at_start < total) or (start = end and at_start = total)")]
     VestingScheduleError(Addr),

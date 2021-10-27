@@ -59,6 +59,7 @@ pub enum CallbackMsg {
     UpdateStateOnRewardClaim {
         user_address: Addr,
         prev_astro_balance: Uint256,
+        withdraw_lp_shares: Uint256,
     },
     UpdateStateOnLiquidityAdditionToPool {
         prev_lp_balance: Uint256,
@@ -122,5 +123,6 @@ pub struct UserInfoResponse {
     pub withdrawn_auction_incentives: Uint256,
     pub withdrawable_auction_incentives: Uint256,
     pub user_reward_index: Decimal256,
-    pub claimable_staking_incentives: Uint256,
+    pub withdrawable_staking_incentives: Uint256,
+    pub withdrawn_staking_incentives: Uint256,
 }

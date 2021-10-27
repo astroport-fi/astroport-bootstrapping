@@ -92,6 +92,8 @@ pub struct UserInfo {
     pub total_auction_incentives: Uint256,
     // ASTRO rewards withdrawn by the user
     pub withdrawn_auction_incentives: Uint256,
+    // ASTRO staking incentives (LP token staking) withdrawn by the user
+    pub withdrawn_staking_incentives: Uint256,
     // Index used to calculate user's staking rewards
     pub user_reward_index: Decimal256,
 }
@@ -106,6 +108,7 @@ impl Default for UserInfo {
             withdrawn_lp_shares: Uint256::zero(),
             total_auction_incentives: Uint256::zero(),
             withdrawn_auction_incentives: Uint256::zero(),
+            withdrawn_staking_incentives: Uint256::zero(),
             user_reward_index: Decimal256::zero(),
         }
     }
