@@ -467,7 +467,7 @@ pub fn handle_tranfer_returned_astro(
     // CHECK ::: Amount needs to be less than returned ASTRO balance available with the contract
     if state.total_astro_returned_available < amount {
         return Err(StdError::generic_err(format!(
-            "Amount needs to be less than {}, which is the current returned ASTRO balance available with the contract",
+            "Amount needs to be less than or equals to {}, which is the current returned ASTRO balance available with the contract",
             state.total_astro_returned_available
         )));
     }
@@ -483,7 +483,9 @@ pub fn handle_tranfer_returned_astro(
             })?,
         }
     } else {
-        return Err(StdError::generic_err("Astro token hasn't been set!"));
+        return Err(StdError::generic_err(
+            "Astro token must be already set until the function!",
+        ));
     };
 
     // Update State
@@ -659,7 +661,7 @@ pub fn handle_stake_lp_tokens(
     } = pool_info
         .migration_info
         .as_ref()
-        .expect("Terraswap liquidity isn't migrated yet!");
+        .expect("Terraswap liquidity hasn't migrated yet!");
 
     let amount = {
         let res: BalanceResponse = deps.querier.query_wasm_smart(
@@ -671,7 +673,7 @@ pub fn handle_stake_lp_tokens(
         res.balance
     };
 
-    let generator = config.generator.expect("Generator address isn't set yet!");
+    let generator = config.generator.expect("Generator address hasn't set yet!");
 
     cosmos_msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
         contract_addr: astroport_lp_token.to_string(),
@@ -746,7 +748,7 @@ pub fn handle_increase_lockup(
 
     let lockup_key = (&terraswap_lp_token, &user_address, U64Key::new(duration));
 
-    LOCKUP_INFO.update::<_, StdError>(deps.storage, lockup_key.clone(), |li| {
+    LOCKUP_INFO.update::<_, StdError>(deps.storage, lockup_key, |li| {
         if let Some(mut li) = li {
             li.lp_units_locked = li.lp_units_locked.checked_add(amount)?;
             Ok(li)
@@ -825,8 +827,8 @@ pub fn handle_withdraw_from_lockup(
         )));
     }
 
-    // Update withdrawal counter if the max_withdrawal_percent <= 50% ::: as it is being processed post the deposit window closure
-    if max_withdrawal_percent != Decimal::from_ratio(100u64, 100u64) {
+    // Update withdrawal flag after the deposit window
+    if env.block.time.seconds() >= config.init_timestamp + config.deposit_window {
         lockup_info.withdrawal_flag = true;
     }
 
@@ -1016,7 +1018,7 @@ pub fn handle_claim_rewards_and_unlock_for_lockup(
                 &generator,
                 &GenQueryMsg::PendingToken {
                     lp_token: astroport_lp_token.clone(),
-                    user: user_address.clone(),
+                    user: env.contract.address.clone(),
                 },
             )?;
 
