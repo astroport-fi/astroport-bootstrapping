@@ -10,8 +10,7 @@
     "ust_deposited",
     "withdrawl_counter",
     "withdrawn_auction_incentives",
-    "withdrawn_lp_shares",
-    "withdrawn_staking_incentives"
+    "withdrawn_lp_shares"
   ],
   "properties": {
     "astro_deposited": {
@@ -36,9 +35,6 @@
       "$ref": "#/definitions/Uint256"
     },
     "withdrawn_lp_shares": {
-      "$ref": "#/definitions/Uint256"
-    },
-    "withdrawn_staking_incentives": {
       "$ref": "#/definitions/Uint256"
     }
   },

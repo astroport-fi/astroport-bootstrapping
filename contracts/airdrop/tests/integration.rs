@@ -22,14 +22,14 @@ fn init_contracts(app: &mut App) -> (Addr, Addr, InstantiateMsg) {
 
     // Instantiate ASTRO Token Contract
     let astro_token_contract = Box::new(ContractWrapper::new(
-        astroport_token::contract::execute,
-        astroport_token::contract::instantiate,
-        astroport_token::contract::query,
+        cw20_base::contract::execute,
+        cw20_base::contract::instantiate,
+        cw20_base::contract::query,
     ));
 
     let astro_token_code_id = app.store_code(astro_token_contract);
 
-    let msg = astroport::token::InstantiateMsg {
+    let msg = cw20_base::msg::InstantiateMsg {
         name: String::from("Astro token"),
         symbol: String::from("ASTRO"),
         decimals: 6,
@@ -38,7 +38,7 @@ fn init_contracts(app: &mut App) -> (Addr, Addr, InstantiateMsg) {
             minter: owner.to_string(),
             cap: None,
         }),
-        init_hook: None,
+        marketing: None,
     };
 
     let astro_token_instance = app
@@ -1059,9 +1059,9 @@ fn test_delegate_astro_to_bootstrap_auction() {
 
     // Initialize Bootstrap Auction contract
     let auction_contract = Box::new(ContractWrapper::new(
-        astro_auction::contract::execute,
-        astro_auction::contract::instantiate,
-        astro_auction::contract::query,
+        mock_astro_auction::contract::execute,
+        mock_astro_auction::contract::instantiate,
+        mock_astro_auction::contract::query,
     ));
     let auction_contract_code_id = app.store_code(auction_contract);
     let auction_init_msg = astroport_periphery::auction::InstantiateMsg {
