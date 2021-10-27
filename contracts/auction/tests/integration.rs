@@ -271,18 +271,12 @@ fn instantiate_airdrop_lockdrop_contracts(
     };
 
     let lockdrop_msg = astroport_periphery::lockdrop::InstantiateMsg {
-        owner: owner.clone().to_string(),
-        auction_contract_address: Some("auction_instance".to_string()),
-        generator_address: Some("generator_address".to_string()),
-        astro_token_address: Some(astro_token_instance.clone().into_string()),
+        owner: Some(owner.to_string()),
         init_timestamp: 1_000_00,
         deposit_window: 100_000_00,
         withdrawal_window: 5_000_00,
-        min_duration: 1u64,
-        max_duration: 52u64,
-        seconds_per_week: 604800u64,
-        weekly_multiplier: Decimal256::from_ratio(1u64, 13u64),
-        lockdrop_incentives: Uint256::from(100_000_00u64),
+        min_lock_duration: 1u64,
+        max_lock_duration: 52u64,
     };
 
     let airdrop_instance = app
@@ -1796,7 +1790,7 @@ fn test_stake_lp_tokens() {
         b.time = Timestamp::from_seconds(10611001)
     });
 
-    let success_ = app
+    let _success = app
         .execute_contract(
             Addr::unchecked(auction_init_msg.owner.to_string()),
             auction_instance.clone(),
