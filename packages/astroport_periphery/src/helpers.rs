@@ -1,4 +1,3 @@
-use crate::tax::deduct_tax;
 use cosmwasm_bignumber::Uint256;
 use cosmwasm_std::{
     to_binary, Addr, Api, BalanceResponse, BankMsg, BankQuery, Binary, Coin, CosmosMsg, Deps,

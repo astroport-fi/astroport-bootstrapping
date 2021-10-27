@@ -32,7 +32,7 @@ dependencies = [
 name = "astro-auction"
 version = "1.0.0"
 dependencies = [
- "astroport",
+ "astroport 2.4.0 (git+ssh://git@github.com/astroport-fi/astroport.git?tag=v0.1-beta)",
  "astroport-periphery",
  "cosmwasm-bignumber",
  "cosmwasm-schema",
@@ -60,10 +60,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "astroport"
+version = "2.4.0"
+source = "git+ssh://git@github.com/astroport-fi/astroport.git?tag=v0.1-beta#fdc054eb97d758564e123fa1bdc5ae9e7e44e3ae"
+dependencies = [
+ "cosmwasm-std",
+ "cw20",
+ "schemars",
+ "serde",
+ "terra-cosmwasm",
+ "uint",
+]
+
+[[package]]
 name = "astroport-lockdrop"
 version = "1.0.0"
 dependencies = [
- "astroport",
+ "astroport 2.4.0",
  "astroport-periphery",
  "cosmwasm-bignumber",
  "cosmwasm-schema",

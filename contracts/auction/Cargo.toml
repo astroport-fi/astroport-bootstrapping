@@ -34,7 +34,7 @@ backtraces = ["cosmwasm-std/backtraces"]
 library = []
 
 [dependencies]
-astroport =  { path = "../../packages/astroport" }
+astroport = {git = "ssh://git@github.com/astroport-fi/astroport.git", tag = "v0.1-beta"}
 astroport-periphery =  { path = "../../packages/astroport_periphery" }
 
 cw20 = { version = "0.8" }
