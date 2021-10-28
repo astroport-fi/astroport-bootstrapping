@@ -59,6 +59,8 @@ pub fn instantiate(
         withdrawal_window: msg.withdrawal_window,
         min_lock_duration: msg.min_lock_duration,
         max_lock_duration: msg.max_lock_duration,
+        weekly_multiplier: msg.weekly_multiplier,
+        weekly_divider: msg.weekly_divider,
         lockdrop_incentives: None,
     };
 
@@ -744,7 +746,7 @@ pub fn handle_increase_lockup(
         return Err(StdError::generic_err("Amount must be greater than 0"));
     }
 
-    pool_info.weighted_amount += Uint256::from(amount).checked_mul(Uint256::from(duration))?;
+    pool_info.weighted_amount += calculate_weight(amount, duration, &config);
 
     let lockup_key = (&terraswap_lp_token, &user_address, U64Key::new(duration));
 
@@ -834,7 +836,7 @@ pub fn handle_withdraw_from_lockup(
 
     // STATE :: RETRIEVE --> UPDATE
     lockup_info.lp_units_locked -= amount;
-    pool_info.weighted_amount -= Uint256::from(amount).checked_mul(Uint256::from(duration))?;
+    pool_info.weighted_amount -= calculate_weight(amount, duration, &config);
 
     // Remove Lockup position from the list of user positions if Lp_Locked balance == 0
     if lockup_info.lp_units_locked.is_zero() {
@@ -974,7 +976,7 @@ pub fn handle_claim_rewards_and_unlock_for_lockup(
     let mut lockup_info = LOCKUP_INFO.load(deps.storage, lockup_key.clone())?;
     if lockup_info.astro_rewards.is_none() {
         let weighted_lockup_balance =
-            Uint256::from(lockup_info.lp_units_locked) * Uint256::from(duration);
+            calculate_weight(lockup_info.lp_units_locked, duration, &config);
         lockup_info.astro_rewards = Some(calculate_astro_incentives_for_lockup(
             weighted_lockup_balance,
             pool_info.weighted_amount,
@@ -1631,6 +1633,19 @@ pub fn calculate_astro_incentives_for_lockup(
     .unwrap()
 }
 
+/// @dev Helper function. Returns effective weight for the amount to be used for calculating lockdrop rewards
+/// @params amount : Number of LP tokens
+/// @params duration : Number of weeks
+/// @config : Config with weekly multiplier and divider
+fn calculate_weight(amount: Uint128, duration: u64, config: &Config) -> Uint256 {
+    let lock_weight = Decimal256::one()
+        + Decimal256::from_ratio(
+            (duration - 1) * config.weekly_multiplier,
+            config.weekly_divider,
+        );
+    lock_weight * amount.into()
+}
+
 //-----------------------------------------------------------
 // HELPER FUNCTIONS :: UPDATE STATE
 //-----------------------------------------------------------
@@ -1671,7 +1686,7 @@ fn update_user_lockup_positions_and_calc_rewards(
         } else {
             // Weighted lockup balance (using terraswap LP units to calculate as pool's total weighted balance is calculated on terraswap LP deposits summed over each deposit tx)
             let weighted_lockup_balance =
-                Uint256::from(lockup_info.lp_units_locked) * Uint256::from(duration);
+                calculate_weight(lockup_info.lp_units_locked, duration, &config);
 
             // Calculate ASTRO Lockdrop rewards for the lockup position
             let lockup_astro_rewards = calculate_astro_incentives_for_lockup(

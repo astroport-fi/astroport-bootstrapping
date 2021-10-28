@@ -35,6 +35,10 @@ pub struct Config {
     pub min_lock_duration: u64,
     /// Max. no. of weeks allowed for lockup
     pub max_lock_duration: u64,
+    /// Lockdrop Reward multiplier
+    pub weekly_multiplier: u64,
+    /// Lockdrop Reward divider
+    pub weekly_divider: u64,
     /// Total ASTRO lockdrop incentives to be distributed among the users
     pub lockdrop_incentives: Option<Uint128>,
 }

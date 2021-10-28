@@ -19,6 +19,10 @@ pub struct InstantiateMsg {
     pub min_lock_duration: u64,
     /// Max. no. of weeks allowed for lockup
     pub max_lock_duration: u64,
+    /// Lockdrop Reward multiplier
+    pub weekly_multiplier: u64,
+    /// Lockdrop Reward divider
+    pub weekly_divider: u64,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
