@@ -24,7 +24,6 @@ pub struct InstantiateMsg {
 pub struct UpdateConfigMsg {
     pub owner: Option<String>,
     pub generator_contract: Option<String>,
-    pub astro_rewards: Option<Uint128>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -36,7 +35,7 @@ pub enum ExecuteMsg {
     DepositUst {},
     WithdrawUst { amount: Uint128 },
 
-    AddLiquidityToAstroportPool { slippage: Option<Decimal> },
+    InitPool { slippage: Option<Decimal> },
     StakeLpTokens {},
 
     ClaimRewards {},

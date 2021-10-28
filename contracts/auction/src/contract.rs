@@ -54,8 +54,8 @@ pub fn instantiate(
         astro_ust_pool_address: deps.api.addr_validate(&msg.astro_ust_pair_address)?,
         astro_ust_lp_token_address: pair_info.liquidity_token,
         generator_contract: deps.api.addr_validate(&msg.generator_contract_address)?,
-        astro_rewards: msg.astro_rewards,
-        astro_vesting_duration: msg.astro_vesting_duration,
+        astro_incentive_amount: msg.astro_rewards, // TODO: we need to make sure this astro_rewards is really there
+        vesting_duration: msg.astro_vesting_duration,
         lp_tokens_vesting_duration: msg.lp_tokens_vesting_duration,
         init_timestamp: msg.init_timestamp,
         deposit_window: msg.deposit_window,
@@ -78,19 +78,15 @@ pub fn execute(
     match msg {
         ExecuteMsg::UpdateConfig { new_config } => handle_update_config(deps, info, new_config),
         ExecuteMsg::Receive(msg) => receive_cw20(deps, env, info, msg),
-
         ExecuteMsg::DepositUst {} => handle_deposit_ust(deps, env, info),
         ExecuteMsg::WithdrawUst { amount } => handle_withdraw_ust(deps, env, info, amount),
-
-        ExecuteMsg::AddLiquidityToAstroportPool { slippage } => {
-            handle_add_liquidity_to_astroport_pool(deps, env, info, slippage)
-        }
+        ExecuteMsg::InitPool { slippage } => handle_init_pool(deps, env, info, slippage),
         ExecuteMsg::StakeLpTokens {} => handle_stake_lp_tokens(deps, env, info),
 
         ExecuteMsg::ClaimRewards {} => handle_claim_rewards(deps, env, info),
         ExecuteMsg::WithdrawLpShares {} => handle_withdraw_unlocked_lp_shares(deps, env, info),
 
-        ExecuteMsg::Callback(msg) => _handle_callback(deps, env, info, msg),
+        ExecuteMsg::Callback(msg) => handle_callback(deps, env, info, msg),
     }
 }
 
@@ -121,7 +117,7 @@ pub fn receive_cw20(
     }
 }
 
-fn _handle_callback(
+fn handle_callback(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
@@ -178,10 +174,6 @@ pub fn handle_update_config(
 
     if let Some(generator_contract) = new_config.generator_contract {
         config.boostrap_auction_address = deps.api.addr_validate(&generator_contract)?;
-    }
-
-    if let Some(astro_rewards) = new_config.astro_rewards {
-        config.astro_rewards = astro_rewards;
     }
 
     CONFIG.save(deps.storage, &config)?;
@@ -254,7 +246,7 @@ pub fn handle_deposit_ust(
 
     // UPDATE STATE
     state.total_ust_delegated += native_token.amount;
-    user_info.ust_deposited += native_token.amount;
+    user_info.ust_delegated += native_token.amount;
 
     // SAVE UPDATED STATE
     STATE.save(deps.storage, &state)?;
@@ -270,7 +262,7 @@ pub fn handle_deposit_ust(
 /// true if deposits are allowed
 fn is_deposit_open(current_timestamp: u64, config: &Config) -> bool {
     current_timestamp >= config.init_timestamp
-        && current_timestamp <= config.init_timestamp + config.deposit_window
+        && current_timestamp < config.init_timestamp + config.deposit_window
 }
 
 /// @dev Facilitates UST withdrawals by users from their deposit positions
@@ -286,9 +278,7 @@ pub fn handle_withdraw_ust(
 
     let user_address = info.sender;
 
-    let mut user_info = USERS
-        .may_load(deps.storage, &user_address)?
-        .unwrap_or_default();
+    let mut user_info = USERS.load(deps.storage, &user_address)?;
 
     // CHECK :: Has the user already withdrawn during the current window
     if user_info.ust_withdrawn {
@@ -297,8 +287,7 @@ pub fn handle_withdraw_ust(
 
     // Check :: Amount should be within the allowed withdrawal limit bounds
     let max_withdrawal_percent = allowed_withdrawal_percent(env.block.time.seconds(), &config);
-    // TODO: check these two functions calculation and logic behind it
-    let max_withdrawal_allowed = user_info.ust_deposited * max_withdrawal_percent;
+    let max_withdrawal_allowed = user_info.ust_delegated * max_withdrawal_percent;
 
     if amount > max_withdrawal_allowed {
         return Err(StdError::generic_err(
@@ -306,15 +295,14 @@ pub fn handle_withdraw_ust(
         ));
     }
 
-    // TODO: ????? what is going on here
-    // Set user's withdrawl_counter to true incase no further withdrawals are allowed for the user
-    if max_withdrawal_percent <= Decimal256::from_ratio(50u32, 100u32) {
+    // After deposit window is closed, we allow to withdraw only once
+    if current_timestamp > config.init_timestamp + config.deposit_window {
         user_info.ust_withdrawn = true;
     }
 
     // UPDATE STATE
     state.total_ust_delegated = state.total_ust_delegated - amount;
-    user_info.ust_deposited = user_info.ust_deposited - amount; // TODO: calculation on line 300 is counting on this value
+    user_info.ust_delegated = user_info.ust_delegated - amount;
 
     // SAVE UPDATED STATE
     STATE.save(deps.storage, &state)?;
@@ -341,36 +329,39 @@ pub fn handle_withdraw_ust(
 ///  @dev Helper function to calculate maximum % of their total UST deposited that can be withdrawn
 /// Returns % UST that can be withdrawn and 'more_withdrawals_allowed' boolean which indicates whether more withdrawls by the user
 /// will be allowed or not
-fn allowed_withdrawal_percent(current_timestamp: u64, config: &Config) -> Decimal256 {
+fn allowed_withdrawal_percent(current_timestamp: u64, config: &Config) -> Decimal {
     let withdrawal_cutoff_init_point = config.init_timestamp + config.deposit_window;
 
     // Deposit window :: 100% withdrawals allowed
-    if current_timestamp <= withdrawal_cutoff_init_point {
-        return Decimal256::from_ratio(100u32, 100u32);
+    if current_timestamp < withdrawal_cutoff_init_point {
+        return Decimal::from_ratio(100u32, 100u32);
     }
 
-    let withdrawal_cutoff_sec_point =
+    let withdrawal_cutoff_second_point =
         withdrawal_cutoff_init_point + (config.withdrawal_window / 2u64);
-
     // Deposit window closed, 1st half of withdrawal window :: 50% withdrawals allowed
-    if current_timestamp <= withdrawal_cutoff_sec_point {
-        return Decimal256::from_ratio(50u32, 100u32);
+    if current_timestamp <= withdrawal_cutoff_second_point {
+        return Decimal::from_ratio(50u32, 100u32);
     }
 
-    let withdrawal_cutoff_final = withdrawal_cutoff_sec_point + (config.withdrawal_window / 2u64);
+    // max withdrawal allowed decreasing linearly from 50% to 0% vs time elapsed
+    let withdrawal_cutoff_final = withdrawal_cutoff_init_point + config.withdrawal_window;
     //  Deposit window closed, 2nd half of withdrawal window :: max withdrawal allowed decreases linearly from 50% to 0% vs time elapsed
     if current_timestamp < withdrawal_cutoff_final {
-        let slope = Decimal256::from_ratio(50u64, config.withdrawal_window / 2u64);
-        let time_elapsed = current_timestamp - withdrawal_cutoff_sec_point;
-        Decimal256::from_ratio(time_elapsed, 1u64) * slope
+        let time_left = withdrawal_cutoff_final - current_timestamp;
+        Decimal::from_ratio(
+            50u64 * time_left,
+            withdrawal_cutoff_final - withdrawal_cutoff_second_point,
+        )
     }
 
-    Decimal256::from_ratio(0u32, 100u32)
+    // Withdrawals not allowed
+    Decimal::from_ratio(0u32, 100u32)
 }
 
 /// @dev Admin function to bootstrap the ASTRO-UST Liquidity pool by depositing all ASTRO, UST tokens deposited to the Astroport pool
 /// @param slippage Optional, to handle slippage that may be there when adding liquidity to the pool
-pub fn handle_add_liquidity_to_astroport_pool(
+pub fn handle_init_pool(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
@@ -389,8 +380,7 @@ pub fn handle_add_liquidity_to_astroport_pool(
     }
 
     // CHECK :: Deposit / withdrawal windows need to be over
-    let window_end = config.init_timestamp + config.deposit_window + config.withdrawal_window;
-    if env.block.time.seconds() < window_end {
+    if !are_windows_closed(env.block.time.seconds(), &config) {
         return Err(StdError::generic_err(
             "Deposit/withdrawal windows are still open",
         ));
@@ -523,36 +513,36 @@ pub fn handle_stake_lp_tokens(
 /// @dev Facilitates ASTRO Reward claim for users
 pub fn handle_claim_rewards(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
 ) -> Result<Response, StdError> {
     let config = CONFIG.load(deps.storage)?;
     let state = STATE.load(deps.storage)?;
     let depositor_address = info.sender;
-    let user_info = USERS
-        .may_load(deps.storage, &depositor_address)?
-        .unwrap_or_default();
+    let user_info = USERS.load(deps.storage, &depositor_address)?;
 
     // CHECK :: Deposit / withdrawal windows need to be over
-    if !are_windows_closed(_env.block.time.seconds(), &config) {
+    if !are_windows_closed(env.block.time.seconds(), &config) {
         return Err(StdError::generic_err("Deposit/withdrawal windows are open"));
     }
 
     // CHECK :: User has valid delegation / deposit balances
-    if user_info.astro_delegated == Uint256::zero() && user_info.ust_deposited == Uint256::zero() {
-        return Err(StdError::generic_err("Invalid request"));
+    if user_info.astro_delegated.is_zero() && user_info.ust_delegated.is_zero() {
+        return Err(StdError::generic_err("No delegated assets"));
     }
 
     let mut cosmos_msgs = vec![];
 
     // QUERY :: ARE ASTRO REWARDS TO BE CLAIMED FOR LP STAKING > 0 ?
     // --> If unclaimed rewards > 0, add claimReward {} msg to the cosmos msg array
-    if state.are_staked {
+    if state.is_lp_staked {
         let unclaimed_rewards_response =
-            query_unclaimed_staking_rewards(deps.as_ref(), &config, _env.contract.address.clone());
-        if unclaimed_rewards_response > Uint128::zero() {
+            query_unclaimed_staking_rewards(deps.as_ref(), &config, env.contract.address.clone());
+
+        // TODO: check dual rewards
+
+        if !unclaimed_rewards_response.is_zero() {
             cosmos_msgs.push(build_claim_astro_rewards(
-                _env.contract.address.clone(),
                 config.lp_token_address,
                 config.generator_contract.clone(),
             )?);
@@ -564,13 +554,14 @@ pub fn handle_claim_rewards(
     let astro_balance = cw20_get_balance(
         &deps.querier,
         config.astro_token_address,
-        _env.contract.address.clone(),
+        env.contract.address.clone(),
     )?;
+
     let update_state_msg = CallbackMsg::UpdateStateOnRewardClaim {
         user_address: depositor_address.clone(),
         prev_astro_balance: astro_balance.into(),
     }
-    .to_cosmos_msg(&_env.contract.address)?;
+    .to_cosmos_msg(&env.contract.address)?;
     cosmos_msgs.push(update_state_msg);
 
     Ok(Response::new()
@@ -578,6 +569,130 @@ pub fn handle_claim_rewards(
         .add_attributes(vec![
             attr("action", "Auction::ExecuteMsg::ClaimRewards"),
             attr("user", depositor_address.to_string()),
+        ]))
+}
+
+/// @dev Queries pending rewards to be claimed from the generator contract for the 'contract_addr'
+fn query_unclaimed_staking_rewards(deps: Deps, config: &Config, contract_addr: Addr) -> Uint128 {
+    let pending_rewards: PendingTokenResponse = deps
+        .querier
+        .query(&QueryRequest::Wasm(WasmQuery::Smart {
+            contract_addr: config.generator_contract.to_string(),
+            msg: to_binary(&GenQueryMsg::PendingToken {
+                lp_token: config.lp_token_address.clone(),
+                user: contract_addr,
+            })
+            .unwrap(),
+        }))
+        .unwrap();
+
+    pending_rewards.pending
+}
+
+fn build_claim_astro_rewards(
+    lp_token_contract: Addr,
+    generator_contract: Addr,
+) -> StdResult<CosmosMsg> {
+    Ok(CosmosMsg::Wasm(WasmMsg::Execute {
+        contract_addr: generator_contract.to_string(),
+        funds: vec![],
+        msg: to_binary(&astroport::generator::ExecuteMsg::Withdraw {
+            lp_token: lp_token_contract,
+            amount: Uint128::zero(),
+        })?,
+    }))
+}
+
+/// @dev Facilitates ASTRO Reward claim for users
+pub fn handle_withdraw_unlocked_lp_shares(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+) -> Result<Response, StdError> {
+    let config = CONFIG.load(deps.storage)?;
+    let mut state = STATE.load(deps.storage)?;
+    let user_address = info.sender;
+    let mut user_info = USERS
+        .may_load(deps.storage, &user_address)?
+        .unwrap_or_default();
+
+    // CHECK :: Deposit / withdrawal windows need to be over
+    if !are_windows_closed(_env.block.time.seconds(), &config) {
+        return Err(StdError::generic_err("Deposit/withdrawal windows are open"));
+    }
+
+    // CHECK :: User has valid delegation / deposit balances
+    if user_info.astro_delegated.is_zero() && user_info.ust_delegated.is_zero() {
+        return Err(StdError::generic_err(
+            "Invalid request. No LP Tokens to claim",
+        ));
+    }
+
+    let mut cosmos_msgs = vec![];
+
+    // QUERY :: ARE ASTRO REWARDS TO BE CLAIMED FOR LP STAKING > 0 ?
+    // --> If unclaimed rewards > 0, add claimReward {} msg to the cosmos msg array
+    if state.is_lp_staked {
+        let unclaimed_rewards_response =
+            query_unclaimed_staking_rewards(deps.as_ref(), &config, _env.contract.address.clone());
+        if unclaimed_rewards_response > Uint128::zero() {
+            cosmos_msgs.push(build_claim_astro_rewards(
+                config.lp_token_address.clone(),
+                config.generator_contract.clone(),
+            )?);
+        }
+    }
+
+    // QUERY :: Current ASTRO Token Balance
+    // -->add CallbackMsg::UpdateStateOnRewardClaim{} msg to the cosmos msg array
+    let astro_balance = cw20_get_balance(
+        &deps.querier,
+        config.astro_token_address.clone(),
+        _env.contract.address.clone(),
+    )?;
+
+    let update_state_msg = CallbackMsg::UpdateStateOnRewardClaim {
+        user_address: user_address.clone(),
+        prev_astro_balance: astro_balance.into(),
+    }
+    .to_cosmos_msg(&_env.contract.address)?;
+    cosmos_msgs.push(update_state_msg);
+
+    // CALCULATE LP SHARES THAT THE USER CAN WITHDRAW (TO DO :: FIGURE THE LOGIC i.e cliff or vesting)
+    let lp_shares_to_withdraw =
+        calculate_withdrawable_lp_shares(_env.block.time.seconds(), &config, &state, &user_info);
+    if lp_shares_to_withdraw.is_zero() {
+        return Err(StdError::generic_err("No LP shares to withdraw"));
+    }
+
+    // COSMOS MSG's :: LP SHARES CLAIM
+    // --> 1. Withdraw LP shares
+    // --> 2. Transfer LP shares
+    if state.is_lp_staked {
+        let unstake_lp_shares = build_unstake_from_generator_msg(&config, lp_shares_to_withdraw)?;
+        cosmos_msgs.push(unstake_lp_shares);
+    }
+
+    let transfer_lp_shares = build_transfer_cw20_token_msg(
+        user_address.clone(),
+        config.astro_ust_lp_token_address.to_string(),
+        lp_shares_to_withdraw.into(),
+    )?;
+
+    cosmos_msgs.push(transfer_lp_shares);
+
+    // STATE UPDATE --> SAVE
+    user_info.claimed_lp_shares += lp_shares_to_withdraw;
+    state.lp_shares_claimed += lp_shares_to_withdraw;
+    USERS.save(deps.storage, &user_address, &user_info)?;
+    STATE.save(deps.storage, &state)?;
+
+    Ok(Response::new()
+        .add_messages(cosmos_msgs)
+        .add_attributes(vec![
+            attr("action", "Auction::ExecuteMsg::WithdrawLPShares"),
+            attr("user", user_address.to_string()),
+            attr("LP_shares_withdrawn", lp_shares_to_withdraw),
         ]))
 }
 
@@ -602,7 +717,8 @@ pub fn update_state_on_liquidity_addition_to_pool(
     )?;
 
     // STATE :: UPDATE --> SAVE
-    state.lp_shares_minted = cur_lp_balance - prev_lp_balance; // TODO: this callback can run only once or will break maths
+    state.lp_shares_minted = cur_lp_balance - prev_lp_balance;
+    state.pool_init_timestamp = env.block.time.seconds();
     STATE.save(deps.storage, &state)?;
 
     // Activate lockdrop and airdrop claims
@@ -619,11 +735,214 @@ pub fn update_state_on_liquidity_addition_to_pool(
         }),
     ];
 
-    Ok(Response::new().add_attributes(vec![
+    Ok(Response::new()
+        .add_messages(cosmos_msgs)
+        .add_attributes(vec![
+            (
+                "action",
+                "Auction::CallbackMsg::UpdateStateOnLiquidityAddition",
+            ),
+            // ("maUST_minted", m_ust_minted.to_string().as_str()),
+        ]))
+}
+
+// @dev CallbackMsg :: Facilitates state update and ASTRO rewards transfer to users post ASTRO incentives claim from the generator contract
+pub fn update_state_on_reward_claim(
+    deps: DepsMut,
+    env: Env,
+    user_address: Addr,
+    prev_astro_balance: Uint128,
+) -> StdResult<Response> {
+    let config = CONFIG.load(deps.storage)?;
+    let mut state = STATE.load(deps.storage)?;
+    let mut user_info = USERS.load(deps.storage, &user_address)?;
+
+    // ASTRO INCENTIVES :: Calculates ASTRO rewards for auction participation for a user if not already done
+    if user_info.auction_incentive_amount.is_zero() {
+        user_info.auction_incentive_amount =
+            calculate_auction_reward_for_user(&state, &user_info, config.astro_incentive_amount);
+    }
+
+    // ASTRO Incentives :: Calculate the unvested amount which can be claimed by the user
+    let incentive_reward = calculate_claimable_auction_reward_for_user(
+        env.block.time.seconds(),
+        &config,
+        &state,
+        &user_info,
+    );
+
+    user_info.claimed_auction_incentives += incentive_reward;
+
+    // QUERY CURRENT LP TOKEN BALANCE :: NEWLY MINTED LP TOKENS
+    let cur_astro_balance = cw20_get_balance(
+        &deps.querier,
+        config.astro_token_address.clone(),
+        env.contract.address,
+    )?;
+
+    let astro_claimed = cur_astro_balance - prev_astro_balance;
+
+    // ASTRO Generator (Staking) rewards :: Calculate the astro amount (from LP staking incentives) which can be claimed by the user
+    let staking_reward = if !astro_claimed.is_zero() {
+        update_astro_rewards_index(&mut state, astro_claimed);
+        compute_user_accrued_reward(&state, &mut user_info)
+    } else {
+        Uint128::zero()
+    };
+
+    let total_reward = incentive_reward + staking_reward;
+
+    let mut msg = vec![];
+
+    // COSMOS MSG :: Transfer Rewards to the user
+    if !total_reward.is_zero() {
+        // TODO: are we storing this reward somewhere?
+        let transfer_astro_rewards = build_transfer_cw20_token_msg(
+            user_address.clone(),
+            config.astro_token_address.to_string(),
+            total_reward.into(),
+        )?;
+        msg.push(transfer_astro_rewards);
+    }
+
+    // SAVE UPDATED STATE
+    STATE.save(deps.storage, &state)?;
+    USERS.save(deps.storage, &user_address, &user_info)?;
+
+    Ok(Response::new().add_messages(msg).add_attributes(vec![
+        ("action", "Auction::CallbackMsg::UpdateStateOnRewardClaim"),
+        ("user_address", user_address.to_string().as_str()),
         (
-            "action",
-            "Auction::CallbackMsg::UpdateStateOnLiquidityAddition",
+            "auction_participation_reward",
+            &(user_astro_rewards - staking_reward).to_string(),
         ),
-        // ("maUST_minted", m_ust_minted.to_string().as_str()),
+        ("staking_lp_reward", &staking_reward.to_string()),
     ]))
+}
+
+/// Calculates ASTRO rewards for participation in the auction for a user
+fn calculate_auction_reward_for_user(
+    state: &State,
+    user_info: &UserInfo,
+    astro_rewards_alloc: Uint128,
+) -> Uint128 {
+    // In-case ASTRO incentives for participation in the auction are already claimed or total ASTRO delegated / UST deposited is currently 0
+    if !user_info.auction_incentive_amount.is_zero()
+        || state.total_astro_delegated.is_zero()
+        || state.total_ust_delegated.is_zero()
+    {
+        return Uint128::zero();
+    }
+
+    // Diving reward by two for astro and ust rewards
+    let astro_reward = astro_rewards_alloc.div(2);
+
+    let mut total_astro_rewards = Uint128::zero();
+
+    // TODO: check doc for proper share calculation
+    // Calculate rewards for ASTRO Allocation by user
+    if user_info.astro_delegated > Uint128::zero() {
+        total_astro_rewards += astro_reward
+            * Decimal256::from_ratio(user_info.astro_delegated, state.total_astro_delegated);
+    }
+
+    // Calculate rewards for UST provided by user
+    if user_info.ust_delegated > Uint128::zero() {
+        total_astro_rewards += astro_reward
+            * Decimal256::from_ratio(user_info.ust_delegated, state.total_ust_delegated);
+    }
+
+    total_astro_rewards
+}
+
+/// Returns ASTRO auction incentives that a user can withdraw based on a vesting schedule
+pub fn calculate_claimable_auction_reward_for_user(
+    cur_timestamp: u64,
+    config: &Config,
+    state: &State,
+    user_info: &UserInfo,
+) -> Uint128 {
+    if user_info.claimed_auction_incentives == user_info.auction_incentive_amount
+        || state.pool_init_timestamp == 0u64
+    {
+        return Uint128::zero();
+    }
+
+    let time_elapsed = cur_timestamp - state.pool_init_timestamp;
+
+    // Return the rest in vesting duration is over
+    if time_elapsed >= config.vesting_duration {
+        return user_info.auction_incentive_amount - user_info.claimed_auction_incentives;
+    }
+
+    let available_reward = user_info.auction_incentive_amount
+        * Decimal256::from_ratio(time_elapsed, config.vesting_duration);
+
+    available_reward - user_info.claimed_auction_incentives
+}
+
+// Accrue ASTRO rewards by updating the reward index
+fn update_astro_rewards_index(state: &mut State, astro_accured: Uint128) {
+    if !state.is_lp_staked {
+        return;
+    }
+
+    // TODO: not sure about this maths yet
+    let astro_rewards_index_increment =
+        Decimal256::from_ratio(astro_accured, state.lp_shares_minted);
+    state.global_reward_index += astro_rewards_index_increment;
+}
+
+// Accrue ASTRO reward for the user by updating the user reward index and adding rewards to the pending rewards
+fn compute_user_accrued_reward(state: &State, user_info: &mut UserInfo) -> Uint128 {
+    if !state.is_lp_staked {
+        return Uint128::zero();
+    }
+
+    // TODO: not sure about this maths yet
+    let pending_user_rewards = (user_info.lp_shares * state.global_reward_index)
+        - (user_info.lp_shares * user_info.user_reward_index);
+    user_info.user_reward_index = state.global_reward_index;
+    pending_user_rewards
+}
+
+/// @dev Helper function. Returns true if the deposit & withdrawal windows are closed, else returns false
+/// @param current_timestamp : Current timestamp
+/// @param config : Configuration
+fn are_windows_closed(current_timestamp: u64, config: &Config) -> bool {
+    let window_end = config.init_timestamp + config.deposit_window + config.withdrawal_window;
+    return current_timestamp >= window_end;
+}
+
+/// Returns LP Balance  that a user can withdraw based on a vesting schedule
+pub fn calculate_withdrawable_lp_shares(
+    cur_timestamp: u64,
+    config: &Config,
+    state: &State,
+    user_info: &UserInfo,
+) -> Uint128 {
+    let time_elapsed = cur_timestamp - state.pool_init_timestamp;
+    if time_elapsed >= config.lp_tokens_vesting_duration {
+        return user_info.lp_shares - user_info.claimed_lp_shares;
+    }
+
+    // TODO: not sure about this maths yet
+    let withdrawable_lp_balance = user_info.lp_shares
+        * Decimal256::from_ratio(time_elapsed, config.lp_tokens_vesting_duration);
+    withdrawable_lp_balance - user_info.claimed_lp_shares
+}
+
+/// Returns CosmosMsg struct to withdraw staked LP Tokens from the Generator contract
+pub fn build_unstake_from_generator_msg(
+    config: &Config,
+    lp_shares_to_withdraw: Uint128,
+) -> StdResult<CosmosMsg> {
+    Ok(CosmosMsg::Wasm(WasmMsg::Execute {
+        contract_addr: config.generator_contract.to_string(),
+        msg: to_binary(&astroport::generator::ExecuteMsg::Withdraw {
+            lp_token: config.lp_token_address.clone(),
+            amount: lp_shares_to_withdraw.into(),
+        })?,
+        funds: vec![],
+    }))
 }

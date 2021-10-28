@@ -29,9 +29,9 @@ pub struct Config {
     ///  Astroport Generator contract with which ASTRO-UST LP Tokens are staked
     pub generator_contract: Addr,
     /// Total ASTRO token rewards to be used to incentivize boostrap auction participants
-    pub astro_rewards: Uint128,
+    pub astro_incentive_amount: Uint128,
     /// Number of seconds over which ASTRO incentives are vested
-    pub astro_vesting_duration: u64,
+    pub vesting_duration: u64,
     ///  Number of seconds over which LP Tokens are vested
     pub lp_tokens_vesting_duration: u64,
     /// Timestamp since which ASTRO / UST deposits will be allowrd
@@ -49,16 +49,13 @@ pub struct State {
     pub total_astro_delegated: Uint128,
     /// Total UST delegated to the contract
     pub total_ust_delegated: Uint128,
-
     pub is_pool_created: bool,
     /// ASTRO--UST LP Shares currently staked with the Staking contract
     pub is_lp_staked: bool,
-
     /// Total LP shares minted post liquidity addition to the ASTRO-UST Pool
     pub lp_shares_minted: Uint128,
     /// Number of LP shares that have been withdrawn as they unvest
     pub lp_shares_claimed: Uint128,
-
     /// Timestamp at which liquidity was added to the ASTRO-UST LP Pool
     pub pool_init_timestamp: u64,
     /// index used to keep track of LP staking rewards and distribute them proportionally among the auction participants
@@ -75,6 +72,7 @@ impl Default for State {
             pool_init_timestamp: 0u64,
             is_lp_staked: false,
             global_reward_index: Decimal256::zero(),
+            is_pool_created: false,
         }
     }
 }
@@ -83,8 +81,8 @@ impl Default for State {
 pub struct UserInfo {
     // Total ASTRO Tokens delegated by the user
     pub astro_delegated: Uint128,
-    // Total UST deposited by the user
-    pub ust_deposited: Uint128,
+    // Total UST delegated by the user
+    pub ust_delegated: Uint128,
     // Withdrawal counter to capture if the user already withdrew UST during the "only withdrawals" window
     pub ust_withdrawn: bool,
     // User's LP share balance
@@ -92,7 +90,7 @@ pub struct UserInfo {
     // LP shares withdrawn by the user
     pub claimed_lp_shares: Uint128,
     // User's ASTRO rewards for participating in the auction
-    pub total_auction_incentives: Uint128,
+    pub auction_incentive_amount: Uint128,
     // ASTRO rewards withdrawn by the user
     pub claimed_auction_incentives: Uint128,
     // Index used to calculate user's staking rewards
@@ -103,11 +101,11 @@ impl Default for UserInfo {
     fn default() -> Self {
         UserInfo {
             astro_delegated: Uint128::zero(),
-            ust_deposited: Uint128::zero(),
+            ust_delegated: Uint128::zero(),
             ust_withdrawn: false,
             lp_shares: Uint128::zero(),
             claimed_lp_shares: Uint128::zero(),
-            total_auction_incentives: Uint128::zero(),
+            auction_incentive_amount: Uint128::zero(),
             claimed_auction_incentives: Uint128::zero(),
             user_reward_index: Decimal256::zero(),
         }
