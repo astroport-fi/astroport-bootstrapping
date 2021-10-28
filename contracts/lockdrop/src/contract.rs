@@ -1240,13 +1240,28 @@ pub fn callback_withdraw_user_rewards_for_lockup_optional_withdraw(
     }) = pool_info.migration_info
     {
         let astroport_lp_amount: Uint128 = {
-            let res: BalanceResponse = deps.querier.query_wasm_smart(
-                &astroport_lp_token,
-                &Cw20QueryMsg::Balance {
-                    address: env.contract.address.to_string(),
-                },
-            )?;
-            (lockup_info.lp_units_locked.full_mul(res.balance)
+            let balance: Uint128 = if pool_info.is_staked {
+                deps.querier.query_wasm_smart(
+                    &config
+                        .generator
+                        .as_ref()
+                        .expect("Should be set!")
+                        .to_string(),
+                    &GenQueryMsg::Deposit {
+                        lp_token: astroport_lp_token.clone(),
+                        user: env.contract.address.clone(),
+                    },
+                )?
+            } else {
+                let res: BalanceResponse = deps.querier.query_wasm_smart(
+                    &astroport_lp_token,
+                    &Cw20QueryMsg::Balance {
+                        address: env.contract.address.to_string(),
+                    },
+                )?;
+                res.balance
+            };
+            (lockup_info.lp_units_locked.full_mul(balance)
                 / Uint256::from(pool_info.terraswap_amount_in_lockups))
             .try_into()?
         };
@@ -1540,6 +1555,7 @@ pub fn query_lockup_info(
     terraswap_lp_token: String,
     duration: u64,
 ) -> StdResult<LockUpInfoResponse> {
+    let config = CONFIG.load(deps.storage)?;
     let terraswap_lp_token = deps.api.addr_validate(&terraswap_lp_token)?;
     let user_address = deps.api.addr_validate(&user_address)?;
     let lockup_key = (&terraswap_lp_token, &user_address, U64Key::new(duration));
@@ -1553,13 +1569,28 @@ pub fn query_lockup_info(
     }) = pool_info.migration_info
     {
         astroport_lp_units = Some({
-            let res: BalanceResponse = deps.querier.query_wasm_smart(
-                &astroport_lp_token.to_string(),
-                &Cw20QueryMsg::Balance {
-                    address: env.contract.address.to_string(),
-                },
-            )?;
-            (lockup_info.lp_units_locked.full_mul(res.balance)
+            let balance: Uint128 = if pool_info.is_staked {
+                deps.querier.query_wasm_smart(
+                    &config
+                        .generator
+                        .as_ref()
+                        .expect("Should be set!")
+                        .to_string(),
+                    &GenQueryMsg::Deposit {
+                        lp_token: astroport_lp_token.clone(),
+                        user: env.contract.address.clone(),
+                    },
+                )?
+            } else {
+                let res: BalanceResponse = deps.querier.query_wasm_smart(
+                    &astroport_lp_token,
+                    &Cw20QueryMsg::Balance {
+                        address: env.contract.address.to_string(),
+                    },
+                )?;
+                res.balance
+            };
+            (lockup_info.lp_units_locked.full_mul(balance)
                 / Uint256::from(pool_info.terraswap_amount_in_lockups))
             .try_into()?
         });
