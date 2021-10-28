@@ -230,15 +230,15 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::Config {} => to_binary(&query_config(deps)?),
         QueryMsg::State {} => to_binary(&query_state(deps)?),
         QueryMsg::Pool { terraswap_lp_token } => to_binary(&query_pool(deps, terraswap_lp_token)?),
-        QueryMsg::UserInfo { address } => to_binary(&query_user_info(deps, address)?),
+        QueryMsg::UserInfo { address } => to_binary(&query_user_info(deps, env, address)?),
         QueryMsg::LockUpInfo {
             user_address,
             terraswap_lp_token,
             duration,
         } => to_binary(&query_lockup_info(
             deps,
-            env,
-            user_address,
+            &env,
+            &user_address,
             terraswap_lp_token,
             duration,
         )?),
@@ -1497,13 +1497,14 @@ pub fn query_pool(deps: Deps, terraswap_lp_token: String) -> StdResult<PoolRespo
 }
 
 /// @dev Returns summarized details regarding the user
-pub fn query_user_info(deps: Deps, user: String) -> StdResult<UserInfoResponse> {
+pub fn query_user_info(deps: Deps, env: Env, user: String) -> StdResult<UserInfoResponse> {
     let user_address = deps.api.addr_validate(&user)?;
     let user_info = USER_INFO
         .may_load(deps.storage, &user_address)?
         .unwrap_or_default();
 
     let mut total_astro_rewards = Uint128::zero();
+    let mut lockup_infos = vec![];
 
     for pool in ASSET_POOLS
         .keys(deps.storage, None, None, Order::Ascending)
@@ -1514,25 +1515,25 @@ pub fn query_user_info(deps: Deps, user: String) -> StdResult<UserInfoResponse> 
             .keys(deps.storage, None, None, Order::Ascending)
             .map(|v| u64::from_be_bytes(v.try_into().expect("Duration deserialization error!")))
         {
-            let lockup_key = (&pool, &user_address, U64Key::new(duration));
-
-            let lockup_info = LOCKUP_INFO.load(deps.storage, lockup_key)?;
+            let lockup_info = query_lockup_info(deps, &env, &user, pool.to_string(), duration)?;
             if let Some(astro_rewards) = lockup_info.astro_rewards {
                 total_astro_rewards += astro_rewards;
             }
+            lockup_infos.push(lockup_info);
         }
     }
     Ok(UserInfoResponse {
         total_astro_rewards,
         delegated_astro_rewards: user_info.delegated_astro_rewards,
+        lockup_infos,
     })
 }
 
 /// @dev Returns summarized details regarding the user
 pub fn query_lockup_info(
     deps: Deps,
-    env: Env,
-    user_address: String,
+    env: &Env,
+    user_address: &String,
     terraswap_lp_token: String,
     duration: u64,
 ) -> StdResult<LockUpInfoResponse> {
@@ -1543,6 +1544,7 @@ pub fn query_lockup_info(
     let lockup_info = LOCKUP_INFO.load(deps.storage, lockup_key)?;
 
     let mut astroport_lp_units: Option<Uint128> = None;
+    let mut astroport_lp_token_opt: Option<Addr> = None;
     if let Some(MigrationInfo {
         astroport_lp_token,
         terraswap_migrated_amount,
@@ -1560,6 +1562,7 @@ pub fn query_lockup_info(
                 / Uint256::from(terraswap_migrated_amount))
             .try_into()?
         });
+        astroport_lp_token_opt = Some(astroport_lp_token);
     }
 
     Ok(LockUpInfoResponse {
@@ -1571,6 +1574,8 @@ pub fn query_lockup_info(
         generator_proxy_debt: lockup_info.generator_proxy_debt,
         unlock_timestamp: lockup_info.unlock_timestamp,
         astroport_lp_units,
+        astroport_lp_token: astroport_lp_token_opt,
+        duration,
     })
 }
 
