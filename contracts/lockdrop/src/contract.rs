@@ -382,6 +382,7 @@ pub fn handle_initialize_pool(
     // POOL INFO :: Initialize new pool
     let pool_info = PoolInfo {
         terraswap_pool,
+        terraswap_amount_in_lockups: Default::default(),
         migration_info: None,
         incentives_share,
         weighted_amount: Default::default(),
@@ -631,6 +632,7 @@ pub fn handle_migrate_liquidity(
         astroport_lp_token,
         terraswap_migrated_amount: lp_balance.balance,
     });
+    pool_info.terraswap_amount_in_lockups = lp_balance.balance;
     ASSET_POOLS.save(deps.storage, &terraswap_lp_token, &pool_info)?;
 
     Ok(Response::new().add_messages(cosmos_msgs))
@@ -747,6 +749,7 @@ pub fn handle_increase_lockup(
     }
 
     pool_info.weighted_amount += calculate_weight(amount, duration, &config);
+    pool_info.terraswap_amount_in_lockups += amount;
 
     let lockup_key = (&terraswap_lp_token, &user_address, U64Key::new(duration));
 
@@ -837,6 +840,7 @@ pub fn handle_withdraw_from_lockup(
     // STATE :: RETRIEVE --> UPDATE
     lockup_info.lp_units_locked -= amount;
     pool_info.weighted_amount -= calculate_weight(amount, duration, &config);
+    pool_info.terraswap_amount_in_lockups -= amount;
 
     // Remove Lockup position from the list of user positions if Lp_Locked balance == 0
     if lockup_info.lp_units_locked.is_zero() {
@@ -1126,15 +1130,13 @@ pub fn update_pool_on_dual_rewards_claim(
         },
     )?;
 
-    let lp_balance = {
-        let res: BalanceResponse = deps.querier.query_wasm_smart(
-            astroport_lp_token,
-            &Cw20QueryMsg::Balance {
-                address: env.contract.address.to_string(),
-            },
-        )?;
-        res.balance
-    };
+    let lp_balance: Uint128 = deps.querier.query_wasm_smart(
+        &generator,
+        &GenQueryMsg::Deposit {
+            lp_token: astroport_lp_token.clone(),
+            user: env.contract.address.clone(),
+        },
+    )?;
 
     let base_reward_received;
     pool_info.generator_astro_per_share = pool_info.generator_astro_per_share + {
@@ -1234,9 +1236,7 @@ pub fn callback_withdraw_user_rewards_for_lockup_optional_withdraw(
     }
 
     if let Some(MigrationInfo {
-        astroport_lp_token,
-        terraswap_migrated_amount,
-        ..
+        astroport_lp_token, ..
     }) = pool_info.migration_info
     {
         let astroport_lp_amount: Uint128 = {
@@ -1247,7 +1247,7 @@ pub fn callback_withdraw_user_rewards_for_lockup_optional_withdraw(
                 },
             )?;
             (lockup_info.lp_units_locked.full_mul(res.balance)
-                / Uint256::from(terraswap_migrated_amount))
+                / Uint256::from(pool_info.terraswap_amount_in_lockups))
             .try_into()?
         };
 
@@ -1466,6 +1466,8 @@ pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
         withdrawal_window: config.withdrawal_window,
         min_lock_duration: config.min_lock_duration,
         max_lock_duration: config.max_lock_duration,
+        weekly_multiplier: config.weekly_multiplier,
+        weekly_divider: config.weekly_divider,
         lockdrop_incentives: config.lockdrop_incentives,
     })
 }
@@ -1487,6 +1489,7 @@ pub fn query_pool(deps: Deps, terraswap_lp_token: String) -> StdResult<PoolRespo
     let pool_info: PoolInfo = ASSET_POOLS.load(deps.storage, &terraswap_lp_token)?;
     Ok(PoolResponse {
         terraswap_pool: pool_info.terraswap_pool,
+        terraswap_amount_in_lockups: pool_info.terraswap_amount_in_lockups,
         migration_info: pool_info.migration_info,
         incentives_share: pool_info.incentives_share,
         weighted_amount: pool_info.weighted_amount,
@@ -1546,9 +1549,7 @@ pub fn query_lockup_info(
     let mut astroport_lp_units: Option<Uint128> = None;
     let mut astroport_lp_token_opt: Option<Addr> = None;
     if let Some(MigrationInfo {
-        astroport_lp_token,
-        terraswap_migrated_amount,
-        ..
+        astroport_lp_token, ..
     }) = pool_info.migration_info
     {
         astroport_lp_units = Some({
@@ -1559,7 +1560,7 @@ pub fn query_lockup_info(
                 },
             )?;
             (lockup_info.lp_units_locked.full_mul(res.balance)
-                / Uint256::from(terraswap_migrated_amount))
+                / Uint256::from(pool_info.terraswap_amount_in_lockups))
             .try_into()?
         });
         astroport_lp_token_opt = Some(astroport_lp_token);

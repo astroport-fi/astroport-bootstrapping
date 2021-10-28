@@ -58,6 +58,7 @@ pub struct State {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct PoolInfo {
     pub terraswap_pool: Addr,
+    pub terraswap_amount_in_lockups: Uint128,
     pub migration_info: Option<MigrationInfo>,
     /// Share of total ASTRO incentives allocated to this pool
     pub incentives_share: u64,
