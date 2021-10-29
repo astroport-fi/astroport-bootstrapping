@@ -4,21 +4,19 @@
   "type": "object",
   "required": [
     "astro_deposited",
-    "withdrawable_staking_incentives",
     "lp_shares",
     "total_auction_incentives",
     "user_reward_index",
     "ust_deposited",
     "withdrawable_auction_incentives",
     "withdrawable_lp_shares",
+    "withdrawable_staking_incentives",
     "withdrawn_auction_incentives",
-    "withdrawn_lp_shares"
+    "withdrawn_lp_shares",
+    "withdrawn_staking_incentives"
   ],
   "properties": {
     "astro_deposited": {
-      "$ref": "#/definitions/Uint256"
-    },
-    "withdrawable_staking_incentives": {
       "$ref": "#/definitions/Uint256"
     },
     "lp_shares": {
@@ -39,10 +37,16 @@
     "withdrawable_lp_shares": {
       "$ref": "#/definitions/Uint256"
     },
+    "withdrawable_staking_incentives": {
+      "$ref": "#/definitions/Uint256"
+    },
     "withdrawn_auction_incentives": {
       "$ref": "#/definitions/Uint256"
     },
     "withdrawn_lp_shares": {
+      "$ref": "#/definitions/Uint256"
+    },
+    "withdrawn_staking_incentives": {
       "$ref": "#/definitions/Uint256"
     }
   },

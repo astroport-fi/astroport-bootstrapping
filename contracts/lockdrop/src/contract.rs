@@ -1537,13 +1537,13 @@ pub fn query_user_info(deps: Deps, env: Env, user: String) -> StdResult<UserInfo
 pub fn query_lockup_info(
     deps: Deps,
     env: &Env,
-    user_address: &String,
+    user_address: &str,
     terraswap_lp_token: String,
     duration: u64,
 ) -> StdResult<LockUpInfoResponse> {
     let config = CONFIG.load(deps.storage)?;
     let terraswap_lp_token = deps.api.addr_validate(&terraswap_lp_token)?;
-    let user_address = deps.api.addr_validate(&user_address)?;
+    let user_address = deps.api.addr_validate(user_address)?;
     let lockup_key = (&terraswap_lp_token, &user_address, U64Key::new(duration));
     let pool_info = ASSET_POOLS.load(deps.storage, &terraswap_lp_token)?;
     let lockup_info = LOCKUP_INFO.load(deps.storage, lockup_key)?;
@@ -1709,7 +1709,7 @@ fn update_user_lockup_positions_and_calc_rewards(
         } else {
             // Weighted lockup balance (using terraswap LP units to calculate as pool's total weighted balance is calculated on terraswap LP deposits summed over each deposit tx)
             let weighted_lockup_balance =
-                calculate_weight(lockup_info.lp_units_locked, duration, &config);
+                calculate_weight(lockup_info.lp_units_locked, duration, config);
 
             // Calculate ASTRO Lockdrop rewards for the lockup position
             let lockup_astro_rewards = calculate_astro_incentives_for_lockup(

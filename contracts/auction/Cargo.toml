@@ -16,17 +16,6 @@ exclude = [
 [lib]
 crate-type = ["cdylib", "rlib"]
 
-[profile.release]
-opt-level = 3
-debug = false
-rpath = false
-lto = true
-debug-assertions = false
-codegen-units = 1
-panic = 'abort'
-incremental = false
-overflow-checks = true
-
 [features]
 # for more explicit tests, cargo test --features=backtraces
 backtraces = ["cosmwasm-std/backtraces"]
@@ -34,7 +23,7 @@ backtraces = ["cosmwasm-std/backtraces"]
 library = []
 
 [dependencies]
-astroport =  { path = "../../packages/astroport" }
+astroport = {git = "https://github.com/astroport-fi/astroport.git", branch = "master"}
 astroport-periphery =  { path = "../../packages/astroport_periphery" }
 
 cw20 = { version = "0.8" }
@@ -50,9 +39,9 @@ cosmwasm-schema = { version = "0.16.0" }
 cosmwasm-storage = { version = "0.16.0" }
 terra-multi-test = {git = "https://github.com/astroport-fi/terra-plus.git"}
 # needed for intergration testing
-astroport-pair =  { path = "../mocks/mock_astroport/pair" }
-astroport-token =  { path = "../mocks/mock_astroport/token" }
-astroport-vesting = {path = "../mocks/mock_astroport/vesting"}
-astroport-generator = {path = "../mocks/mock_astroport/generator"}
+astroport-pair = {git = "https://github.com/astroport-fi/astroport.git", branch = "master", package = "astroport-pair"}
+astroport-token = {git = "https://github.com/astroport-fi/astroport.git", branch = "master", package = "astroport-token"}
+astroport-vesting = {git = "https://github.com/astroport-fi/astroport.git", branch = "master", package = "astroport-vesting"}
+astroport-generator = {git = "https://github.com/astroport-fi/astroport.git", branch = "master", package = "astroport-generator"}
 astro-airdrop =  { path = "../airdrop" }
 astroport-lockdrop =  { path = "../lockdrop" }

@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "CallbackMsg",
-  "anyOf": [
+  "oneOf": [
     {
       "type": "object",
       "required": [
@@ -12,7 +12,8 @@
           "type": "object",
           "required": [
             "prev_astro_balance",
-            "user_address"
+            "user_address",
+            "withdraw_lp_shares"
           ],
           "properties": {
             "prev_astro_balance": {
@@ -20,6 +21,9 @@
             },
             "user_address": {
               "$ref": "#/definitions/Addr"
+            },
+            "withdraw_lp_shares": {
+              "$ref": "#/definitions/Uint256"
             }
           }
         }
