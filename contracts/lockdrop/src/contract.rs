@@ -632,7 +632,6 @@ pub fn handle_migrate_liquidity(
         astroport_lp_token,
         terraswap_migrated_amount: lp_balance.balance,
     });
-    pool_info.terraswap_amount_in_lockups = lp_balance.balance;
     ASSET_POOLS.save(deps.storage, &terraswap_lp_token, &pool_info)?;
 
     Ok(Response::new().add_messages(cosmos_msgs))
@@ -1203,7 +1202,7 @@ pub fn callback_withdraw_user_rewards_for_lockup_optional_withdraw(
     force_unlock: bool,
 ) -> StdResult<Response> {
     let config = CONFIG.load(deps.storage)?;
-    let pool_info = ASSET_POOLS.load(deps.storage, &terraswap_lp_token)?;
+    let mut pool_info = ASSET_POOLS.load(deps.storage, &terraswap_lp_token)?;
     let lockup_key = (&terraswap_lp_token, &user_address, U64Key::new(duration));
     let mut lockup_info = LOCKUP_INFO.load(deps.storage, lockup_key.clone())?;
 
@@ -1237,7 +1236,7 @@ pub fn callback_withdraw_user_rewards_for_lockup_optional_withdraw(
 
     if let Some(MigrationInfo {
         astroport_lp_token, ..
-    }) = pool_info.migration_info
+    }) = &pool_info.migration_info
     {
         let astroport_lp_amount: Uint128 = {
             let balance: Uint128 = if pool_info.is_staked {
@@ -1254,7 +1253,7 @@ pub fn callback_withdraw_user_rewards_for_lockup_optional_withdraw(
                 )?
             } else {
                 let res: BalanceResponse = deps.querier.query_wasm_smart(
-                    &astroport_lp_token,
+                    astroport_lp_token,
                     &Cw20QueryMsg::Balance {
                         address: env.contract.address.to_string(),
                     },
@@ -1360,6 +1359,8 @@ pub fn callback_withdraw_user_rewards_for_lockup_optional_withdraw(
                 })?,
                 funds: vec![],
             }));
+            pool_info.terraswap_amount_in_lockups -= lockup_info.lp_units_locked;
+            ASSET_POOLS.save(deps.storage, &terraswap_lp_token, &pool_info)?;
             event
                 .attributes
                 .push(attr("astroport_lp_unlocked", astroport_lp_amount));
