@@ -1,5 +1,4 @@
-use cosmwasm_bignumber::Decimal256;
-use cosmwasm_std::{to_binary, Addr, CosmosMsg, Decimal, StdResult, Uint128, WasmMsg};
+use cosmwasm_std::{to_binary, Addr, CosmosMsg, Decimal, Decimal256, StdResult, Uint128, WasmMsg};
 use cw20::Cw20ReceiveMsg;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};

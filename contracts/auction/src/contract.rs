@@ -946,3 +946,92 @@ pub fn build_unstake_from_generator_msg(
         funds: vec![],
     }))
 }
+
+//----------------------------------------------------------------------------------------
+// Query functions
+//----------------------------------------------------------------------------------------
+
+/// @dev Returns the airdrop configuration
+fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
+    let config = CONFIG.load(deps.storage)?;
+    Ok(ConfigResponse {
+        owner: config.owner.to_string(),
+        astro_token_address: config.astro_token_address.to_string(),
+        airdrop_contract_address: config.airdrop_contract_address.to_string(),
+        lp_token_address: config.lp_token_address.to_string(),
+        lockdrop_contract_address: config.lockdrop_contract_address.to_string(),
+        generator_contract: config.generator_contract.to_string(),
+        astro_rewards: config.astro_incentive_amount,
+        init_timestamp: config.init_timestamp,
+        deposit_window: config.deposit_window,
+        withdrawal_window: config.withdrawal_window,
+    })
+}
+
+/// @dev Returns the airdrop contract state
+fn query_state(deps: Deps) -> StdResult<StateResponse> {
+    let state = STATE.load(deps.storage)?;
+    Ok(StateResponse {
+        total_astro_delegated: state.total_astro_delegated,
+        total_ust_deposited: state.total_ust_deposited,
+        lp_shares_minted: state.lp_shares_minted,
+        lp_shares_claimed: state.lp_shares_claimed,
+        are_staked: state.are_staked,
+        global_reward_index: state.global_reward_index,
+    })
+}
+
+/// @dev Returns details around user's ASTRO Airdrop claim
+fn query_user_info(deps: Deps, _env: Env, user_address: String) -> StdResult<UserInfoResponse> {
+    let config = CONFIG.load(deps.storage)?;
+    let mut state = STATE.load(deps.storage)?;
+    let user_address = deps.api.addr_validate(&user_address)?;
+    let mut user_info = USERS
+        .may_load(deps.storage, &user_address)?
+        .unwrap_or_default();
+
+    if user_info.auction_incentive_amount.is_zero() {
+        user_info.auction_incentive_amount =
+            calculate_auction_reward_for_user(&state, &user_info, config.astro_incentive_amount);
+    }
+    let claimable_lp_shares =
+        calculate_withdrawable_lp_shares(_env.block.time.seconds(), &config, &state, &user_info);
+    let claimable_auction_reward = calculate_claimable_auction_reward_for_user(
+        _env.block.time.seconds(),
+        &config,
+        &state,
+        &user_info,
+    );
+    let mut claimable_staking_reward = Uint128::zero();
+
+    if state.are_staked {
+        let unclaimed_rewards_response: PendingTokenResponse = deps
+            .querier
+            .query(&QueryRequest::Wasm(WasmQuery::Smart {
+                contract_addr: config.generator_contract.to_string(),
+                msg: to_binary(&GenQueryMsg::PendingToken {
+                    lp_token: config.lp_token_address,
+                    user: _env.contract.address,
+                })
+                .unwrap(),
+            }))
+            .unwrap();
+        if unclaimed_rewards_response.pending > Uint128::zero() {
+            update_astro_rewards_index(&mut state, unclaimed_rewards_response.pending.into());
+            claimable_staking_reward = compute_user_accrued_reward(&state, &mut user_info);
+        }
+    }
+
+    Ok(UserInfoResponse {
+        astro_delegated: user_info.astro_delegated,
+        ust_deposited: user_info.ust_deposited,
+        lp_shares: user_info.lp_shares,
+        claimed_lp_shares: user_info.claimed_lp_shares,
+        claimable_lp_shares,
+        total_auction_incentives: user_info.total_auction_incentives,
+        claimed_auction_incentives: user_info.claimed_auction_incentives,
+        claimable_auction_incentives: claimable_auction_reward,
+        user_reward_index: user_info.user_reward_index,
+        claimable_staking_incentives: claimable_staking_reward,
+    })
+}
