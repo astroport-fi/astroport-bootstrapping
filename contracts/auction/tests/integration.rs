@@ -292,6 +292,12 @@ fn instantiate_airdrop_lockdrop_contracts(
         )
         .unwrap();
 
+    // open claim period for successful deposit
+    app.update_block(|b| {
+        b.height += 17280;
+        b.time = Timestamp::from_seconds(900_00)
+    });
+
     let lockdrop_instance = app
         .instantiate_contract(
             lockdrop_code_id,
@@ -302,6 +308,41 @@ fn instantiate_airdrop_lockdrop_contracts(
             None,
         )
         .unwrap();
+
+    mint_some_astro(
+        app,
+        owner.clone(),
+        astro_token_instance.clone(),
+        Uint128::new(100_000_00u128),
+        owner.to_string(),
+    );
+    app.execute_contract(
+        owner.clone(),
+        astro_token_instance.clone(),
+        &CW20ExecuteMsg::IncreaseAllowance {
+            spender: lockdrop_instance.clone().to_string(),
+            amount: Uint128::new(900_000_000_000),
+            expires: None,
+        },
+        &[],
+    )
+    .unwrap();
+
+    app.execute_contract(
+        owner,
+        lockdrop_instance.clone(),
+        &astroport_periphery::lockdrop::ExecuteMsg::UpdateConfig {
+            new_config: astroport_periphery::lockdrop::UpdateConfigMsg {
+                owner: None,
+                astro_token_address: Some(astro_token_instance.clone().into_string()),
+                auction_contract_address: None,
+                generator_address: None,
+                lockdrop_incentives: Some(Uint128::from(100_000_00u64)),
+            },
+        },
+        &[],
+    )
+    .unwrap();
 
     (airdrop_instance, lockdrop_instance)
 }
@@ -344,6 +385,17 @@ fn instantiate_generator_and_vesting(
         Uint128::new(900_000_000_000),
         owner.to_string(),
     );
+    app.execute_contract(
+        owner.clone(),
+        astro_token_instance.clone(),
+        &CW20ExecuteMsg::IncreaseAllowance {
+            spender: vesting_instance.clone().to_string(),
+            amount: Uint128::new(900_000_000_000),
+            expires: None,
+        },
+        &[],
+    )
+    .unwrap();
 
     // Generator
     let generator_contract = Box::new(

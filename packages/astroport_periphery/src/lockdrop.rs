@@ -78,7 +78,7 @@ pub enum ExecuteMsg {
         terraswap_lp_token: String,
         astroport_pool_addr: String,
     },
-    // // ADMIN Function ::: To stake LP Tokens with the generator contract
+    // ADMIN Function ::: To stake LP Tokens with the generator contract
     StakeLpTokens {
         terraswap_lp_token: String,
     },
@@ -86,21 +86,15 @@ pub enum ExecuteMsg {
     DelegateAstroToAuction {
         amount: Uint128,
     },
-    // Facilitates ASTRO reward withdrawal which have not been delegated to bootstrap auction
-    ClaimRewardsForLockup {
+    // Facilitates ASTRO reward withdrawal which have not been delegated to bootstrap auction along with optional Unlock (can be forceful)
+    // If withdraw_lp_stake is true and force_unlock is false, it Unlocks the lockup position if its lockup duration has concluded
+    // If both withdraw_lp_stake and force_unlock are true, it forcefully unlocks the positon. user needs to approve ASTRO Token to
+    // be transferred by the lockdrop contract to itself for forceful unlock
+    ClaimRewardsAndOptionallyUnlock {
         terraswap_lp_token: String,
         duration: u64,
-    },
-    // Unlocks a lockup position whose lockup duration has concluded
-    UnlockPosition {
-        terraswap_lp_token: String,
-        duration: u64,
-    },
-    // Unlocks a lockup position whose lockup duration has not concluded. user needs to approve ASTRO Token to
-    // be transferred by the lockdrop contract before calling this function
-    ForceUnlockPosition {
-        terraswap_lp_token: String,
-        duration: u64,
+        withdraw_lp_stake: bool,
+        force_unlock: bool,
     },
     /// Callbacks; only callable by the contract itself.
     Callback(CallbackMsg),
