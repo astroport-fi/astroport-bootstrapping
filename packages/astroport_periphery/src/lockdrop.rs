@@ -203,6 +203,8 @@ pub struct StateResponse {
     pub total_astro_returned_available: Uint128,
     /// Boolean value indicating if the user can withdraw thier ASTRO rewards or not
     pub are_claims_allowed: bool,
+    /// Vector containing LP addresses for all the supported LP Pools
+    pub supported_pairs_list: Vec<Addr>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
