@@ -1496,8 +1496,8 @@ pub fn query_state(deps: Deps) -> StdResult<StateResponse> {
         total_astro_returned_available: state.total_astro_returned_available,
         are_claims_allowed: state.are_claims_allowed,
         supported_pairs_list: ASSET_POOLS
-            .keys(deps.storage, None, None, Order::Ascending)
-            .map(|v| Addr::unchecked(String::from_utf8(v).expect("Addr deserialization error!")))
+            .range(deps.storage, None, None, Order::Ascending)
+            .map(|v| v.expect("Should be deserialized!").1.terraswap_pool)
             .collect(),
     })
 }
