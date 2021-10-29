@@ -37,7 +37,10 @@ pub fn instantiate(
 ) -> StdResult<Response> {
     // CHECK :: init_timestamp needs to be valid
     if env.block.time.seconds() > msg.init_timestamp {
-        return Err(StdError::generic_err("Invalid init_timestamp"));
+        return Err(StdError::generic_err(format!(
+            "Invalid init_timestamp. Current timestamp : {}",
+            env.block.time.seconds()
+        )));
     }
 
     // CHECK :: min_lock_duration , max_lock_duration need to be valid (min_lock_duration < max_lock_duration)
@@ -114,41 +117,19 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
             duration,
             amount,
         } => handle_withdraw_from_lockup(deps, env, info, terraswap_lp_token, duration, amount),
-        ExecuteMsg::ClaimRewardsForLockup {
+        ExecuteMsg::ClaimRewardsAndOptionallyUnlock {
             terraswap_lp_token,
             duration,
+            withdraw_lp_stake,
+            force_unlock,
         } => handle_claim_rewards_and_unlock_for_lockup(
             deps,
             env,
             info,
             terraswap_lp_token,
             duration,
-            false,
-            false,
-        ),
-        ExecuteMsg::UnlockPosition {
-            terraswap_lp_token,
-            duration,
-        } => handle_claim_rewards_and_unlock_for_lockup(
-            deps,
-            env,
-            info,
-            terraswap_lp_token,
-            duration,
-            true,
-            false,
-        ),
-        ExecuteMsg::ForceUnlockPosition {
-            terraswap_lp_token,
-            duration,
-        } => handle_claim_rewards_and_unlock_for_lockup(
-            deps,
-            env,
-            info,
-            terraswap_lp_token,
-            duration,
-            true,
-            true,
+            withdraw_lp_stake,
+            force_unlock,
         ),
 
         ExecuteMsg::Callback(msg) => _handle_callback(deps, env, info, msg),

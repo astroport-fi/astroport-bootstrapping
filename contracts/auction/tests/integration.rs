@@ -271,18 +271,14 @@ fn instantiate_airdrop_lockdrop_contracts(
     };
 
     let lockdrop_msg = astroport_periphery::lockdrop::InstantiateMsg {
-        owner: owner.clone().to_string(),
-        auction_contract_address: Some("auction_instance".to_string()),
-        generator_address: Some("generator_address".to_string()),
-        astro_token_address: Some(astro_token_instance.clone().into_string()),
+        owner: Some(owner.clone().to_string()),
         init_timestamp: 1_000_00,
         deposit_window: 100_000_00,
         withdrawal_window: 5_000_00,
-        min_duration: 1u64,
-        max_duration: 52u64,
-        seconds_per_week: 604800u64,
-        weekly_multiplier: Decimal256::from_ratio(1u64, 13u64),
-        lockdrop_incentives: Uint256::from(100_000_00u64),
+        min_lock_duration: 1u64,
+        max_lock_duration: 52u64,
+        weekly_multiplier: 1u64,
+        weekly_divider: 13u64,
     };
 
     let airdrop_instance = app
@@ -296,6 +292,12 @@ fn instantiate_airdrop_lockdrop_contracts(
         )
         .unwrap();
 
+    // open claim period for successful deposit
+    app.update_block(|b| {
+        b.height += 17280;
+        b.time = Timestamp::from_seconds(900_00)
+    });
+
     let lockdrop_instance = app
         .instantiate_contract(
             lockdrop_code_id,
@@ -306,6 +308,41 @@ fn instantiate_airdrop_lockdrop_contracts(
             None,
         )
         .unwrap();
+
+    mint_some_astro(
+        app,
+        owner.clone(),
+        astro_token_instance.clone(),
+        Uint128::new(100_000_00u128),
+        owner.to_string(),
+    );
+    app.execute_contract(
+        owner.clone(),
+        astro_token_instance.clone(),
+        &CW20ExecuteMsg::IncreaseAllowance {
+            spender: lockdrop_instance.clone().to_string(),
+            amount: Uint128::new(900_000_000_000),
+            expires: None,
+        },
+        &[],
+    )
+    .unwrap();
+
+    app.execute_contract(
+        owner,
+        lockdrop_instance.clone(),
+        &astroport_periphery::lockdrop::ExecuteMsg::UpdateConfig {
+            new_config: astroport_periphery::lockdrop::UpdateConfigMsg {
+                owner: None,
+                astro_token_address: Some(astro_token_instance.clone().into_string()),
+                auction_contract_address: None,
+                generator_address: None,
+                lockdrop_incentives: Some(Uint128::from(100_000_00u64)),
+            },
+        },
+        &[],
+    )
+    .unwrap();
 
     (airdrop_instance, lockdrop_instance)
 }
@@ -348,6 +385,17 @@ fn instantiate_generator_and_vesting(
         Uint128::new(900_000_000_000),
         owner.to_string(),
     );
+    app.execute_contract(
+        owner.clone(),
+        astro_token_instance.clone(),
+        &CW20ExecuteMsg::IncreaseAllowance {
+            spender: vesting_instance.clone().to_string(),
+            amount: Uint128::new(900_000_000_000),
+            expires: None,
+        },
+        &[],
+    )
+    .unwrap();
 
     // Generator
     let generator_contract = Box::new(
