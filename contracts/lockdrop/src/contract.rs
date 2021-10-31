@@ -72,6 +72,7 @@ pub fn instantiate(
         total_astro_delegated: Uint128::zero(),
         total_astro_returned_available: Uint128::zero(),
         are_claims_allowed: false,
+        supported_pairs_list: vec![],
     };
 
     CONFIG.save(deps.storage, &config)?;
@@ -251,7 +252,7 @@ pub fn handle_update_config(
     // CHECK ::: Configuration can only be updated before claims are enabled
     if state.are_claims_allowed {
         return Err(StdError::generic_err(
-            "ASTRO tokens are live. Incentives % cannot be updated now",
+            "ASTRO tokens are live. Configuration cannot be updated now",
         ));
     }
 
@@ -375,6 +376,7 @@ pub fn handle_initialize_pool(
     ASSET_POOLS.save(deps.storage, &terraswap_lp_token, &pool_info)?;
 
     state.total_incentives_share += incentives_share;
+    state.supported_pairs_list.push(terraswap_lp_token.clone());
     STATE.save(deps.storage, &state)?;
 
     Ok(Response::new().add_event(
@@ -1477,10 +1479,7 @@ pub fn query_state(deps: Deps) -> StdResult<StateResponse> {
         total_astro_delegated: state.total_astro_delegated,
         total_astro_returned_available: state.total_astro_returned_available,
         are_claims_allowed: state.are_claims_allowed,
-        supported_pairs_list: ASSET_POOLS
-            .range(deps.storage, None, None, Order::Ascending)
-            .map(|v| v.expect("Should be deserialized!").1.terraswap_pool)
-            .collect(),
+        supported_pairs_list: state.supported_pairs_list,
     })
 }
 
@@ -1638,7 +1637,7 @@ fn calculate_max_withdrawal_percent_allowed(current_timestamp: u64, config: &Con
 /// @dev Helper function to calculate ASTRO rewards for a particular Lockup position
 /// @params lockup_weighted_balance : Lockup position's weighted terraswap LP balance
 /// @params total_weighted_amount : Total weighted terraswap LP balance of the Pool
-/// @params incentives_share : Share of total ASTRO incentives allocated to this pool
+/// @params pool_incentives_share : Share of total ASTRO incentives allocated to this pool
 /// @params total_incentives_share: Calculated total incentives share for allocating among pools
 /// @params total_lockdrop_incentives : Total ASTRO incentives to be distributed among Lockdrop participants
 pub fn calculate_astro_incentives_for_lockup(

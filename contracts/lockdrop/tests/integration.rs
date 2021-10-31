@@ -1,10 +1,14 @@
+use std::ops::Add;
+
 use astroport_periphery::lockdrop::{
-    ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, QueryMsg, StateResponse,
+    ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, PoolResponse, QueryMsg, StateResponse,
     UpdateConfigMsg, UserInfoResponse,
 };
 use cosmwasm_bignumber::Uint256;
 use cosmwasm_std::testing::{mock_env, MockApi, MockQuerier, MockStorage};
-use cosmwasm_std::{attr, to_binary, Addr, Coin, Timestamp, Uint128, Uint64};
+use cosmwasm_std::{
+    attr, to_binary, Addr, Coin, Decimal, Timestamp, Uint128, Uint256 as CUint256, Uint64,
+};
 use cw20_base::msg::ExecuteMsg as CW20ExecuteMsg;
 use terra_multi_test::{App, BankKeeper, ContractWrapper, Executor, TerraMockQuerier};
 
@@ -175,7 +179,6 @@ fn instantiate_generator_and_vesting(
     mut app: &mut App,
     owner: Addr,
     astro_token_instance: Addr,
-    lp_token_instance: Addr,
 ) -> (Addr, Addr) {
     // Vesting
     let vesting_contract = Box::new(ContractWrapper::new(
@@ -297,19 +300,19 @@ fn instantiate_generator_and_vesting(
     app.execute_contract(owner.clone(), vesting_instance.clone(), &msg, &[])
         .unwrap();
 
-    let msg = astroport::generator::ExecuteMsg::Add {
-        alloc_point: Uint64::from(10u64),
-        reward_proxy: None,
-        lp_token: lp_token_instance.clone(),
-        with_update: true,
-    };
-    app.execute_contract(
-        Addr::unchecked(owner.clone()),
-        generator_instance.clone(),
-        &msg,
-        &[],
-    )
-    .unwrap();
+    // let msg = astroport::generator::ExecuteMsg::Add {
+    //     alloc_point: Uint64::from(10u64),
+    //     reward_proxy: None,
+    //     lp_token: lp_token_instance.clone(),
+    //     with_update: true,
+    // };
+    // app.execute_contract(
+    //     Addr::unchecked(owner.clone()),
+    //     generator_instance.clone(),
+    //     &msg,
+    //     &[],
+    // )
+    // .unwrap();
 
     (generator_instance, vesting_instance)
 }
@@ -403,7 +406,6 @@ fn instantiate_lockdrop_contract(app: &mut App, owner: Addr) -> (Addr, Instantia
         weekly_divider: 12u64,
     };
 
-    // open claim period for successful deposit
     app.update_block(|b| {
         b.height += 17280;
         b.time = Timestamp::from_seconds(900_00)
@@ -423,10 +425,109 @@ fn instantiate_lockdrop_contract(app: &mut App, owner: Addr) -> (Addr, Instantia
     (lockdrop_instance, lockdrop_instantiate_msg)
 }
 
+// Instantiate
+fn instantiate_all_contracts(
+    mut app: &mut App,
+    owner: Addr,
+) -> (Addr, Addr, Addr, Addr, UpdateConfigMsg) {
+    let (lockdrop_instance, lockdrop_instantiate_msg) =
+        instantiate_lockdrop_contract(&mut app, owner.clone());
+
+    let astro_token = instantiate_astro_token(&mut app, owner.clone());
+
+    // Initiate Terraswap
+    let terraswap_factory_instance = instantiate_terraswap(&mut app, owner.clone());
+
+    // Initiate ASTRO-UST Pair on Astroport
+    let astroport_factory_instance = instantiate_astroport(&mut app, owner.clone());
+    let pair_info = [
+        astroport::asset::AssetInfo::Token {
+            contract_addr: astro_token.clone(),
+        },
+        astroport::asset::AssetInfo::NativeToken {
+            denom: "uusd".to_string(),
+        },
+    ];
+    app.execute_contract(
+        Addr::unchecked("user"),
+        astroport_factory_instance.clone(),
+        &astroport::factory::ExecuteMsg::CreatePair {
+            asset_infos: pair_info.clone(),
+            init_hook: None,
+            pair_type: astroport::factory::PairType::Xyk {},
+        },
+        &[],
+    )
+    .unwrap();
+    let pair_resp: astroport::asset::PairInfo = app
+        .wrap()
+        .query_wasm_smart(
+            &astroport_factory_instance,
+            &astroport::factory::QueryMsg::Pair {
+                asset_infos: pair_info.clone(),
+            },
+        )
+        .unwrap();
+    let pool_address = pair_resp.contract_addr;
+    let lp_token_address = pair_resp.liquidity_token;
+
+    // Initiate Auction contract
+    let (auction_contract, _) = instantiate_auction_contract(
+        &mut app,
+        owner.clone(),
+        astro_token.clone(),
+        Addr::unchecked("auction_instance"),
+        lockdrop_instance.clone(),
+        pool_address,
+        lp_token_address,
+    );
+
+    let (generator_address, _) =
+        instantiate_generator_and_vesting(&mut app, owner.clone(), astro_token.clone());
+
+    let update_msg = UpdateConfigMsg {
+        owner: None,
+        astro_token_address: Some(astro_token.to_string()),
+        auction_contract_address: Some(auction_contract.to_string()),
+        generator_address: Some(generator_address.to_string()),
+        lockdrop_incentives: Some(Uint128::from(1000000000u64)),
+    };
+    app.execute_contract(
+        owner.clone(),
+        astro_token.clone(),
+        &CW20ExecuteMsg::IncreaseAllowance {
+            spender: lockdrop_instance.clone().to_string(),
+            amount: Uint128::new(1000000000u128),
+            expires: None,
+        },
+        &[],
+    )
+    .unwrap();
+
+    app.execute_contract(
+        owner.clone(),
+        lockdrop_instance.clone(),
+        &ExecuteMsg::UpdateConfig {
+            new_config: update_msg.clone(),
+        },
+        &[],
+    )
+    .unwrap();
+
+    return (
+        astro_token,
+        lockdrop_instance,
+        astroport_factory_instance,
+        terraswap_factory_instance,
+        update_msg,
+    );
+}
+
 #[test]
 fn proper_initialization_lockdrop() {
     let mut app = mock_app();
     let owner = Addr::unchecked("contract_owner");
+
     let (lockdrop_instance, lockdrop_instantiate_msg) =
         instantiate_lockdrop_contract(&mut app, owner);
 
@@ -474,4 +575,546 @@ fn proper_initialization_lockdrop() {
     assert_eq!(Uint128::zero(), resp.total_astro_delegated);
     assert_eq!(Uint128::zero(), resp.total_astro_returned_available);
     assert_eq!(false, resp.are_claims_allowed);
+}
+
+#[test]
+fn test_update_config() {
+    let mut app = mock_app();
+    let owner = Addr::unchecked("contract_owner");
+
+    let (lockdrop_instance, lockdrop_instantiate_msg) =
+        instantiate_lockdrop_contract(&mut app, owner.clone());
+
+    let astro_token = instantiate_astro_token(&mut app, owner.clone());
+
+    // Initiate ASTRO-UST Pair on Astroport
+    let astroport_factory_instance = instantiate_astroport(&mut app, owner.clone());
+    let pair_info = [
+        astroport::asset::AssetInfo::Token {
+            contract_addr: astro_token.clone(),
+        },
+        astroport::asset::AssetInfo::NativeToken {
+            denom: "uusd".to_string(),
+        },
+    ];
+    app.execute_contract(
+        Addr::unchecked("user"),
+        astroport_factory_instance.clone(),
+        &astroport::factory::ExecuteMsg::CreatePair {
+            asset_infos: pair_info.clone(),
+            init_hook: None,
+            pair_type: astroport::factory::PairType::Xyk {},
+        },
+        &[],
+    )
+    .unwrap();
+    let pair_resp: astroport::asset::PairInfo = app
+        .wrap()
+        .query_wasm_smart(
+            &astroport_factory_instance,
+            &astroport::factory::QueryMsg::Pair {
+                asset_infos: pair_info.clone(),
+            },
+        )
+        .unwrap();
+    let pool_address = pair_resp.contract_addr;
+    let lp_token_address = pair_resp.liquidity_token;
+
+    // Initiate Auction contract
+    let (auction_contract, _) = instantiate_auction_contract(
+        &mut app,
+        owner.clone(),
+        astro_token.clone(),
+        Addr::unchecked("auction_instance"),
+        lockdrop_instance.clone(),
+        pool_address,
+        lp_token_address,
+    );
+
+    let (generator_address, _) =
+        instantiate_generator_and_vesting(&mut app, owner.clone(), astro_token.clone());
+
+    let update_msg = UpdateConfigMsg {
+        owner: Some("new_owner".to_string()),
+        astro_token_address: Some(astro_token.to_string()),
+        auction_contract_address: Some(auction_contract.to_string()),
+        generator_address: Some(generator_address.to_string()),
+        lockdrop_incentives: Some(Uint128::from(1000000000u64)),
+    };
+
+    // ######    ERROR :: Unauthorized     ######
+    let err = app
+        .execute_contract(
+            Addr::unchecked("wrong_owner"),
+            lockdrop_instance.clone(),
+            &ExecuteMsg::UpdateConfig {
+                new_config: update_msg.clone(),
+            },
+            &[],
+        )
+        .unwrap_err();
+    assert_eq!(err.to_string(), "Generic error: Unauthorized");
+
+    // ######    ERROR :: No allowance for this account     ######
+    let err = app
+        .execute_contract(
+            owner.clone(),
+            lockdrop_instance.clone(),
+            &ExecuteMsg::UpdateConfig {
+                new_config: update_msg.clone(),
+            },
+            &[],
+        )
+        .unwrap_err();
+    assert_eq!(err.to_string(), "No allowance for this account");
+
+    // ######    SUCCESS :: Should have successfully updated   ######
+
+    app.execute_contract(
+        owner.clone(),
+        astro_token.clone(),
+        &CW20ExecuteMsg::IncreaseAllowance {
+            spender: lockdrop_instance.clone().to_string(),
+            amount: Uint128::new(1000000000u128),
+            expires: None,
+        },
+        &[],
+    )
+    .unwrap();
+
+    app.execute_contract(
+        owner.clone(),
+        lockdrop_instance.clone(),
+        &ExecuteMsg::UpdateConfig {
+            new_config: update_msg.clone(),
+        },
+        &[],
+    )
+    .unwrap();
+    let resp: ConfigResponse = app
+        .wrap()
+        .query_wasm_smart(&lockdrop_instance, &QueryMsg::Config {})
+        .unwrap();
+
+    assert_eq!(update_msg.clone().owner.unwrap(), resp.owner);
+    assert_eq!(
+        update_msg.clone().astro_token_address.unwrap(),
+        resp.astro_token.unwrap()
+    );
+    assert_eq!(
+        update_msg.clone().auction_contract_address.unwrap(),
+        resp.auction_contract.unwrap()
+    );
+    assert_eq!(
+        update_msg.clone().generator_address.unwrap(),
+        resp.generator.unwrap()
+    );
+    assert_eq!(
+        update_msg.clone().lockdrop_incentives.unwrap(),
+        resp.lockdrop_incentives.unwrap()
+    );
+
+    // ######    ERROR :: ASTRO is already being distributed     ######
+
+    app.update_block(|b| {
+        b.height += 17280;
+        b.time = Timestamp::from_seconds(10600001)
+    });
+
+    let err = app
+        .execute_contract(
+            Addr::unchecked("new_owner".to_string()),
+            lockdrop_instance.clone(),
+            &ExecuteMsg::UpdateConfig {
+                new_config: update_msg.clone(),
+            },
+            &[],
+        )
+        .unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        "Generic error: ASTRO is already being distributed"
+    );
+
+    // ######    ERROR :: ASTRO tokens are live. Configuration cannot be updated now     ######
+    app.execute_contract(
+        Addr::unchecked(auction_contract),
+        lockdrop_instance.clone(),
+        &ExecuteMsg::EnableClaims {},
+        &[],
+    )
+    .unwrap();
+
+    let err = app
+        .execute_contract(
+            Addr::unchecked("new_owner".to_string()),
+            lockdrop_instance.clone(),
+            &ExecuteMsg::UpdateConfig {
+                new_config: update_msg.clone(),
+            },
+            &[],
+        )
+        .unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        "Generic error: ASTRO tokens are live. Configuration cannot be updated now"
+    );
+}
+
+#[test]
+fn test_initialize_pool() {
+    let mut app = mock_app();
+    let owner = Addr::unchecked("contract_owner");
+
+    let (_, lockdrop_instance, _, _, update_msg) =
+        instantiate_all_contracts(&mut app, owner.clone());
+
+    // Terraswap LP Token
+    let terraswap_token_contract = Box::new(ContractWrapper::new(
+        terraswap_token::contract::execute,
+        terraswap_token::contract::instantiate,
+        terraswap_token::contract::query,
+    ));
+    let terraswap_token_code_id = app.store_code(terraswap_token_contract);
+
+    let terraswap_token_instance = app
+        .instantiate_contract(
+            terraswap_token_code_id,
+            Addr::unchecked("user".to_string()),
+            &terraswap::token::InstantiateMsg {
+                name: "terraswap liquidity token".to_string(),
+                symbol: "uLP".to_string(),
+                decimals: 6,
+                initial_balances: vec![],
+                mint: Some(cw20::MinterResponse {
+                    minter: "pair_instance".to_string(),
+                    cap: None,
+                }),
+            },
+            &[],
+            String::from("terraswap_lp_token"),
+            None,
+        )
+        .unwrap();
+
+    let initialize_pool_msg = astroport_periphery::lockdrop::ExecuteMsg::InitializePool {
+        terraswap_lp_token: terraswap_token_instance.to_string(),
+        incentives_share: 10000000u64,
+    };
+
+    // ######    ERROR :: Unauthorized     ######
+    let err = app
+        .execute_contract(
+            Addr::unchecked("wrong_owner"),
+            lockdrop_instance.clone(),
+            &initialize_pool_msg,
+            &[],
+        )
+        .unwrap_err();
+    assert_eq!(err.to_string(), "Generic error: Unauthorized");
+
+    // ######    SUCCESS :: SHOULD SUCCESSFULLY INITIALIZE     ######
+    app.execute_contract(
+        owner.clone(),
+        lockdrop_instance.clone(),
+        &initialize_pool_msg,
+        &[],
+    )
+    .unwrap();
+    // check state
+    let state_resp: StateResponse = app
+        .wrap()
+        .query_wasm_smart(&lockdrop_instance, &QueryMsg::State {})
+        .unwrap();
+    assert_eq!(10000000u64, state_resp.total_incentives_share);
+    assert_eq!(Uint128::zero(), state_resp.total_astro_delegated);
+    assert_eq!(Uint128::zero(), state_resp.total_astro_returned_available);
+    assert_eq!(false, state_resp.are_claims_allowed);
+    assert_eq!(
+        vec![terraswap_token_instance.clone()],
+        state_resp.supported_pairs_list
+    );
+    // check Pool Info
+    let pool_resp: PoolResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &lockdrop_instance,
+            &QueryMsg::Pool {
+                terraswap_lp_token: terraswap_token_instance.clone().to_string(),
+            },
+        )
+        .unwrap();
+    assert_eq!("pair_instance".to_string(), pool_resp.terraswap_pool);
+    assert_eq!(Uint128::zero(), pool_resp.terraswap_amount_in_lockups);
+    assert_eq!(None, pool_resp.migration_info);
+    assert_eq!(10000000u64, pool_resp.incentives_share);
+    assert_eq!(CUint256::zero(), pool_resp.weighted_amount);
+    assert_eq!(Decimal::zero(), pool_resp.generator_astro_per_share);
+    assert_eq!(Decimal::zero(), pool_resp.generator_proxy_per_share);
+    assert_eq!(false, pool_resp.is_staked);
+
+    // ######    ERROR :: Already supported     ######
+    let err = app
+        .execute_contract(
+            owner.clone(),
+            lockdrop_instance.clone(),
+            &initialize_pool_msg,
+            &[],
+        )
+        .unwrap_err();
+    assert_eq!(err.to_string(), "Generic error: Already supported");
+
+    // ######    SUCCESS :: SHOULD SUCCESSFULLY INITIALIZE #2    ######
+
+    let terraswap_token_instance2 = app
+        .instantiate_contract(
+            terraswap_token_code_id,
+            Addr::unchecked("user".to_string()),
+            &terraswap::token::InstantiateMsg {
+                name: "terraswap liquidity token #2".to_string(),
+                symbol: "uLP".to_string(),
+                decimals: 6,
+                initial_balances: vec![],
+                mint: Some(cw20::MinterResponse {
+                    minter: "pair_instance#2".to_string(),
+                    cap: None,
+                }),
+            },
+            &[],
+            String::from("terraswap_lp_token#2"),
+            None,
+        )
+        .unwrap();
+
+    app.execute_contract(
+        owner.clone(),
+        lockdrop_instance.clone(),
+        &astroport_periphery::lockdrop::ExecuteMsg::InitializePool {
+            terraswap_lp_token: terraswap_token_instance2.to_string(),
+            incentives_share: 10400000u64,
+        },
+        &[],
+    )
+    .unwrap();
+    // check state
+    let state_resp: StateResponse = app
+        .wrap()
+        .query_wasm_smart(&lockdrop_instance, &QueryMsg::State {})
+        .unwrap();
+    assert_eq!(20400000u64, state_resp.total_incentives_share);
+    assert_eq!(
+        vec![
+            terraswap_token_instance.clone(),
+            terraswap_token_instance2.clone()
+        ],
+        state_resp.supported_pairs_list
+    );
+    // check Pool Info
+    let pool_resp: PoolResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &lockdrop_instance,
+            &QueryMsg::Pool {
+                terraswap_lp_token: terraswap_token_instance2.clone().to_string(),
+            },
+        )
+        .unwrap();
+    assert_eq!("pair_instance#2".to_string(), pool_resp.terraswap_pool);
+    assert_eq!(Uint128::zero(), pool_resp.terraswap_amount_in_lockups);
+    assert_eq!(None, pool_resp.migration_info);
+    assert_eq!(10400000u64, pool_resp.incentives_share);
+
+    // ######    ERROR :: Pools cannot be added post deposit window closure     ######
+    app.update_block(|b| {
+        b.height += 17280;
+        b.time = Timestamp::from_seconds(900000_00)
+    });
+    let err = app
+        .execute_contract(
+            owner.clone(),
+            lockdrop_instance.clone(),
+            &initialize_pool_msg,
+            &[],
+        )
+        .unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        "Generic error: Pools cannot be added post deposit window closure"
+    );
+}
+
+#[test]
+fn test_update_pool() {
+    let mut app = mock_app();
+    let owner = Addr::unchecked("contract_owner");
+
+    let (_, lockdrop_instance, _, _, update_msg) =
+        instantiate_all_contracts(&mut app, owner.clone());
+
+    // Terraswap LP Token
+    let terraswap_token_contract = Box::new(ContractWrapper::new(
+        terraswap_token::contract::execute,
+        terraswap_token::contract::instantiate,
+        terraswap_token::contract::query,
+    ));
+    let terraswap_token_code_id = app.store_code(terraswap_token_contract);
+
+    let terraswap_token_instance = app
+        .instantiate_contract(
+            terraswap_token_code_id,
+            Addr::unchecked("user".to_string()),
+            &terraswap::token::InstantiateMsg {
+                name: "terraswap liquidity token".to_string(),
+                symbol: "uLP".to_string(),
+                decimals: 6,
+                initial_balances: vec![],
+                mint: Some(cw20::MinterResponse {
+                    minter: "pair_instance".to_string(),
+                    cap: None,
+                }),
+            },
+            &[],
+            String::from("terraswap_lp_token"),
+            None,
+        )
+        .unwrap();
+
+    // SUCCESSFULLY INITIALIZES POOL
+    app.execute_contract(
+        owner.clone(),
+        lockdrop_instance.clone(),
+        &astroport_periphery::lockdrop::ExecuteMsg::InitializePool {
+            terraswap_lp_token: terraswap_token_instance.to_string(),
+            incentives_share: 10000000u64,
+        },
+        &[],
+    )
+    .unwrap();
+
+    // ######    ERROR :: Unauthorized     ######
+    let err = app
+        .execute_contract(
+            Addr::unchecked("wrong_owner"),
+            lockdrop_instance.clone(),
+            &astroport_periphery::lockdrop::ExecuteMsg::UpdatePool {
+                terraswap_lp_token: terraswap_token_instance.to_string(),
+                incentives_share: 3434543u64,
+            },
+            &[],
+        )
+        .unwrap_err();
+    assert_eq!(err.to_string(), "Generic error: Unauthorized");
+
+    // ######    SUCCESS :: SHOULD SUCCESSFULLY UPDATE POOL     ######
+    app.execute_contract(
+        owner.clone(),
+        lockdrop_instance.clone(),
+        &astroport_periphery::lockdrop::ExecuteMsg::UpdatePool {
+            terraswap_lp_token: terraswap_token_instance.to_string(),
+            incentives_share: 3434543u64,
+        },
+        &[],
+    )
+    .unwrap();
+    // check state
+    let state_resp: StateResponse = app
+        .wrap()
+        .query_wasm_smart(&lockdrop_instance, &QueryMsg::State {})
+        .unwrap();
+    assert_eq!(3434543u64, state_resp.total_incentives_share);
+    assert_eq!(Uint128::zero(), state_resp.total_astro_delegated);
+    assert_eq!(Uint128::zero(), state_resp.total_astro_returned_available);
+    assert_eq!(false, state_resp.are_claims_allowed);
+    assert_eq!(
+        vec![terraswap_token_instance.clone()],
+        state_resp.supported_pairs_list
+    );
+    // check Pool Info
+    let pool_resp: PoolResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &lockdrop_instance,
+            &QueryMsg::Pool {
+                terraswap_lp_token: terraswap_token_instance.clone().to_string(),
+            },
+        )
+        .unwrap();
+    assert_eq!("pair_instance".to_string(), pool_resp.terraswap_pool);
+    assert_eq!(Uint128::zero(), pool_resp.terraswap_amount_in_lockups);
+    assert_eq!(None, pool_resp.migration_info);
+    assert_eq!(3434543u64, pool_resp.incentives_share);
+    assert_eq!(CUint256::zero(), pool_resp.weighted_amount);
+    assert_eq!(Decimal::zero(), pool_resp.generator_astro_per_share);
+    assert_eq!(Decimal::zero(), pool_resp.generator_proxy_per_share);
+    assert_eq!(false, pool_resp.is_staked);
+
+    // ######    ERROR :: Pools cannot be added post deposit window closure     ######
+    app.update_block(|b| {
+        b.height += 17280;
+        b.time = Timestamp::from_seconds(900000_00)
+    });
+    let err = app
+        .execute_contract(
+            owner.clone(),
+            lockdrop_instance.clone(),
+            &astroport_periphery::lockdrop::ExecuteMsg::UpdatePool {
+                terraswap_lp_token: terraswap_token_instance.to_string(),
+                incentives_share: 3434543u64,
+            },
+            &[],
+        )
+        .unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        "Generic error: Pools cannot be updated post deposit window closure"
+    );
+}
+
+#[test]
+fn test_increase_lockup() {
+    let mut app = mock_app();
+    let owner = Addr::unchecked("contract_owner");
+
+    let (_, lockdrop_instance, _, _, update_msg) =
+        instantiate_all_contracts(&mut app, owner.clone());
+
+    // Terraswap LP Token
+    let terraswap_token_contract = Box::new(ContractWrapper::new(
+        terraswap_token::contract::execute,
+        terraswap_token::contract::instantiate,
+        terraswap_token::contract::query,
+    ));
+    let terraswap_token_code_id = app.store_code(terraswap_token_contract);
+
+    let terraswap_token_instance = app
+        .instantiate_contract(
+            terraswap_token_code_id,
+            Addr::unchecked("user".to_string()),
+            &terraswap::token::InstantiateMsg {
+                name: "terraswap liquidity token".to_string(),
+                symbol: "uLP".to_string(),
+                decimals: 6,
+                initial_balances: vec![],
+                mint: Some(cw20::MinterResponse {
+                    minter: "pair_instance".to_string(),
+                    cap: None,
+                }),
+            },
+            &[],
+            String::from("terraswap_lp_token"),
+            None,
+        )
+        .unwrap();
+
+    // SUCCESSFULLY INITIALIZES POOL
+    app.execute_contract(
+        owner.clone(),
+        lockdrop_instance.clone(),
+        &astroport_periphery::lockdrop::ExecuteMsg::InitializePool {
+            terraswap_lp_token: terraswap_token_instance.to_string(),
+            incentives_share: 10000000u64,
+        },
+        &[],
+    )
+    .unwrap();
 }

@@ -53,6 +53,7 @@ pub struct State {
     pub total_astro_returned_available: Uint128,
     /// Boolean value indicating if the user can withdraw their ASTRO rewards or not
     pub are_claims_allowed: bool,
+    pub supported_pairs_list: Vec<Addr>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
