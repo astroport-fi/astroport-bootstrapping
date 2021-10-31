@@ -28,13 +28,27 @@ library = []
 astroport = {git = "https://github.com/astroport-fi/astroport.git", branch = "master"}
 astroport-periphery =  { path = "../../packages/astroport_periphery" }
 terraswap = "2.4.0"
-
+cw20-base = { version = "0.8", features = ["library"] }
 cosmwasm-std = { version = "0.16.0", features = ["iterator"] }
 cw20 = { version = "0.8" } 
 cw-storage-plus = "0.8"
-
+cosmwasm-bignumber = "2.2.0"
 schemars = "0.8.3"
 serde = { version = "1.0.127", default-features = false, features = ["derive"] }
 
 [dev-dependencies]
 cosmwasm-schema = { version = "0.16.0" }
+terra-multi-test = {git = "https://github.com/astroport-fi/terra-plus.git"}
+terraswap = "2.4.0"
+# Terraswap contracts
+terraswap-factory = {git = "https://github.com/terraswap/terraswap.git", branch = "main", package = "terraswap-factory"}
+terraswap-pair = {git = "https://github.com/terraswap/terraswap.git", branch = "main", package = "terraswap-pair"}
+terraswap-token = {git = "https://github.com/terraswap/terraswap.git", branch = "main", package = "terraswap-token"}
+# Astroport contracts
+astroport-factory = {git = "https://github.com/astroport-fi/astroport.git", branch = "master", package = "astroport-factory"}
+astroport-pair = {git = "https://github.com/astroport-fi/astroport.git", branch = "master", package = "astroport-pair"}
+astroport-pair-stable = {git = "https://github.com/astroport-fi/astroport.git", branch = "master", package = "astroport-pair-stable"}
+astroport-token = {git = "https://github.com/astroport-fi/astroport.git", branch = "master", package = "astroport-token"}
+astroport-vesting = {git = "https://github.com/astroport-fi/astroport.git", branch = "master", package = "astroport-vesting"}
+astroport-generator = {git = "https://github.com/astroport-fi/astroport.git", branch = "master", package = "astroport-generator"}
+astro-auction = {path = "../auction"}
