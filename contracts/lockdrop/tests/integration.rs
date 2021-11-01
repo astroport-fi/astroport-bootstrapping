@@ -1141,8 +1141,9 @@ fn test_increase_lockup() {
     .unwrap();
 
     let user_address = "user".to_string();
+    let user2_address = "user2".to_string();
 
-    // Mint some LP tokens to user
+    // Mint some LP tokens to user#1
     app.execute_contract(
         Addr::unchecked("pair_instance".to_string()),
         terraswap_token_instance.clone(),
@@ -1158,6 +1159,28 @@ fn test_increase_lockup() {
         terraswap_token_instance2.clone(),
         &cw20::Cw20ExecuteMsg::Mint {
             recipient: user_address.clone(),
+            amount: Uint128::from(100000000u128),
+        },
+        &[],
+    )
+    .unwrap();
+
+    // Mint some LP tokens to user#2
+    app.execute_contract(
+        Addr::unchecked("pair_instance".to_string()),
+        terraswap_token_instance.clone(),
+        &cw20::Cw20ExecuteMsg::Mint {
+            recipient: user2_address.clone(),
+            amount: Uint128::from(124231343u128),
+        },
+        &[],
+    )
+    .unwrap();
+    app.execute_contract(
+        Addr::unchecked("pair2_instance".to_string()),
+        terraswap_token_instance2.clone(),
+        &cw20::Cw20ExecuteMsg::Mint {
+            recipient: user2_address.clone(),
             amount: Uint128::from(100000000u128),
         },
         &[],
@@ -1240,18 +1263,17 @@ fn test_increase_lockup() {
     );
 
     // ######    SUCCESS :: SHOULD SUCCESSFULLY DEPOSIT LP TOKENS INTO POOL     ######
-    let success_resp = app
-        .execute_contract(
-            Addr::unchecked(user_address.clone()),
-            terraswap_token_instance.clone(),
-            &cw20::Cw20ExecuteMsg::Send {
-                contract: lockdrop_instance.clone().to_string(),
-                amount: Uint128::from(10000u128),
-                msg: to_binary(&lockdrop::Cw20HookMsg::IncreaseLockup { duration: 5u64 }).unwrap(),
-            },
-            &[],
-        )
-        .unwrap();
+    app.execute_contract(
+        Addr::unchecked(user_address.clone()),
+        terraswap_token_instance.clone(),
+        &cw20::Cw20ExecuteMsg::Send {
+            contract: lockdrop_instance.clone().to_string(),
+            amount: Uint128::from(10000u128),
+            msg: to_binary(&lockdrop::Cw20HookMsg::IncreaseLockup { duration: 5u64 }).unwrap(),
+        },
+        &[],
+    )
+    .unwrap();
 
     // check Pool Info
     let pool_resp: PoolResponse = app
@@ -1307,4 +1329,440 @@ fn test_increase_lockup() {
     assert_eq!(13624000u64, user_resp.lockup_infos[0].unlock_timestamp);
     assert_eq!(None, user_resp.lockup_infos[0].astroport_lp_units);
     assert_eq!(None, user_resp.lockup_infos[0].astroport_lp_token);
+
+    // ######    SUCCESS :: SHOULD SUCCESSFULLY DEPOSIT LP TOKENS INTO POOL (2nd USER)     ######
+    app.execute_contract(
+        Addr::unchecked(user2_address.clone()),
+        terraswap_token_instance.clone(),
+        &cw20::Cw20ExecuteMsg::Send {
+            contract: lockdrop_instance.clone().to_string(),
+            amount: Uint128::from(10000u128),
+            msg: to_binary(&lockdrop::Cw20HookMsg::IncreaseLockup { duration: 10u64 }).unwrap(),
+        },
+        &[],
+    )
+    .unwrap();
+
+    // check Pool Info
+    let pool_resp: PoolResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &lockdrop_instance,
+            &QueryMsg::Pool {
+                terraswap_lp_token: terraswap_token_instance.clone().to_string(),
+            },
+        )
+        .unwrap();
+    assert_eq!(
+        Uint128::from(20000u128),
+        pool_resp.terraswap_amount_in_lockups
+    );
+    assert_eq!(CUint256::from(30833u64), pool_resp.weighted_amount);
+
+    // check User Info
+    let user_resp: UserInfoResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &lockdrop_instance,
+            &QueryMsg::UserInfo {
+                address: user2_address.clone(),
+            },
+        )
+        .unwrap();
+    assert_eq!(Uint128::from(567573703u64), user_resp.total_astro_rewards);
+    assert_eq!(
+        Uint128::from(10000u128),
+        user_resp.lockup_infos[0].lp_units_locked
+    );
+    assert_eq!(
+        user_resp.total_astro_rewards,
+        user_resp.lockup_infos[0].astro_rewards
+    );
+    assert_eq!(16648000u64, user_resp.lockup_infos[0].unlock_timestamp);
+
+    // check User#1 Info (ASTRO rewards should be the latest one)
+    let user_resp: UserInfoResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &lockdrop_instance,
+            &QueryMsg::UserInfo {
+                address: user_address.clone(),
+            },
+        )
+        .unwrap();
+    assert_eq!(Uint128::from(432426296u128), user_resp.total_astro_rewards);
+    assert_eq!(
+        Uint128::from(10000u128),
+        user_resp.lockup_infos[0].lp_units_locked
+    );
+
+    // ######    SUCCESS :: SHOULD SUCCESSFULLY AGAIN DEPOSIT LP TOKENS INTO POOL     ######
+    app.execute_contract(
+        Addr::unchecked(user_address.clone()),
+        terraswap_token_instance.clone(),
+        &cw20::Cw20ExecuteMsg::Send {
+            contract: lockdrop_instance.clone().to_string(),
+            amount: Uint128::from(10u128),
+            msg: to_binary(&lockdrop::Cw20HookMsg::IncreaseLockup { duration: 51u64 }).unwrap(),
+        },
+        &[],
+    )
+    .unwrap();
+
+    // check Pool Info
+    let pool_resp: PoolResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &lockdrop_instance,
+            &QueryMsg::Pool {
+                terraswap_lp_token: terraswap_token_instance.clone().to_string(),
+            },
+        )
+        .unwrap();
+    assert_eq!(
+        Uint128::from(20010u128),
+        pool_resp.terraswap_amount_in_lockups
+    );
+
+    // check User Info
+    let user_resp: UserInfoResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &lockdrop_instance,
+            &QueryMsg::UserInfo {
+                address: user_address.clone(),
+            },
+        )
+        .unwrap();
+    assert_eq!(
+        Uint128::from(10u128),
+        user_resp.lockup_infos[1].lp_units_locked
+    );
+    assert_eq!(51u64, user_resp.lockup_infos[1].duration);
+    assert_eq!(Uint128::from(433363553u128), user_resp.total_astro_rewards);
+
+    // ######    ERROR :: Deposit window closed   ######
+    app.update_block(|b| {
+        b.height += 17280;
+        b.time = Timestamp::from_seconds(900_000000)
+    });
+
+    let err = app
+        .execute_contract(
+            Addr::unchecked(user_address.clone()),
+            terraswap_token_instance.clone(),
+            &cw20::Cw20ExecuteMsg::Send {
+                contract: lockdrop_instance.clone().to_string(),
+                amount: Uint128::from(100u128),
+                msg: to_binary(&lockdrop::Cw20HookMsg::IncreaseLockup { duration: 5u64 }).unwrap(),
+            },
+            &[],
+        )
+        .unwrap_err();
+    assert_eq!(err.to_string(), "Generic error: Deposit window closed");
+}
+
+#[test]
+fn test_withdraw_from_lockup() {
+    let mut app = mock_app();
+    let owner = Addr::unchecked("contract_owner");
+
+    let (_, lockdrop_instance, _, _, update_msg) =
+        instantiate_all_contracts(&mut app, owner.clone());
+
+    // Terraswap LP Token
+    let terraswap_token_contract = Box::new(ContractWrapper::new(
+        terraswap_token::contract::execute,
+        terraswap_token::contract::instantiate,
+        terraswap_token::contract::query,
+    ));
+    let terraswap_token_code_id = app.store_code(terraswap_token_contract);
+
+    // LP Token #1
+    let terraswap_token_instance = app
+        .instantiate_contract(
+            terraswap_token_code_id,
+            Addr::unchecked("user".to_string()),
+            &terraswap::token::InstantiateMsg {
+                name: "terraswap liquidity token".to_string(),
+                symbol: "uLP".to_string(),
+                decimals: 6,
+                initial_balances: vec![],
+                mint: Some(cw20::MinterResponse {
+                    minter: "pair_instance".to_string(),
+                    cap: None,
+                }),
+            },
+            &[],
+            String::from("terraswap_lp_token"),
+            None,
+        )
+        .unwrap();
+
+    // SUCCESSFULLY INITIALIZES POOL
+    app.execute_contract(
+        owner.clone(),
+        lockdrop_instance.clone(),
+        &astroport_periphery::lockdrop::ExecuteMsg::InitializePool {
+            terraswap_lp_token: terraswap_token_instance.to_string(),
+            incentives_share: 10000000u64,
+        },
+        &[],
+    )
+    .unwrap();
+
+    let user_address = "user".to_string();
+    let user2_address = "user2".to_string();
+
+    // Mint some LP tokens to user#1
+    app.execute_contract(
+        Addr::unchecked("pair_instance".to_string()),
+        terraswap_token_instance.clone(),
+        &cw20::Cw20ExecuteMsg::Mint {
+            recipient: user_address.clone(),
+            amount: Uint128::from(124231343u128),
+        },
+        &[],
+    )
+    .unwrap();
+
+    // Deposit into Lockup Position
+
+    app.update_block(|b| {
+        b.height += 17280;
+        b.time = Timestamp::from_seconds(1_000_00)
+    });
+
+    app.execute_contract(
+        Addr::unchecked(user_address.clone()),
+        terraswap_token_instance.clone(),
+        &cw20::Cw20ExecuteMsg::Send {
+            contract: lockdrop_instance.clone().to_string(),
+            amount: Uint128::from(10000000u128),
+            msg: to_binary(&lockdrop::Cw20HookMsg::IncreaseLockup { duration: 10u64 }).unwrap(),
+        },
+        &[],
+    )
+    .unwrap();
+
+    // ######    ERROR :: Invalid withdrawal request   ######
+
+    let err = app
+        .execute_contract(
+            Addr::unchecked(user_address.clone()),
+            lockdrop_instance.clone(),
+            &ExecuteMsg::WithdrawFromLockup {
+                terraswap_lp_token: terraswap_token_instance.clone().to_string(),
+                amount: Uint128::from(0u128),
+                duration: 1u64,
+            },
+            &[],
+        )
+        .unwrap_err();
+    assert_eq!(err.to_string(), "Generic error: Invalid withdrawal request");
+
+    // ######    ERROR :: LP Token not supported   ######
+
+    let err = app
+        .execute_contract(
+            Addr::unchecked(user_address.clone()),
+            lockdrop_instance.clone(),
+            &ExecuteMsg::WithdrawFromLockup {
+                terraswap_lp_token: "wrong_terraswap_token_instance".to_string(),
+                amount: Uint128::from(10u128),
+                duration: 1u64,
+            },
+            &[],
+        )
+        .unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        "astroport_lockdrop::state::PoolInfo not found"
+    );
+
+    // ######    ERROR :: Invalid lockup position   ######
+
+    let err = app
+        .execute_contract(
+            Addr::unchecked(user_address.clone()),
+            lockdrop_instance.clone(),
+            &ExecuteMsg::WithdrawFromLockup {
+                terraswap_lp_token: terraswap_token_instance.clone().to_string(),
+                amount: Uint128::from(10u128),
+                duration: 1u64,
+            },
+            &[],
+        )
+        .unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        "astroport_lockdrop::state::LockupInfo not found"
+    );
+
+    // ######    SUCCESS :: SHOULD SUCCESSFULLY WITHDRAW LP TOKENS FROM POOL     ######
+    app.execute_contract(
+        Addr::unchecked(user_address.clone()),
+        lockdrop_instance.clone(),
+        &ExecuteMsg::WithdrawFromLockup {
+            terraswap_lp_token: terraswap_token_instance.clone().to_string(),
+            amount: Uint128::from(10000000u128),
+            duration: 10u64,
+        },
+        &[],
+    )
+    .unwrap();
+
+    // check Pool Info
+    let pool_resp: PoolResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &lockdrop_instance,
+            &QueryMsg::Pool {
+                terraswap_lp_token: terraswap_token_instance.clone().to_string(),
+            },
+        )
+        .unwrap();
+    assert_eq!(Uint128::from(0u128), pool_resp.terraswap_amount_in_lockups);
+    assert_eq!(CUint256::from(0u64), pool_resp.weighted_amount);
+
+    // check User Info
+    let user_resp: UserInfoResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &lockdrop_instance,
+            &QueryMsg::UserInfo {
+                address: user_address.clone(),
+            },
+        )
+        .unwrap();
+    assert_eq!(Uint128::from(0u128), user_resp.total_astro_rewards);
+    assert_eq!(Uint128::zero(), user_resp.delegated_astro_rewards);
+    assert_eq!(0, user_resp.lockup_infos.len());
+
+    // Deposit Again into Lockup
+    app.execute_contract(
+        Addr::unchecked(user_address.clone()),
+        terraswap_token_instance.clone(),
+        &cw20::Cw20ExecuteMsg::Send {
+            contract: lockdrop_instance.clone().to_string(),
+            amount: Uint128::from(10000000u128),
+            msg: to_binary(&lockdrop::Cw20HookMsg::IncreaseLockup { duration: 10u64 }).unwrap(),
+        },
+        &[],
+    )
+    .unwrap();
+
+    // ######    ERROR :: Amount exceeds maximum allowed withdrawal limit of {}    ######
+    // First half of withdrawal window
+    app.update_block(|b| {
+        b.height += 17280;
+        b.time = Timestamp::from_seconds(10350000)
+    });
+
+    let err = app
+        .execute_contract(
+            Addr::unchecked(user_address.clone()),
+            lockdrop_instance.clone(),
+            &ExecuteMsg::WithdrawFromLockup {
+                terraswap_lp_token: terraswap_token_instance.clone().to_string(),
+                amount: Uint128::from(5000001u128),
+                duration: 10u64,
+            },
+            &[],
+        )
+        .unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        "Generic error: Amount exceeds maximum allowed withdrawal limit of 5000000"
+    );
+
+    // 2nd half of withdrawal window
+    app.update_block(|b| {
+        b.height += 17280;
+        b.time = Timestamp::from_seconds(10390000)
+    });
+
+    let err = app
+        .execute_contract(
+            Addr::unchecked(user_address.clone()),
+            lockdrop_instance.clone(),
+            &ExecuteMsg::WithdrawFromLockup {
+                terraswap_lp_token: terraswap_token_instance.clone().to_string(),
+                amount: Uint128::from(5000001u128),
+                duration: 10u64,
+            },
+            &[],
+        )
+        .unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        "Generic error: Amount exceeds maximum allowed withdrawal limit of 4200000"
+    );
+
+    // ######    SUCCESS :: SHOULD SUCCESSFULLY WITHDRAW LP TOKENS FROM POOL     ######
+    app.execute_contract(
+        Addr::unchecked(user_address.clone()),
+        lockdrop_instance.clone(),
+        &ExecuteMsg::WithdrawFromLockup {
+            terraswap_lp_token: terraswap_token_instance.clone().to_string(),
+            amount: Uint128::from(4200000u128),
+            duration: 10u64,
+        },
+        &[],
+    )
+    .unwrap();
+
+    // check Pool Info
+    let pool_resp: PoolResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &lockdrop_instance,
+            &QueryMsg::Pool {
+                terraswap_lp_token: terraswap_token_instance.clone().to_string(),
+            },
+        )
+        .unwrap();
+    assert_eq!(
+        Uint128::from(5800000u128),
+        pool_resp.terraswap_amount_in_lockups
+    );
+    assert_eq!(CUint256::from(10150000u64), pool_resp.weighted_amount);
+
+    // check User Info
+    let user_resp: UserInfoResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &lockdrop_instance,
+            &QueryMsg::UserInfo {
+                address: user_address.clone(),
+            },
+        )
+        .unwrap();
+    assert_eq!(Uint128::from(1000000000u128), user_resp.total_astro_rewards);
+    assert_eq!(1, user_resp.lockup_infos.len());
+    assert_eq!(1, user_resp.lockup_infos.len());
+    assert_eq!(
+        Uint128::from(5800000u128),
+        user_resp.lockup_infos[0].lp_units_locked
+    );
+    assert_eq!(true, user_resp.lockup_infos[0].withdrawal_flag);
+
+    // ######    ERROR :: Amount exceeds maximum allowed withdrawal limit of {}    ######
+
+    let err = app
+        .execute_contract(
+            Addr::unchecked(user_address.clone()),
+            lockdrop_instance.clone(),
+            &ExecuteMsg::WithdrawFromLockup {
+                terraswap_lp_token: terraswap_token_instance.clone().to_string(),
+                amount: Uint128::from(1u128),
+                duration: 10u64,
+            },
+            &[],
+        )
+        .unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        "Generic error: Withdrawal already happened. No more withdrawals accepted"
+    );
 }

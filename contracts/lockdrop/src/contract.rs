@@ -804,7 +804,7 @@ pub fn handle_withdraw_from_lockup(
     let max_withdrawal_allowed = lockup_info.lp_units_locked * max_withdrawal_percent;
     if amount > max_withdrawal_allowed {
         return Err(StdError::generic_err(format!(
-            "Amount exceeds maximum allowed withdrawal limit of {} ",
+            "Amount exceeds maximum allowed withdrawal limit of {}",
             max_withdrawal_allowed
         )));
     }
@@ -1493,8 +1493,6 @@ pub fn query_pool(deps: Deps, terraswap_lp_token: String) -> StdResult<PoolRespo
 
 /// @dev Returns summarized details regarding the user
 pub fn query_user_info(deps: Deps, env: Env, user: String) -> StdResult<UserInfoResponse> {
-    let config = CONFIG.load(deps.storage)?;
-    let state = STATE.load(deps.storage)?;
     let user_address = deps.api.addr_validate(&user)?;
     let user_info = USER_INFO
         .may_load(deps.storage, &user_address)?
@@ -1634,7 +1632,7 @@ fn calculate_max_withdrawal_percent_allowed(current_timestamp: u64, config: &Con
         let time_left = withdrawal_cutoff_final - current_timestamp;
         Decimal::from_ratio(
             50u64 * time_left,
-            withdrawal_cutoff_final - withdrawal_cutoff_second_point,
+            100u64 * (withdrawal_cutoff_final - withdrawal_cutoff_second_point),
         )
     }
     // Withdrawals not allowed
