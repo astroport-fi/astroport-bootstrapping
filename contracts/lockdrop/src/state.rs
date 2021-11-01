@@ -86,7 +86,7 @@ pub struct LockupInfo {
     /// Boolean value indicating if the user's has withdrawn funds post the only 1 withdrawal limit cutoff
     pub withdrawal_flag: bool,
     /// ASTRO tokens received as rewards for participation in the lockdrop
-    pub astro_rewards: Option<Uint128>,
+    pub astro_rewards: Uint128,
     /// ASTRO tokens transferred to user
     pub astro_transferred: bool,
     /// Generator ASTRO tokens loockup received as generator rewards

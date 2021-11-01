@@ -241,11 +241,11 @@ pub struct LockUpInfoResponse {
     /// Boolean value indicating if the user's has withdrawn funds post the only 1 withdrawal limit cutoff
     pub withdrawal_flag: bool,
     /// ASTRO tokens received as rewards for participation in the lockdrop
-    pub astro_rewards: Option<Uint128>,
+    pub astro_rewards: Uint128,
     /// ASTRO tokens transferred to user
     pub astro_transferred: bool,
     pub duration: u64,
-    /// Generator ASTRO tokens loockup received as generator rewards
+    /// Generator ASTRO tokens lockup received as generator rewards
     pub generator_astro_debt: Uint128,
     /// Generator Proxy tokens lockup received as generator rewards
     pub generator_proxy_debt: Uint128,
