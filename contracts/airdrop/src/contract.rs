@@ -3,7 +3,9 @@ use astroport_periphery::airdrop::{
     UserInfoResponse,
 };
 use astroport_periphery::auction::Cw20HookMsg::DepositAstroTokens;
-use astroport_periphery::helpers::{build_send_cw20_token_msg, build_transfer_cw20_token_msg};
+use astroport_periphery::helpers::{
+    build_send_cw20_token_msg, build_transfer_cw20_token_msg, option_string_to_addr, zero_address,
+};
 use cosmwasm_std::{
     attr, entry_point, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdError,
     StdResult, Uint128,
@@ -49,7 +51,11 @@ pub fn instantiate(
         merkle_roots: msg.merkle_roots.unwrap_or_default(),
         from_timestamp,
         to_timestamp: msg.to_timestamp,
-        auction_contract_address: deps.api.addr_validate(&msg.auction_contract_address)?,
+        auction_contract_address: option_string_to_addr(
+            deps.api,
+            msg.auction_contract_address,
+            zero_address(),
+        )?,
         are_claims_enabled: false,
     };
 
@@ -425,7 +431,7 @@ fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
         merkle_roots: config.merkle_roots,
         from_timestamp: config.from_timestamp,
         to_timestamp: config.to_timestamp,
-        auction_contract_address: config.auction_contract_address.to_string(),
+        auction_contract_address: Some(config.auction_contract_address.to_string()),
         are_claims_allowed: config.are_claims_enabled,
     })
 }

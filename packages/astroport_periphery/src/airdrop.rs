@@ -9,7 +9,7 @@ pub struct InstantiateMsg {
     pub merkle_roots: Option<Vec<String>>,
     pub from_timestamp: Option<u64>,
     pub to_timestamp: u64,
-    pub auction_contract_address: String,
+    pub auction_contract_address: Option<String>,
     pub total_airdrop_size: Uint128,
 }
 
@@ -62,7 +62,7 @@ pub struct ConfigResponse {
     pub merkle_roots: Vec<String>,
     pub from_timestamp: u64,
     pub to_timestamp: u64,
-    pub auction_contract_address: String,
+    pub auction_contract_address: Option<String>,
     pub are_claims_allowed: bool,
 }
 

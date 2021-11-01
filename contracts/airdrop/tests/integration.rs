@@ -67,7 +67,7 @@ fn init_contracts(app: &mut App) -> (Addr, Addr, InstantiateMsg) {
         merkle_roots: Some(vec!["merkle_roots".to_string()]),
         from_timestamp: Some(1_000_00),
         to_timestamp: 100_000_00,
-        auction_contract_address: String::from("auction_contract_address"),
+        auction_contract_address: Some(String::from("auction_contract_address")),
         total_airdrop_size: Uint128::new(100_000_000_000),
     };
 
@@ -586,7 +586,7 @@ fn test_claim_by_terra_user() {
     enable_claims(
         &mut app,
         Addr::unchecked(airdrop_instance.clone()),
-        Addr::unchecked(init_msg.auction_contract_address),
+        Addr::unchecked(init_msg.auction_contract_address.unwrap()),
     );
 
     // ################################
@@ -808,7 +808,7 @@ fn test_enable_claims() {
     // ###### Should successfully enable claims ######
 
     app.execute_contract(
-        Addr::unchecked(init_msg.auction_contract_address.clone()),
+        Addr::unchecked(init_msg.auction_contract_address.clone().unwrap()),
         airdrop_instance.clone(),
         &msg,
         &[],
@@ -825,7 +825,7 @@ fn test_enable_claims() {
 
     resp_f = app
         .execute_contract(
-            Addr::unchecked(init_msg.auction_contract_address.clone()),
+            Addr::unchecked(init_msg.auction_contract_address.clone().unwrap()),
             airdrop_instance.clone(),
             &msg,
             &[],
@@ -1012,7 +1012,7 @@ fn test_withdraw_airdrop_rewards() {
     enable_claims(
         &mut app,
         Addr::unchecked(airdrop_instance.clone()),
-        Addr::unchecked(init_msg.auction_contract_address),
+        Addr::unchecked(init_msg.auction_contract_address.unwrap()),
     );
 
     // Should be a success
