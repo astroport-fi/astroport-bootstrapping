@@ -179,7 +179,12 @@ pub fn handle_enable_claims(deps: DepsMut, info: MessageInfo) -> StdResult<Respo
     let mut config = CONFIG.load(deps.storage)?;
 
     // CHECK :: ONLY AUCTION CONTRACT CAN CALL THIS FUNCTION
-    if info.sender != config.auction_contract_address.clone().unwrap() {
+    if info.sender
+        != config
+            .auction_contract_address
+            .clone()
+            .expect("Auction contract not set")
+    {
         return Err(StdError::generic_err("Unauthorized"));
     }
 
@@ -300,7 +305,10 @@ pub fn handle_delegate_astro_to_bootstrap_auction(
     })?;
 
     let delegate_msg = build_send_cw20_token_msg(
-        config.auction_contract_address.unwrap().to_string(),
+        config
+            .auction_contract_address
+            .expect("Auction contract not set")
+            .to_string(),
         config.astro_token_address.to_string(),
         amount_to_delegate,
         msg,
