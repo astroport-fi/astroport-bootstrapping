@@ -107,6 +107,7 @@ dependencies = [
  "astroport-periphery",
  "astroport-token",
  "astroport-vesting",
+ "cosmwasm-bignumber",
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-storage-plus 0.8.1",

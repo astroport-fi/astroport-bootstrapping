@@ -1,15 +1,15 @@
-use std::ops::Add;
-
 use astroport_periphery::lockdrop::{
-    self, ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, PoolResponse, QueryMsg,
-    StateResponse, UpdateConfigMsg, UserInfoResponse,
+    self, ConfigResponse, ExecuteMsg, InstantiateMsg, PoolResponse, QueryMsg, StateResponse,
+    UpdateConfigMsg, UserInfoResponse,
 };
 use cosmwasm_bignumber::Uint256;
 use cosmwasm_std::testing::{mock_env, MockApi, MockQuerier, MockStorage};
 use cosmwasm_std::{
-    attr, to_binary, Addr, Coin, Decimal, Timestamp, Uint128, Uint256 as CUint256, Uint64,
+    attr, to_binary, Addr, Decimal, Timestamp, Uint128, Uint256 as CUint256, Uint64,
 };
-use cw20_base::msg::ExecuteMsg as CW20ExecuteMsg;
+
+use astroport::token::InstantiateMsg as TokenInstantiateMsg;
+use cw20::Cw20ExecuteMsg;
 use terra_multi_test::{App, BankKeeper, ContractWrapper, Executor, TerraMockQuerier};
 
 fn mock_app() -> App {
@@ -25,14 +25,14 @@ fn mock_app() -> App {
 // Instantiate ASTRO Token Contract
 fn instantiate_astro_token(app: &mut App, owner: Addr) -> Addr {
     let astro_token_contract = Box::new(ContractWrapper::new(
-        cw20_base::contract::execute,
-        cw20_base::contract::instantiate,
-        cw20_base::contract::query,
+        astroport_token::contract::execute,
+        astroport_token::contract::instantiate,
+        astroport_token::contract::query,
     ));
 
     let astro_token_code_id = app.store_code(astro_token_contract);
 
-    let msg = cw20_base::msg::InstantiateMsg {
+    let msg = TokenInstantiateMsg {
         name: String::from("Astro token"),
         symbol: String::from("ASTRO"),
         decimals: 6,
@@ -41,7 +41,7 @@ fn instantiate_astro_token(app: &mut App, owner: Addr) -> Addr {
             minter: owner.to_string(),
             cap: None,
         }),
-        marketing: None,
+        init_hook: None,
     };
 
     let astro_token_instance = app
@@ -214,7 +214,7 @@ fn instantiate_generator_and_vesting(
     app.execute_contract(
         owner.clone(),
         astro_token_instance.clone(),
-        &CW20ExecuteMsg::IncreaseAllowance {
+        &Cw20ExecuteMsg::IncreaseAllowance {
             spender: vesting_instance.clone().to_string(),
             amount: Uint128::new(900_000_000_000),
             expires: None,
@@ -275,7 +275,7 @@ fn instantiate_generator_and_vesting(
 
     let amount = Uint128::new(630720000000);
 
-    let msg = CW20ExecuteMsg::IncreaseAllowance {
+    let msg = Cw20ExecuteMsg::IncreaseAllowance {
         spender: vesting_instance.clone().to_string(),
         amount,
         expires: None,
@@ -430,7 +430,7 @@ fn instantiate_all_contracts(
     mut app: &mut App,
     owner: Addr,
 ) -> (Addr, Addr, Addr, Addr, UpdateConfigMsg) {
-    let (lockdrop_instance, lockdrop_instantiate_msg) =
+    let (lockdrop_instance, _lockdrop_instantiate_msg) =
         instantiate_lockdrop_contract(&mut app, owner.clone());
 
     let astro_token = instantiate_astro_token(&mut app, owner.clone());
@@ -495,7 +495,7 @@ fn instantiate_all_contracts(
     app.execute_contract(
         owner.clone(),
         astro_token.clone(),
-        &CW20ExecuteMsg::IncreaseAllowance {
+        &Cw20ExecuteMsg::IncreaseAllowance {
             spender: lockdrop_instance.clone().to_string(),
             amount: Uint128::new(1000000000u128),
             expires: None,
@@ -582,7 +582,7 @@ fn test_update_config() {
     let mut app = mock_app();
     let owner = Addr::unchecked("contract_owner");
 
-    let (lockdrop_instance, lockdrop_instantiate_msg) =
+    let (lockdrop_instance, _lockdrop_instantiate_msg) =
         instantiate_lockdrop_contract(&mut app, owner.clone());
 
     let astro_token = instantiate_astro_token(&mut app, owner.clone());
@@ -673,7 +673,7 @@ fn test_update_config() {
     app.execute_contract(
         owner.clone(),
         astro_token.clone(),
-        &CW20ExecuteMsg::IncreaseAllowance {
+        &Cw20ExecuteMsg::IncreaseAllowance {
             spender: lockdrop_instance.clone().to_string(),
             amount: Uint128::new(1000000000u128),
             expires: None,
@@ -766,7 +766,7 @@ fn test_initialize_pool() {
     let mut app = mock_app();
     let owner = Addr::unchecked("contract_owner");
 
-    let (_, lockdrop_instance, _, _, update_msg) =
+    let (_, lockdrop_instance, _, _, _update_msg) =
         instantiate_all_contracts(&mut app, owner.clone());
 
     // Terraswap LP Token
@@ -904,8 +904,8 @@ fn test_initialize_pool() {
     assert_eq!(20400000u64, state_resp.total_incentives_share);
     assert_eq!(
         vec![
-            terraswap_token_instance.clone(),
-            terraswap_token_instance2.clone()
+            terraswap_token_instance2.clone(),
+            terraswap_token_instance.clone()
         ],
         state_resp.supported_pairs_list
     );
@@ -948,7 +948,7 @@ fn test_update_pool() {
     let mut app = mock_app();
     let owner = Addr::unchecked("contract_owner");
 
-    let (_, lockdrop_instance, _, _, update_msg) =
+    let (_, lockdrop_instance, _, _, _update_msg) =
         instantiate_all_contracts(&mut app, owner.clone());
 
     // Terraswap LP Token
@@ -1313,7 +1313,7 @@ fn test_increase_lockup() {
     );
     assert_eq!(false, user_resp.lockup_infos[0].withdrawal_flag);
     assert_eq!(
-        user_resp.total_astro_rewards,
+        Some(user_resp.total_astro_rewards),
         user_resp.lockup_infos[0].astro_rewards
     );
     assert_eq!(false, user_resp.lockup_infos[0].astro_transferred);
@@ -1375,7 +1375,7 @@ fn test_increase_lockup() {
         user_resp.lockup_infos[0].lp_units_locked
     );
     assert_eq!(
-        user_resp.total_astro_rewards,
+        Some(user_resp.total_astro_rewards),
         user_resp.lockup_infos[0].astro_rewards
     );
     assert_eq!(16648000u64, user_resp.lockup_infos[0].unlock_timestamp);
@@ -1467,7 +1467,7 @@ fn test_withdraw_from_lockup() {
     let mut app = mock_app();
     let owner = Addr::unchecked("contract_owner");
 
-    let (_, lockdrop_instance, _, _, update_msg) =
+    let (_, lockdrop_instance, _, _, _update_msg) =
         instantiate_all_contracts(&mut app, owner.clone());
 
     // Terraswap LP Token
@@ -1512,7 +1512,7 @@ fn test_withdraw_from_lockup() {
     .unwrap();
 
     let user_address = "user".to_string();
-    let user2_address = "user2".to_string();
+    let _user2_address = "user2".to_string();
 
     // Mint some LP tokens to user#1
     app.execute_contract(
@@ -1777,9 +1777,9 @@ fn test_withdraw_from_lockup() {
 
 //     // CW20 TOKEN :: Dummy token
 //     let cw20_contract = Box::new(ContractWrapper::new(
-//         cw20_base::contract::execute,
-//         cw20_base::contract::instantiate,
-//         cw20_base::contract::query,
+//         astroport_token::contract::execute,
+//         astroport_token::contract::instantiate,
+//         astroport_token::contract::query,
 //     ));
 
 //     let cw20_code_id = app.store_code(cw20_contract);
@@ -1788,7 +1788,7 @@ fn test_withdraw_from_lockup() {
 //         .instantiate_contract(
 //             cw20_code_id,
 //             owner.clone(),
-//             &cw20_base::msg::InstantiateMsg {
+//             &astroport_token::msg::InstantiateMsg {
 //                 name: String::from("ANC"),
 //                 symbol: String::from("ANC"),
 //                 decimals: 6,
