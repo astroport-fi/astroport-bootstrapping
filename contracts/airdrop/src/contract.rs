@@ -3,9 +3,7 @@ use astroport_periphery::airdrop::{
     UserInfoResponse,
 };
 use astroport_periphery::auction::Cw20HookMsg::DepositAstroTokens;
-use astroport_periphery::helpers::{
-    build_send_cw20_token_msg, build_transfer_cw20_token_msg, zero_address,
-};
+use astroport_periphery::helpers::{build_send_cw20_token_msg, build_transfer_cw20_token_msg};
 use cosmwasm_std::{
     attr, entry_point, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdError,
     StdResult, Uint128,
@@ -51,7 +49,7 @@ pub fn instantiate(
         merkle_roots: msg.merkle_roots.unwrap_or_default(),
         from_timestamp,
         to_timestamp: msg.to_timestamp,
-        auction_contract_address: zero_address(),
+        auction_contract_address: None,
         are_claims_enabled: false,
     };
 
@@ -143,7 +141,15 @@ pub fn handle_update_config(
     }
 
     if let Some(auction_contract_address) = auction_contract_address {
-        config.auction_contract_address = deps.api.addr_validate(&auction_contract_address)?;
+        match config.auction_contract_address {
+            Some(_) => {
+                return Err(StdError::generic_err("Auction contract already set."));
+            }
+            None => {
+                config.auction_contract_address =
+                    Some(deps.api.addr_validate(&auction_contract_address)?);
+            }
+        }
     }
 
     if let Some(merkle_roots) = merkle_roots {
@@ -173,7 +179,7 @@ pub fn handle_enable_claims(deps: DepsMut, info: MessageInfo) -> StdResult<Respo
     let mut config = CONFIG.load(deps.storage)?;
 
     // CHECK :: ONLY AUCTION CONTRACT CAN CALL THIS FUNCTION
-    if info.sender != config.auction_contract_address {
+    if info.sender != config.auction_contract_address.clone().unwrap() {
         return Err(StdError::generic_err("Unauthorized"));
     }
 
@@ -294,7 +300,7 @@ pub fn handle_delegate_astro_to_bootstrap_auction(
     })?;
 
     let delegate_msg = build_send_cw20_token_msg(
-        config.auction_contract_address.to_string(),
+        config.auction_contract_address.unwrap().to_string(),
         config.astro_token_address.to_string(),
         amount_to_delegate,
         msg,
@@ -427,7 +433,7 @@ fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
         merkle_roots: config.merkle_roots,
         from_timestamp: config.from_timestamp,
         to_timestamp: config.to_timestamp,
-        auction_contract_address: Some(config.auction_contract_address.to_string()),
+        auction_contract_address: config.auction_contract_address,
         are_claims_allowed: config.are_claims_enabled,
     })
 }
