@@ -4,7 +4,7 @@ use astroport_periphery::airdrop::{
 };
 use astroport_periphery::auction::Cw20HookMsg::DepositAstroTokens;
 use astroport_periphery::helpers::{
-    build_send_cw20_token_msg, build_transfer_cw20_token_msg, option_string_to_addr, zero_address,
+    build_send_cw20_token_msg, build_transfer_cw20_token_msg, zero_address,
 };
 use cosmwasm_std::{
     attr, entry_point, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdError,
@@ -51,11 +51,7 @@ pub fn instantiate(
         merkle_roots: msg.merkle_roots.unwrap_or_default(),
         from_timestamp,
         to_timestamp: msg.to_timestamp,
-        auction_contract_address: option_string_to_addr(
-            deps.api,
-            msg.auction_contract_address,
-            zero_address(),
-        )?,
+        auction_contract_address: zero_address(),
         are_claims_enabled: false,
     };
 
