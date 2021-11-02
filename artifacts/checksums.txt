@@ -1,0 +1,4 @@
+c6ce19ac03ea2dec647f76a1f417238d17fc75812e1e57dc7127c5e18e226a6a  astro_airdrop.wasm
+53fe04604dea9b57aab98e21180c2e5fc3b677ca4663956358fa7d4ed33102b8  astro_auction.wasm
+98d83fa0231d872558dc537cb171caeea581ad5941e6c72bf2c8afcd0cae6f96  astroport_lockdrop.wasm
+
