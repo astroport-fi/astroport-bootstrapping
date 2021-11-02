@@ -66,6 +66,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "astroport-factory"
+version = "0.0.0"
+source = "git+https://github.com/astroport-fi/astroport.git?branch=master#c13babefd606ad505701857467d4c8c6e03598ef"
+dependencies = [
+ "astroport",
+ "cosmwasm-std",
+ "cw-storage-plus 0.8.1",
+ "cw2",
+ "schemars",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "astroport-generator"
 version = "0.0.0"
 source = "git+https://github.com/astroport-fi/astroport.git?branch=master#c13babefd606ad505701857467d4c8c6e03598ef"
@@ -84,19 +98,48 @@ dependencies = [
 name = "astroport-lockdrop"
 version = "1.0.0"
 dependencies = [
+ "astro-auction",
  "astroport",
+ "astroport-factory",
+ "astroport-generator",
+ "astroport-pair",
+ "astroport-pair-stable",
  "astroport-periphery",
+ "astroport-token",
+ "astroport-vesting",
+ "cosmwasm-bignumber",
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-storage-plus 0.8.1",
  "cw20",
  "schemars",
  "serde",
- "terraswap",
+ "terra-multi-test",
+ "terraswap 2.4.0",
+ "terraswap-factory",
+ "terraswap-pair",
+ "terraswap-token",
 ]
 
 [[package]]
 name = "astroport-pair"
+version = "0.0.0"
+source = "git+https://github.com/astroport-fi/astroport.git?branch=master#c13babefd606ad505701857467d4c8c6e03598ef"
+dependencies = [
+ "astroport",
+ "cosmwasm-bignumber",
+ "cosmwasm-std",
+ "cw-storage-plus 0.8.1",
+ "cw2",
+ "cw20",
+ "integer-sqrt",
+ "schemars",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
+name = "astroport-pair-stable"
 version = "0.0.0"
 source = "git+https://github.com/astroport-fi/astroport.git?branch=master#c13babefd606ad505701857467d4c8c6e03598ef"
 dependencies = [
@@ -123,7 +166,7 @@ dependencies = [
  "schemars",
  "serde",
  "terra-cosmwasm",
- "terraswap",
+ "terraswap 2.4.0",
 ]
 
 [[package]]
@@ -429,6 +472,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "cw20-legacy"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6d27b11827323369993519abb494f3ae9b6aac4d716d058bea5e181b9b0074b7"
+dependencies = [
+ "cosmwasm-std",
+ "cosmwasm-storage",
+ "cw-storage-plus 0.8.1",
+ "cw0 0.8.1",
+ "cw2",
+ "cw20",
+ "cw20-base",
+ "schemars",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "der"
 version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -681,6 +742,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "protobuf"
+version = "2.25.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "47c327e191621a2158159df97cdbc2e7074bb4e940275e35abf38eb3d2595754"
+dependencies = [
+ "bytes",
+]
+
+[[package]]
 name = "quote"
 version = "1.0.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -928,6 +998,67 @@ dependencies = [
  "schemars",
  "serde",
  "terra-cosmwasm",
+]
+
+[[package]]
+name = "terraswap"
+version = "2.4.1"
+source = "git+https://github.com/terraswap/terraswap.git?branch=main#97cefa337798bdb0cba0327dd4152607839a5c77"
+dependencies = [
+ "cosmwasm-std",
+ "cosmwasm-storage",
+ "cw20",
+ "schemars",
+ "serde",
+ "terra-cosmwasm",
+]
+
+[[package]]
+name = "terraswap-factory"
+version = "0.0.0"
+source = "git+https://github.com/terraswap/terraswap.git?branch=main#97cefa337798bdb0cba0327dd4152607839a5c77"
+dependencies = [
+ "cosmwasm-std",
+ "cw-storage-plus 0.8.1",
+ "protobuf",
+ "schemars",
+ "serde",
+ "terraswap 2.4.1",
+]
+
+[[package]]
+name = "terraswap-pair"
+version = "0.0.0"
+source = "git+https://github.com/terraswap/terraswap.git?branch=main#97cefa337798bdb0cba0327dd4152607839a5c77"
+dependencies = [
+ "cosmwasm-bignumber",
+ "cosmwasm-std",
+ "cw-storage-plus 0.8.1",
+ "cw2",
+ "cw20",
+ "integer-sqrt",
+ "protobuf",
+ "schemars",
+ "serde",
+ "terraswap 2.4.1",
+ "thiserror",
+]
+
+[[package]]
+name = "terraswap-token"
+version = "0.0.0"
+source = "git+https://github.com/terraswap/terraswap.git?branch=main#97cefa337798bdb0cba0327dd4152607839a5c77"
+dependencies = [
+ "cosmwasm-std",
+ "cw-storage-plus 0.8.1",
+ "cw0 0.8.1",
+ "cw2",
+ "cw20",
+ "cw20-legacy",
+ "schemars",
+ "serde",
+ "terraswap 2.4.1",
+ "thiserror",
 ]
 
 [[package]]

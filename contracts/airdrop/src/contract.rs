@@ -49,7 +49,7 @@ pub fn instantiate(
         merkle_roots: msg.merkle_roots.unwrap_or_default(),
         from_timestamp,
         to_timestamp: msg.to_timestamp,
-        auction_contract_address: deps.api.addr_validate(&msg.auction_contract_address)?,
+        auction_contract_address: None,
         are_claims_enabled: false,
     };
 
@@ -141,7 +141,15 @@ pub fn handle_update_config(
     }
 
     if let Some(auction_contract_address) = auction_contract_address {
-        config.auction_contract_address = deps.api.addr_validate(&auction_contract_address)?;
+        match config.auction_contract_address {
+            Some(_) => {
+                return Err(StdError::generic_err("Auction contract already set."));
+            }
+            None => {
+                config.auction_contract_address =
+                    Some(deps.api.addr_validate(&auction_contract_address)?);
+            }
+        }
     }
 
     if let Some(merkle_roots) = merkle_roots {
@@ -171,7 +179,12 @@ pub fn handle_enable_claims(deps: DepsMut, info: MessageInfo) -> StdResult<Respo
     let mut config = CONFIG.load(deps.storage)?;
 
     // CHECK :: ONLY AUCTION CONTRACT CAN CALL THIS FUNCTION
-    if info.sender != config.auction_contract_address {
+    if info.sender
+        != config
+            .auction_contract_address
+            .clone()
+            .expect("Auction contract not set")
+    {
         return Err(StdError::generic_err("Unauthorized"));
     }
 
@@ -292,7 +305,10 @@ pub fn handle_delegate_astro_to_bootstrap_auction(
     })?;
 
     let delegate_msg = build_send_cw20_token_msg(
-        config.auction_contract_address.to_string(),
+        config
+            .auction_contract_address
+            .expect("Auction contract not set")
+            .to_string(),
         config.astro_token_address.to_string(),
         amount_to_delegate,
         msg,
@@ -425,7 +441,7 @@ fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
         merkle_roots: config.merkle_roots,
         from_timestamp: config.from_timestamp,
         to_timestamp: config.to_timestamp,
-        auction_contract_address: config.auction_contract_address.to_string(),
+        auction_contract_address: config.auction_contract_address,
         are_claims_allowed: config.are_claims_enabled,
     })
 }

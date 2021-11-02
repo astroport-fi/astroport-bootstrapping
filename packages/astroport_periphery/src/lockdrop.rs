@@ -245,7 +245,7 @@ pub struct LockUpInfoResponse {
     /// ASTRO tokens transferred to user
     pub astro_transferred: bool,
     pub duration: u64,
-    /// Generator ASTRO tokens loockup received as generator rewards
+    /// Generator ASTRO tokens lockup received as generator rewards
     pub generator_astro_debt: Uint128,
     /// Generator Proxy tokens lockup received as generator rewards
     pub generator_proxy_debt: Uint128,

@@ -251,7 +251,7 @@ pub fn handle_update_config(
     // CHECK ::: Configuration can only be updated before claims are enabled
     if state.are_claims_allowed {
         return Err(StdError::generic_err(
-            "ASTRO tokens are live. Incentives % cannot be updated now",
+            "ASTRO tokens are live. Configuration cannot be updated now",
         ));
     }
 
@@ -723,11 +723,6 @@ pub fn handle_increase_lockup(
         )));
     }
 
-    // CHECK ::: Amount needs to be valid
-    if amount.is_zero() {
-        return Err(StdError::generic_err("Amount must be greater than 0"));
-    }
-
     pool_info.weighted_amount += calculate_weight(amount, duration, &config);
     pool_info.terraswap_amount_in_lockups += amount;
 
@@ -807,7 +802,7 @@ pub fn handle_withdraw_from_lockup(
     let max_withdrawal_allowed = lockup_info.lp_units_locked * max_withdrawal_percent;
     if amount > max_withdrawal_allowed {
         return Err(StdError::generic_err(format!(
-            "Amount exceeds maximum allowed withdrawal limit of {} ",
+            "Amount exceeds maximum allowed withdrawal limit of {}",
             max_withdrawal_allowed
         )));
     }
@@ -1478,8 +1473,8 @@ pub fn query_state(deps: Deps) -> StdResult<StateResponse> {
         total_astro_returned_available: state.total_astro_returned_available,
         are_claims_allowed: state.are_claims_allowed,
         supported_pairs_list: ASSET_POOLS
-            .range(deps.storage, None, None, Order::Ascending)
-            .map(|v| v.expect("Should be deserialized!").1.terraswap_pool)
+            .keys(deps.storage, None, None, Order::Ascending)
+            .map(|v| Addr::unchecked(String::from_utf8(v).expect("Addr deserialization error!")))
             .collect(),
     })
 }
@@ -1542,11 +1537,12 @@ pub fn query_lockup_info(
     duration: u64,
 ) -> StdResult<LockUpInfoResponse> {
     let config = CONFIG.load(deps.storage)?;
+    let state = STATE.load(deps.storage)?;
     let terraswap_lp_token = deps.api.addr_validate(&terraswap_lp_token)?;
     let user_address = deps.api.addr_validate(user_address)?;
     let lockup_key = (&terraswap_lp_token, &user_address, U64Key::new(duration));
     let pool_info = ASSET_POOLS.load(deps.storage, &terraswap_lp_token)?;
-    let lockup_info = LOCKUP_INFO.load(deps.storage, lockup_key)?;
+    let mut lockup_info = LOCKUP_INFO.load(deps.storage, lockup_key)?;
 
     let mut astroport_lp_units: Option<Uint128> = None;
     let mut astroport_lp_token_opt: Option<Addr> = None;
@@ -1581,6 +1577,22 @@ pub fn query_lockup_info(
             .try_into()?
         });
         astroport_lp_token_opt = Some(astroport_lp_token);
+    }
+
+    // Calculate currently expected ASTRO Rewards if not finalized
+    if lockup_info.astro_rewards.is_none() {
+        let pool_info = ASSET_POOLS.load(deps.storage, &terraswap_lp_token)?;
+        let weighted_lockup_balance =
+            calculate_weight(lockup_info.lp_units_locked, duration, &config);
+        lockup_info.astro_rewards = Some(calculate_astro_incentives_for_lockup(
+            weighted_lockup_balance,
+            pool_info.weighted_amount,
+            pool_info.incentives_share,
+            state.total_incentives_share,
+            config
+                .lockdrop_incentives
+                .expect("Lockdrop incentives should be set!"),
+        ));
     }
 
     Ok(LockUpInfoResponse {
@@ -1626,7 +1638,7 @@ fn calculate_max_withdrawal_percent_allowed(current_timestamp: u64, config: &Con
         let time_left = withdrawal_cutoff_final - current_timestamp;
         Decimal::from_ratio(
             50u64 * time_left,
-            withdrawal_cutoff_final - withdrawal_cutoff_second_point,
+            100u64 * (withdrawal_cutoff_final - withdrawal_cutoff_second_point),
         )
     }
     // Withdrawals not allowed
@@ -1638,7 +1650,7 @@ fn calculate_max_withdrawal_percent_allowed(current_timestamp: u64, config: &Con
 /// @dev Helper function to calculate ASTRO rewards for a particular Lockup position
 /// @params lockup_weighted_balance : Lockup position's weighted terraswap LP balance
 /// @params total_weighted_amount : Total weighted terraswap LP balance of the Pool
-/// @params incentives_share : Share of total ASTRO incentives allocated to this pool
+/// @params pool_incentives_share : Share of total ASTRO incentives allocated to this pool
 /// @params total_incentives_share: Calculated total incentives share for allocating among pools
 /// @params total_lockdrop_incentives : Total ASTRO incentives to be distributed among Lockdrop participants
 pub fn calculate_astro_incentives_for_lockup(

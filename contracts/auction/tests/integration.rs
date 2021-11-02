@@ -266,7 +266,6 @@ fn instantiate_airdrop_lockdrop_contracts(
         merkle_roots: Some(vec!["merkle_roots".to_string()]),
         from_timestamp: Some(1_000_00),
         to_timestamp: 100_000_00,
-        auction_contract_address: "auction_instance".to_string(),
         total_airdrop_size: Uint128::new(100_000_000_000),
     };
 

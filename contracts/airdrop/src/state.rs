@@ -25,7 +25,7 @@ pub struct Config {
     /// Timestamp to which ASTRO airdrops can be claimed
     pub to_timestamp: u64,
     /// Boostrap auction contract address
-    pub auction_contract_address: Addr,
+    pub auction_contract_address: Option<Addr>,
     /// Boolean value indicating if the users can withdraw their ASTRO airdrop tokens or not
     /// This value is updated in the same Tx in which Liquidity is added to the LP Pool
     pub are_claims_enabled: bool,

@@ -1,7 +1,7 @@
 import keccak256 from 'keccak256';
 import { MerkleTree } from 'merkletreejs';
 
-export class Terra_Merkle_Tree {
+export class Merkle_Tree {
 
   private tree: MerkleTree;
 
