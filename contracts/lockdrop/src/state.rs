@@ -53,7 +53,6 @@ pub struct State {
     pub total_astro_returned_available: Uint128,
     /// Boolean value indicating if the user can withdraw their ASTRO rewards or not
     pub are_claims_allowed: bool,
-    pub supported_pairs_list: Vec<Addr>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -86,7 +85,7 @@ pub struct LockupInfo {
     /// Boolean value indicating if the user's has withdrawn funds post the only 1 withdrawal limit cutoff
     pub withdrawal_flag: bool,
     /// ASTRO tokens received as rewards for participation in the lockdrop
-    pub astro_rewards: Uint128,
+    pub astro_rewards: Option<Uint128>,
     /// ASTRO tokens transferred to user
     pub astro_transferred: bool,
     /// Generator ASTRO tokens loockup received as generator rewards
