@@ -18,7 +18,7 @@ const ARTIFACTS_PATH = "../artifacts"
 const ASTRO_TOKEN_ADDRESS = "terra146hem5nuxgfg87xqhqlkqnk2fjrhekxdkxdjzh";
 const GENERATOR_CONTRACT_ADDRESS = "terra146hem5nuxgfg87xqhqlkqnk2fjrhekxdkxdjzh";
 
-const FROM_TIMESTAMP = parseInt((Date.now()/1000).toFixed(0))
+const FROM_TIMESTAMP = parseInt((Date.now()/1000).toFixed(0) + 25 )
 
 const AIRDROP_INCENTIVES = 1000000
 const LOCKDROP_INCENTIVES = "1000000"
@@ -43,11 +43,11 @@ async function main() {
   bombay_testnet.airdrop_InitMsg.config.merkle_roots = merkle_roots;
   bombay_testnet.airdrop_InitMsg.config.from_timestamp = FROM_TIMESTAMP;
   bombay_testnet.airdrop_InitMsg.config.to_timestamp = FROM_TIMESTAMP + 86400*90;
-  bombay_testnet.airdrop_InitMsg.config.total_airdrop_size = AIRDROP_INCENTIVES;
+  bombay_testnet.airdrop_InitMsg.config.total_airdrop_size = String(AIRDROP_INCENTIVES);
   console.log(bombay_testnet.airdrop_InitMsg.config)
 
-  const airdrop_contract_address = await deployContract(terra, wallet, join(ARTIFACTS_PATH, 'astro_airdrop.wasm'),  bombay_testnet.airdrop_InitMsg.config)
-  console.log('AIRDROP CONTRACT ADDRESS : ' + airdrop_contract_address )
+  const airdrop_contract_address = "terra1n3j890xggs9v44szy8clu5pl08p3lqz2uecnn4" // await deployContract(terra, wallet, join(ARTIFACTS_PATH, 'astro_airdrop.wasm'),  bombay_testnet.airdrop_InitMsg.config)
+  console.log('AIRDROP CONTRACT ADDRESS : ' + airdrop_contract_address + " \n" )
 
   // TRANSFER ASTRO TOKENS TO THE AIRDROP CONTRACT
 //   let mars_rewards = 50000000000;
@@ -62,10 +62,11 @@ async function main() {
    bombay_testnet.lockdrop_InitMsg.config.init_timestamp = FROM_TIMESTAMP;
    bombay_testnet.lockdrop_InitMsg.config.deposit_window = 86400;
    bombay_testnet.lockdrop_InitMsg.config.withdrawal_window = 86400;
- 
+   console.log(bombay_testnet.lockdrop_InitMsg.config)
+
    
-   const lockdrop_contract_address = await deployContract(terra, wallet, join(ARTIFACTS_PATH, 'astroport_lockdrop.wasm'),  bombay_testnet.lockdrop_InitMsg.config)
-   console.log('LOCKDROP CONTRACT ADDRESS : ' + lockdrop_contract_address )
+   const lockdrop_contract_address = "terra1kmc9t047lug8l4mg5rgql62mmu78attgag73dv" // await deployContract(terra, wallet, join(ARTIFACTS_PATH, 'astroport_lockdrop.wasm'),  bombay_testnet.lockdrop_InitMsg.config)
+   console.log('LOCKDROP CONTRACT ADDRESS : ' + lockdrop_contract_address + " \n" )
  
 
 
@@ -82,9 +83,10 @@ async function main() {
    bombay_testnet.auction_InitMsg.config.init_timestamp = FROM_TIMESTAMP;
    bombay_testnet.auction_InitMsg.config.deposit_window = 86400;
    bombay_testnet.auction_InitMsg.config.withdrawal_window = 86400;
+   console.log(bombay_testnet.auction_InitMsg.config)
  
 
-   const auction_contract_address = await deployContract(terra, wallet, join(ARTIFACTS_PATH, 'astro_auction.wasm'),  bombay_testnet.lockdrop_InitMsg.config)
+   const auction_contract_address = "terra1h2vfqdk8mtnea2hwr6qmyca94q470pr922vlgt" // await deployContract(terra, wallet, join(ARTIFACTS_PATH, 'astro_auction.wasm'),  bombay_testnet.auction_InitMsg.config)
    console.log('AUCTION CONTRACT ADDRESS : ' + auction_contract_address )
  
 
@@ -94,8 +96,9 @@ async function main() {
    // LOCKDROP :: UPDATE MSG
    bombay_testnet.lockdropUpdateMsg.config.auction_contract_address = auction_contract_address;
    bombay_testnet.lockdropUpdateMsg.config.generator_address = GENERATOR_CONTRACT_ADDRESS;
-   bombay_testnet.lockdropUpdateMsg.config.lockdrop_incentives = LOCKDROP_INCENTIVES;
- 
+  //  bombay_testnet.lockdropUpdateMsg.config.lockdrop_incentives = LOCKDROP_INCENTIVES;
+  console.log(bombay_testnet.lockdropUpdateMsg.config)
+
    await executeContract(terra, wallet, lockdrop_contract_address,  { "update_config" : { "new_config": bombay_testnet.lockdropUpdateMsg.config}} )
    console.log('LOCKDROP CONFIG UPDATED')
 }

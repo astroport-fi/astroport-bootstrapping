@@ -1,10 +1,8 @@
-# Astroport Periphery 
+# Astroport Periphery
 
-This repo contains the contracts which facilitates ASTRO tokens airdrop, lockdrop and LP Bootstrapping via auction during the intital protocol launch. 
-
+This repo contains the contracts which facilitates ASTRO tokens airdrop, lockdrop and LP Bootstrapping via auction during the intital protocol launch.
 
 ## Development
-
 
 ### Dependencies
 
@@ -13,7 +11,6 @@ This repo contains the contracts which facilitates ASTRO tokens airdrop, lockdro
 - Docker
 - [LocalTerra](https://github.com/terra-project/LocalTerra)
 - Node.js v16
-
 
 ### Envrionment Setup
 
@@ -26,14 +23,18 @@ rustup default stable
 rustup target add wasm32-unknown-unknown
 ```
 
-
-3. Install Node libraries required for testing:
+3. Install Node libraries required:
 
 ```bash
 cd scripts
 npm install
 ```
 
+3. Deploy on testnet:
+
+```bash
+node --experimental-json-modules --loader ts-node/esm deploy_script.ts
+```
 
 ### Compile
 
@@ -47,30 +48,6 @@ docker run --rm -v "$(pwd)":/code \
   cosmwasm/rust-optimizer:0.11.3
 ```
 
-
 ## License
 
 TBD
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
