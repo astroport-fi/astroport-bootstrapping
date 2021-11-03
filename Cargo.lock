@@ -1003,7 +1003,7 @@ dependencies = [
 [[package]]
 name = "terraswap"
 version = "2.4.1"
-source = "git+https://github.com/terraswap/terraswap.git?branch=main#97cefa337798bdb0cba0327dd4152607839a5c77"
+source = "git+https://github.com/astroport-fi/terraswap.git?branch=main#a6997d13b0b9d94a78ce996bd89e05012572ceab"
 dependencies = [
  "cosmwasm-std",
  "cosmwasm-storage",
@@ -1016,7 +1016,7 @@ dependencies = [
 [[package]]
 name = "terraswap-factory"
 version = "0.0.0"
-source = "git+https://github.com/terraswap/terraswap.git?branch=main#97cefa337798bdb0cba0327dd4152607839a5c77"
+source = "git+https://github.com/astroport-fi/terraswap.git?branch=main#a6997d13b0b9d94a78ce996bd89e05012572ceab"
 dependencies = [
  "cosmwasm-std",
  "cw-storage-plus 0.8.1",
@@ -1029,7 +1029,7 @@ dependencies = [
 [[package]]
 name = "terraswap-pair"
 version = "0.0.0"
-source = "git+https://github.com/terraswap/terraswap.git?branch=main#97cefa337798bdb0cba0327dd4152607839a5c77"
+source = "git+https://github.com/astroport-fi/terraswap.git?branch=main#a6997d13b0b9d94a78ce996bd89e05012572ceab"
 dependencies = [
  "cosmwasm-bignumber",
  "cosmwasm-std",
@@ -1047,7 +1047,7 @@ dependencies = [
 [[package]]
 name = "terraswap-token"
 version = "0.0.0"
-source = "git+https://github.com/terraswap/terraswap.git?branch=main#97cefa337798bdb0cba0327dd4152607839a5c77"
+source = "git+https://github.com/astroport-fi/terraswap.git?branch=main#a6997d13b0b9d94a78ce996bd89e05012572ceab"
 dependencies = [
  "cosmwasm-std",
  "cw-storage-plus 0.8.1",

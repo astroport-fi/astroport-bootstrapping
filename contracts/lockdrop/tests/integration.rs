@@ -1767,155 +1767,158 @@ fn test_withdraw_from_lockup() {
     );
 }
 
-// #[test]
-// fn test_migrate_liquidity() {
-//     let mut app = mock_app();
-//     let owner = Addr::unchecked("contract_owner");
+#[test]
+fn test_migrate_liquidity() {
+    let mut app = mock_app();
+    let owner = Addr::unchecked("contract_owner");
 
-//     let (_, lockdrop_instance, _, _, update_msg) =
-//         instantiate_all_contracts(&mut app, owner.clone());
+    let (_, lockdrop_instance, _, _, update_msg) =
+        instantiate_all_contracts(&mut app, owner.clone());
 
-//     // CW20 TOKEN :: Dummy token
-//     let cw20_contract = Box::new(ContractWrapper::new(
-//         astroport_token::contract::execute,
-//         astroport_token::contract::instantiate,
-//         astroport_token::contract::query,
-//     ));
+    // CW20 TOKEN :: Dummy token
+    let cw20_contract = Box::new(ContractWrapper::new(
+        astroport_token::contract::execute,
+        astroport_token::contract::instantiate,
+        astroport_token::contract::query,
+    ));
 
-//     let cw20_code_id = app.store_code(cw20_contract);
+    let cw20_code_id = app.store_code(cw20_contract);
 
-//     let anc_instance = app
-//         .instantiate_contract(
-//             cw20_code_id,
-//             owner.clone(),
-//             &astroport_token::msg::InstantiateMsg {
-//                 name: String::from("ANC"),
-//                 symbol: String::from("ANC"),
-//                 decimals: 6,
-//                 initial_balances: vec![],
-//                 mint: Some(cw20::MinterResponse {
-//                     minter: owner.to_string(),
-//                     cap: None,
-//                 }),
-//                 marketing: None,
-//             },
-//             &[],
-//             String::from("ANC"),
-//             None,
-//         )
-//         .unwrap();
+    let anc_instance = app
+        .instantiate_contract(
+            cw20_code_id,
+            owner.clone(),
+            &TokenInstantiateMsg {
+                name: String::from("ANC"),
+                symbol: String::from("ANC"),
+                decimals: 6,
+                initial_balances: vec![],
+                mint: Some(cw20::MinterResponse {
+                    minter: owner.to_string(),
+                    cap: None,
+                }),
+                init_hook: None,
+            },
+            &[],
+            String::from("ANC"),
+            None,
+        )
+        .unwrap();
 
-//     // Terraswap LP Token
-//     let terraswap_token_contract = Box::new(ContractWrapper::new(
-//         terraswap_token::contract::execute,
-//         terraswap_token::contract::instantiate,
-//         terraswap_token::contract::query,
-//     ));
-//     let terraswap_token_code_id = app.store_code(terraswap_token_contract);
+    // Terraswap LP Token
+    let terraswap_token_contract = Box::new(ContractWrapper::new(
+        terraswap_token::contract::execute,
+        terraswap_token::contract::instantiate,
+        terraswap_token::contract::query,
+    ));
+    let terraswap_token_code_id = app.store_code(terraswap_token_contract);
 
-//     // Terraswap Pair
-//     let terraswap_pair_contract = Box::new(ContractWrapper::new(
-//         terraswap_pair::contract::execute,
-//         terraswap_pair::contract::instantiate,
-//         terraswap_pair::contract::query,
-//     ));
-//     let terraswap_pair_code_id = app.store_code(terraswap_pair_contract);
+    // Terraswap Pair
+    let terraswap_pair_contract = Box::new(
+        ContractWrapper::new(
+            terraswap_pair::contract::execute,
+            terraswap_pair::contract::instantiate,
+            terraswap_pair::contract::query,
+        )
+        .with_reply(terraswap_pair::contract::reply),
+    );
+    let terraswap_pair_code_id = app.store_code(terraswap_pair_contract);
 
-//     // LP POOL INSTANCE
-//     let terraswap_pool_instance = app
-//         .instantiate_contract(
-//             terraswap_pair_code_id,
-//             Addr::unchecked("user".to_string()),
-//             &terraswap::pair::InstantiateMsg {
-//                 asset_infos: [
-//                     terraswap::asset::AssetInfo::Token {
-//                         contract_addr: anc_instance.clone().to_string(),
-//                     },
-//                     terraswap::asset::AssetInfo::NativeToken {
-//                         denom: "uusd".to_string(),
-//                     },
-//                 ],
-//                 token_code_id: terraswap_token_code_id,
-//             },
-//             &[],
-//             String::from("terraswap_pool_token"),
-//             None,
-//         )
-//         .unwrap();
+    // LP POOL INSTANCE
+    let terraswap_pool_instance = app
+        .instantiate_contract(
+            terraswap_pair_code_id,
+            Addr::unchecked("user".to_string()),
+            &terraswap::pair::InstantiateMsg {
+                asset_infos: [
+                    terraswap::asset::AssetInfo::Token {
+                        contract_addr: anc_instance.clone().to_string(),
+                    },
+                    terraswap::asset::AssetInfo::NativeToken {
+                        denom: "uusd".to_string(),
+                    },
+                ],
+                token_code_id: terraswap_token_code_id,
+            },
+            &[],
+            String::from("terraswap_pool_token"),
+            None,
+        )
+        .unwrap();
 
-// LP Token
-// let terraswap_token_instance = app
-//     .instantiate_contract(
-//         terraswap_token_code_id,
-//         Addr::unchecked("user".to_string()),
-//         &terraswap::token::InstantiateMsg {
-//             name: "terraswap liquidity token".to_string(),
-//             symbol: "uLP".to_string(),
-//             decimals: 6,
-//             initial_balances: vec![],
-//             mint: Some(cw20::MinterResponse {
-//                 minter: terraswap_pool_instance.to_string(),
-//                 cap: None,
-//             }),
-//         },
-//         &[],
-//         String::from("terraswap_lp_token"),
-//         None,
-//     )
-//     .unwrap();
+    // LP Token
+    let terraswap_token_instance = app
+        .instantiate_contract(
+            terraswap_token_code_id,
+            Addr::unchecked("user".to_string()),
+            &terraswap::token::InstantiateMsg {
+                name: "terraswap liquidity token".to_string(),
+                symbol: "uLP".to_string(),
+                decimals: 6,
+                initial_balances: vec![],
+                mint: Some(cw20::MinterResponse {
+                    minter: terraswap_pool_instance.to_string(),
+                    cap: None,
+                }),
+            },
+            &[],
+            String::from("terraswap_lp_token"),
+            None,
+        )
+        .unwrap();
 
-// SUCCESSFULLY INITIALIZES POOL
-// app.execute_contract(
-//     owner.clone(),
-//     lockdrop_instance.clone(),
-//     &astroport_periphery::lockdrop::ExecuteMsg::InitializePool {
-//         terraswap_lp_token: terraswap_token_instance.to_string(),
-//         incentives_share: 10000000u64,
-//     },
-//     &[],
-// )
-// .unwrap();
+    // SUCCESSFULLY INITIALIZES POOL
+    app.execute_contract(
+        owner.clone(),
+        lockdrop_instance.clone(),
+        &astroport_periphery::lockdrop::ExecuteMsg::InitializePool {
+            terraswap_lp_token: terraswap_token_instance.to_string(),
+            incentives_share: 10000000u64,
+        },
+        &[],
+    )
+    .unwrap();
 
-// let user_address = "user".to_string();
-// let user2_address = "user2".to_string();
+    let user_address = "user".to_string();
+    let user2_address = "user2".to_string();
 
-// // Mint some LP tokens to user#1
-// app.execute_contract(
-//     Addr::unchecked("pair_instance".to_string()),
-//     terraswap_token_instance.clone(),
-//     &cw20::Cw20ExecuteMsg::Mint {
-//         recipient: user_address.clone(),
-//         amount: Uint128::from(124231343u128),
-//     },
-//     &[],
-// )
-// .unwrap();
+    // Mint some LP tokens to user#1
+    app.execute_contract(
+        Addr::unchecked("pair_instance".to_string()),
+        terraswap_token_instance.clone(),
+        &cw20::Cw20ExecuteMsg::Mint {
+            recipient: user_address.clone(),
+            amount: Uint128::from(124231343u128),
+        },
+        &[],
+    )
+    .unwrap();
 
-// // Deposit into Lockup Position
+    // Deposit into Lockup Position
 
-// app.update_block(|b| {
-//     b.height += 17280;
-//     b.time = Timestamp::from_seconds(1_000_00)
-// });
+    app.update_block(|b| {
+        b.height += 17280;
+        b.time = Timestamp::from_seconds(1_000_00)
+    });
 
-// app.execute_contract(
-//     Addr::unchecked(user_address.clone()),
-//     terraswap_token_instance.clone(),
-//     &cw20::Cw20ExecuteMsg::Send {
-//         contract: lockdrop_instance.clone().to_string(),
-//         amount: Uint128::from(10000000u128),
-//         msg: to_binary(&lockdrop::Cw20HookMsg::IncreaseLockup { duration: 10u64 }).unwrap(),
-//     },
-//     &[],
-// )
-// .unwrap();
-// }
+    app.execute_contract(
+        Addr::unchecked(user_address.clone()),
+        terraswap_token_instance.clone(),
+        &cw20::Cw20ExecuteMsg::Send {
+            contract: lockdrop_instance.clone().to_string(),
+            amount: Uint128::from(10000000u128),
+            msg: to_binary(&lockdrop::Cw20HookMsg::IncreaseLockup { duration: 10u64 }).unwrap(),
+        },
+        &[],
+    )
+    .unwrap();
+}
 
-// #[test]
-// fn test_stake_lp_tokens() {
-//     let mut app = mock_app();
-//     let owner = Addr::unchecked("contract_owner");
+#[test]
+fn test_stake_lp_tokens() {
+    let mut app = mock_app();
+    let owner = Addr::unchecked("contract_owner");
 
-//     let (_, lockdrop_instance, _, _, update_msg) =
-//         instantiate_all_contracts(&mut app, owner.clone());
-// }
+    let (_, lockdrop_instance, _, _, update_msg) =
+        instantiate_all_contracts(&mut app, owner.clone());
+}
