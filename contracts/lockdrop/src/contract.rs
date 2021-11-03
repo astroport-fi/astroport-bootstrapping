@@ -291,7 +291,7 @@ pub fn handle_update_config(
                             amount,
                         })?,
                     });
-                    event.attributes.push(attr("incentives returned", amount));
+                    event.attributes.push(attr("incentives_returned", amount));
                 }
                 Ordering::Less => {
                     let amount = new_incentives - prev_incentives;
@@ -304,7 +304,7 @@ pub fn handle_update_config(
                             amount,
                         })?,
                     });
-                    event.attributes.push(attr("incentives received", amount));
+                    event.attributes.push(attr("incentives_received", amount));
                 }
             };
             config.lockdrop_incentives = Some(new_incentives);
@@ -380,7 +380,7 @@ pub fn handle_initialize_pool(
     Ok(Response::new().add_event(
         Event::new("Initialized pool")
             .add_attribute("terraswap_lp_token", terraswap_lp_token)
-            .add_attribute("incentives share", incentives_share.to_string()),
+            .add_attribute("incentives_share", incentives_share.to_string()),
     ))
 }
 
@@ -427,7 +427,7 @@ pub fn handle_update_pool(
     Ok(Response::new().add_event(
         Event::new("Updated pool")
             .add_attribute("terraswap_lp_token", terraswap_lp_token)
-            .add_attribute("set incentives share", incentives_share.to_string()),
+            .add_attribute("set_incentives_share", incentives_share.to_string()),
     ))
 }
 
@@ -752,7 +752,7 @@ pub fn handle_increase_lockup(
     ASSET_POOLS.save(deps.storage, &terraswap_lp_token, &pool_info)?;
 
     Ok(Response::new().add_event(
-        Event::new("Increased lockup position")
+        Event::new("Increased_lockup_position")
             .add_attribute("terraswap_lp_token", terraswap_lp_token)
             .add_attribute("user", user_address)
             .add_attribute("duration", duration.to_string())
@@ -838,7 +838,7 @@ pub fn handle_withdraw_from_lockup(
     });
 
     Ok(Response::new().add_message(msg).add_event(
-        Event::new("Withdraw from lockup")
+        Event::new("Withdraw_from_lockup")
             .add_attribute("terraswap_lp_token", terraswap_lp_token)
             .add_attribute("user_address", user_address)
             .add_attribute("duration", duration.to_string())
@@ -918,7 +918,7 @@ pub fn handle_delegate_astro_to_auction(
     });
 
     Ok(Response::new().add_message(msg).add_event(
-        Event::new("Astro delegated to auction")
+        Event::new("Astro_delegated_to_auction")
             .add_attribute("user_address", user_address)
             .add_attribute("amount", amount),
     ))
@@ -1147,7 +1147,7 @@ pub fn update_pool_on_dual_rewards_claim(
     ASSET_POOLS.save(deps.storage, &terraswap_lp_token, &pool_info)?;
 
     Ok(Response::new().add_event(
-        Event::new("Generator dual rewards have updated")
+        Event::new("Generator_dual_rewards_have_updated")
             .add_attribute("terraswap_lp_token", terraswap_lp_token)
             .add_attribute("astro_reward_received", base_reward_received)
             .add_attribute("proxy_reward_received", proxy_reward_received)
@@ -1183,7 +1183,7 @@ pub fn callback_withdraw_user_rewards_for_lockup_optional_withdraw(
     let mut lockup_info = LOCKUP_INFO.load(deps.storage, lockup_key.clone())?;
 
     let mut cosmos_msgs = vec![];
-    let mut event = Event::new("Withdraw rewards and/or unlock")
+    let mut event = Event::new("Withdraw_rewards_and/or_unlock")
         .add_attribute("terraswap_lp_token", &terraswap_lp_token)
         .add_attribute("user_address", &user_address)
         .add_attribute("duration", duration.to_string());
@@ -1433,7 +1433,7 @@ pub fn callback_deposit_liquidity_in_astroport(
     }));
 
     Ok(Response::new().add_messages(cosmos_msgs).add_event(
-        Event::new("Liquidity has been migrated from terraswap to astroport")
+        Event::new("Liquidity_has_been_migrated_from_terraswap_to_astroport")
             .add_attribute("terraswap_lp_token", terraswap_lp_token)
             .add_attribute("astroport_pool", astroport_pool)
             .add_attribute("liquidity", format!("{}-{}", assets[0], assets[1])),
