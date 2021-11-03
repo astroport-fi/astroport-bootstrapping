@@ -6,9 +6,8 @@ export const bombay_testnet: Config = {
             "astro_token_address": "",
             "merkle_roots": [],
             "from_timestamp": undefined, 
-            "to_timestamp": undefined, 
-            "auction_contract_address": undefined, 
-            "total_airdrop_size": 0, 
+            "to_timestamp": 0, 
+            "total_airdrop_size": "0", 
         } 
     },
 
@@ -18,8 +17,8 @@ export const bombay_testnet: Config = {
             "init_timestamp": 0,
             "deposit_window": 86400,         
             "withdrawal_window": 86400,      
-            "min_duration": 1,         
-            "max_duration": 52,
+            "min_lock_duration": 1,         
+            "max_lock_duration": 52,
             "weekly_multiplier": 1,    
             "weekly_divider": 12,    
         }
@@ -82,8 +81,8 @@ interface LockdropInitMsg {
         init_timestamp: number
         deposit_window: number 
         withdrawal_window: number 
-        min_duration: number 
-        max_duration: number
+        min_lock_duration: number 
+        max_lock_duration: number
         weekly_multiplier: number
         weekly_divider: number
     }
@@ -106,9 +105,8 @@ interface AirdropInitMsg {
         astro_token_address: string
         merkle_roots?: string[]
         from_timestamp?: number 
-        to_timestamp?: number 
-        auction_contract_address?: string 
-        total_airdrop_size: number 
+        to_timestamp: number 
+        total_airdrop_size: string 
 
     }
 }
