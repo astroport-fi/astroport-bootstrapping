@@ -40,9 +40,9 @@ cosmwasm-schema = { version = "0.16.0" }
 terra-multi-test = {git = "https://github.com/astroport-fi/terra-plus.git"}
 terraswap = "2.4.0"
 # Terraswap contracts
-terraswap-factory = {git = "https://github.com/terraswap/terraswap.git", branch = "main", package = "terraswap-factory"}
-terraswap-pair = {git = "https://github.com/terraswap/terraswap.git", branch = "main", package = "terraswap-pair"}
-terraswap-token = {git = "https://github.com/terraswap/terraswap.git", branch = "main", package = "terraswap-token"}
+terraswap-factory = {git = "https://github.com/astroport-fi/terraswap.git", branch = "main", package = "terraswap-factory"}
+terraswap-pair = {git = "https://github.com/astroport-fi/terraswap.git", branch = "main", package = "terraswap-pair"}
+terraswap-token = {git = "https://github.com/astroport-fi/terraswap.git", branch = "main", package = "terraswap-token"}
 # Astroport contracts
 astroport-factory = {git = "https://github.com/astroport-fi/astroport.git", branch = "master", package = "astroport-factory"}
 astroport-pair = {git = "https://github.com/astroport-fi/astroport.git", branch = "master", package = "astroport-pair"}
