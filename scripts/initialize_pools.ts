@@ -109,5 +109,6 @@ async function add_pool(name:String, symbol:String, amount:number, send_to: Stri
 
 
 
-add_pool("PSI", "PSI", 100000000_000000, "terra1lv845g7szf9m3082qn3eehv9ewkjjr2kdyz0t6").catch(console.log)
+add_pool("ANC", "ANC", 100000000_000000, "terra1lv845g7szf9m3082qn3eehv9ewkjjr2kdyz0t6").catch(console.log)
+add_pool("MIR", "MIR", 100000000_000000, "terra1lv845g7szf9m3082qn3eehv9ewkjjr2kdyz0t6").catch(console.log)
 

@@ -15,7 +15,7 @@ import { join } from "path"
 const ARTIFACTS_PATH = "../artifacts"
 
 
-const FROM_TIMESTAMP = parseInt((Date.now()/1000).toFixed(0) + 25 )
+const FROM_TIMESTAMP = parseInt((Date.now()/1000).toFixed(0)) +  150
 
 const AIRDROP_INCENTIVES = 25_000_000_000000
 const LOCKDROP_INCENTIVES = 75_000_000_000000
@@ -33,6 +33,8 @@ async function main() {
 
   const {terra, wallet} = newClient()
   console.log(`chainID: ${terra.config.chainID} wallet: ${wallet.key.accAddress}`)
+  console.log(`FROM_TIMESTAMP: ${FROM_TIMESTAMP} `)
+  FROM_TIMESTAMP
 
   const network = readArtifact(terra.config.chainID)
   console.log('network:', network)
