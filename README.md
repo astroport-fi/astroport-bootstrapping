@@ -33,6 +33,9 @@ npm install
 3. Deploy on testnet:
 
 ```bash
+export WALLET="<mnemonic seed>"
+export LCD_CLIENT_URL="https://bombay-lcd.terra.dev"
+export CHAIN_ID="bombay-12"
 node --experimental-json-modules --loader ts-node/esm deploy_script.ts
 ```
 

@@ -23,6 +23,7 @@ use crate::state::{
 use cw20::{BalanceResponse, Cw20ExecuteMsg, Cw20QueryMsg, Cw20ReceiveMsg};
 
 const SECONDS_PER_WEEK: u64 = 7 * 24 * 60 * 60;
+const UNLOCK_FINE: u64 = 25u64;
 
 //----------------------------------------------------------------------------------------
 // Entry Points
@@ -1310,6 +1311,12 @@ pub fn callback_withdraw_user_rewards_for_lockup_optional_withdraw(
         if withdraw_lp_stake {
             // COSMOS MSG :: Transfers ASTRO (that user received as rewards for this lockup position) from user to itself
             if force_unlock && lockup_info.astro_transferred {
+                let astro_to_return = Uint256::from(
+                    lockup_info
+                        .astro_rewards
+                        .expect("Position astro rewards should be set"),
+                ) * Decimal256::from_ratio(UNLOCK_FINE, 100u64);
+
                 let astro_token = config
                     .astro_token
                     .as_ref()
@@ -1321,7 +1328,7 @@ pub fn callback_withdraw_user_rewards_for_lockup_optional_withdraw(
                     msg: to_binary(&cw20::Cw20ExecuteMsg::TransferFrom {
                         owner: user_address.to_string(),
                         recipient: env.contract.address.to_string(),
-                        amount: astro_rewards,
+                        amount: astro_to_return.try_into().unwrap(),
                     })?,
                 }));
                 state.total_astro_returned_available += astro_rewards;

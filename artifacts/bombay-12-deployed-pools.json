@@ -1,0 +1,23 @@
+{
+  "cw20_token_address": "terra1xxtkqrt90c0ygkwteu2a433xszlmtvslk3x3we",
+  "terra_pool_info": {
+    "asset_infos": [
+      {
+        "native_token": {
+          "denom": "uusd"
+        }
+      },
+      {
+        "token": {
+          "contract_addr": "terra1xxtkqrt90c0ygkwteu2a433xszlmtvslk3x3we"
+        }
+      }
+    ],
+    "contract_addr": "terra1hkfg566akwduh2n373thd6tan0ms6zyduqxry8",
+    "liquidity_token": "terra1y6ar7ejrm93umvcuzzdnflpw2entm7pj9yd2lz"
+  },
+  "symbol": "PSI",
+  "liquidity_token_balance": {
+    "balance": "0"
+  }
+}

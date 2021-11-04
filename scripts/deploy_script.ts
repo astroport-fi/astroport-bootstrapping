@@ -1,106 +1,167 @@
+import 'dotenv/config'
 import {getMerkleRoots}  from "./helpers/merkle_tree_utils.js";
 import {
-    transferCW20Tokens,
     deployContract,
     executeContract,
-    instantiateContract,
-    queryContract,
-    recover,
+    newClient,
+    readArtifact,
+    writeArtifact,
+    Client
   } from "./helpers/helpers.js";
-import { bombay_testnet } from "./configs.js";
+import { bombay_testnet } from "./deploy_configs.js";
 import { LCDClient } from "@terra-money/terra.js"
 import { join } from "path"
 
-
-
 const ARTIFACTS_PATH = "../artifacts"
 
-const ASTRO_TOKEN_ADDRESS = "terra146hem5nuxgfg87xqhqlkqnk2fjrhekxdkxdjzh";
-const GENERATOR_CONTRACT_ADDRESS = "terra146hem5nuxgfg87xqhqlkqnk2fjrhekxdkxdjzh";
 
 const FROM_TIMESTAMP = parseInt((Date.now()/1000).toFixed(0) + 25 )
 
-const AIRDROP_INCENTIVES = 1000000
-const LOCKDROP_INCENTIVES = "1000000"
+const AIRDROP_INCENTIVES = 25_000_000_000000
+const LOCKDROP_INCENTIVES = 75_000_000_000000
+const AUCTION_INCENTIVES = 10_000_000_000000
 
-
+async function transferAmount(cl: Client, sender: string, recipient: string, amount: String) {
+  let out: any, msg: any
+  msg = { transfer: { recipient: recipient, amount: amount } }
+  console.log('execute', sender, JSON.stringify(msg))
+  out = await executeContract(cl.terra, cl.wallet, sender, msg)
+  console.log(out.txhash)
+}
 
 async function main() {
 
-  let terra = new LCDClient({ URL: 'https://bombay-lcd.terra.dev', chainID: 'bombay-12'})
-  let wallet = recover(terra, process.env.TEST_MAIN!)
+  const {terra, wallet} = newClient()
+  console.log(`chainID: ${terra.config.chainID} wallet: ${wallet.key.accAddress}`)
 
-  console.log(`Wallet address from seed: ${wallet.key.accAddress}`)
-
-/*************************************** DEPLOYMENT :: AIRDROP CONTRACT  *****************************************/
-
-  // MERKLE ROOTS :: TERRA USERS
-  let merkle_roots = await getMerkleRoots();
-
-   // AIRDROP :: INIT MSG
-  bombay_testnet.airdrop_InitMsg.config.owner = wallet.key.accAddress;
-  bombay_testnet.airdrop_InitMsg.config.astro_token_address = ASTRO_TOKEN_ADDRESS;
-  bombay_testnet.airdrop_InitMsg.config.merkle_roots = merkle_roots;
-  bombay_testnet.airdrop_InitMsg.config.from_timestamp = FROM_TIMESTAMP;
-  bombay_testnet.airdrop_InitMsg.config.to_timestamp = FROM_TIMESTAMP + 86400*90;
-  bombay_testnet.airdrop_InitMsg.config.total_airdrop_size = String(AIRDROP_INCENTIVES);
-  console.log(bombay_testnet.airdrop_InitMsg.config)
-
-  const airdrop_contract_address = "terra1n3j890xggs9v44szy8clu5pl08p3lqz2uecnn4" // await deployContract(terra, wallet, join(ARTIFACTS_PATH, 'astro_airdrop.wasm'),  bombay_testnet.airdrop_InitMsg.config)
-  console.log('AIRDROP CONTRACT ADDRESS : ' + airdrop_contract_address + " \n" )
-
-  // TRANSFER ASTRO TOKENS TO THE AIRDROP CONTRACT
-//   let mars_rewards = 50000000000;
-//   await transferCW20Tokens(terra, wallet, ASTRO_TOKEN_ADDRESS, airdrop_contract_address, mars_rewards);
-//   console.log( (mars_rewards/(10**6)).toString() +  ' MARS TRANSFERRED TO THE AIRDROP CONTRACT :: ' + airdrop_contract_address )
+  const network = readArtifact(terra.config.chainID)
+  console.log('network:', network)
 
 
-/*************************************** DEPLOYMENT :: LOCKDROP CONTRACT  *****************************************/
+  if (!network.astrotokenAddress) {
+    console.log(`Please deploy the CW20-base ASTRO token, and then set this address in the deploy config before running this script...`)
+    return
+  }
 
-   // LOCKDROP :: INIT MSG
-   bombay_testnet.lockdrop_InitMsg.config.owner = wallet.key.accAddress;
-   bombay_testnet.lockdrop_InitMsg.config.init_timestamp = FROM_TIMESTAMP;
-   bombay_testnet.lockdrop_InitMsg.config.deposit_window = 86400;
-   bombay_testnet.lockdrop_InitMsg.config.withdrawal_window = 86400;
-   console.log(bombay_testnet.lockdrop_InitMsg.config)
+  if (!network.generator_contract) {
+    console.log(`Please set the ASTRO Generator address in the deploy config before running this script...`)
+    return
+  }
+  /*************************************** DEPLOYMENT :: AIRDROP CONTRACT  *****************************************/
+  if (!network.airdropAddress) {
+    console.log('Deploy Airdrop...')
 
-   
-   const lockdrop_contract_address = "terra1kmc9t047lug8l4mg5rgql62mmu78attgag73dv" // await deployContract(terra, wallet, join(ARTIFACTS_PATH, 'astroport_lockdrop.wasm'),  bombay_testnet.lockdrop_InitMsg.config)
-   console.log('LOCKDROP CONTRACT ADDRESS : ' + lockdrop_contract_address + " \n" )
- 
+    bombay_testnet.airdrop_InitMsg.config.owner = wallet.key.accAddress;
+    bombay_testnet.airdrop_InitMsg.config.astro_token_address = network.astrotokenAddress;
+    bombay_testnet.airdrop_InitMsg.config.merkle_roots = await getMerkleRoots();
+    bombay_testnet.airdrop_InitMsg.config.from_timestamp = FROM_TIMESTAMP;
+    bombay_testnet.airdrop_InitMsg.config.to_timestamp = FROM_TIMESTAMP + 86400*90;
+    bombay_testnet.airdrop_InitMsg.config.total_airdrop_size = String(AIRDROP_INCENTIVES);
+  
+    network.airdropAddress = await deployContract(terra, wallet, join(ARTIFACTS_PATH, 'astro_airdrop.wasm'),  bombay_testnet.airdrop_InitMsg.config)
+    console.log(`Airdrop Contract Address : ${network.airdropAddress}`)
 
+    //  ************* Transfer tokens to Airdrop Contract *************
+    await transferAmount({terra, wallet}, network.astrotokenAddress, network.airdropAddress, String(AIRDROP_INCENTIVES))
+  }
 
-/*************************************** DEPLOYMENT :: AUCTION CONTRACT  *****************************************/
+  /*************************************** DEPLOYMENT :: LOCKDROP CONTRACT  *****************************************/
 
-   // AUCTION :: INIT MSG
-   bombay_testnet.auction_InitMsg.config.owner = wallet.key.accAddress;
-   bombay_testnet.auction_InitMsg.config.astro_token_address = ASTRO_TOKEN_ADDRESS;
-   bombay_testnet.auction_InitMsg.config.airdrop_contract_address = airdrop_contract_address;
-   bombay_testnet.auction_InitMsg.config.lockdrop_contract_address = lockdrop_contract_address;
-   bombay_testnet.auction_InitMsg.config.generator_contract = GENERATOR_CONTRACT_ADDRESS;
-   bombay_testnet.auction_InitMsg.config.astro_vesting_duration = 86400;
-   bombay_testnet.auction_InitMsg.config.lp_tokens_vesting_duration = 86400;
-   bombay_testnet.auction_InitMsg.config.init_timestamp = FROM_TIMESTAMP;
-   bombay_testnet.auction_InitMsg.config.deposit_window = 86400;
-   bombay_testnet.auction_InitMsg.config.withdrawal_window = 86400;
-   console.log(bombay_testnet.auction_InitMsg.config)
- 
+  if (!network.lockdropAddress) {
+    console.log('Deploy Lockdrop...')
 
-   const auction_contract_address = "terra1h2vfqdk8mtnea2hwr6qmyca94q470pr922vlgt" // await deployContract(terra, wallet, join(ARTIFACTS_PATH, 'astro_auction.wasm'),  bombay_testnet.auction_InitMsg.config)
-   console.log('AUCTION CONTRACT ADDRESS : ' + auction_contract_address )
- 
+    bombay_testnet.lockdrop_InitMsg.config.owner = wallet.key.accAddress;
+    bombay_testnet.lockdrop_InitMsg.config.init_timestamp = FROM_TIMESTAMP;
+    bombay_testnet.lockdrop_InitMsg.config.deposit_window = 86400;
+    bombay_testnet.lockdrop_InitMsg.config.withdrawal_window = 86400;
+    // console.log(bombay_testnet.lockdrop_InitMsg.config)
 
+    network.lockdropAddress = await deployContract(terra, wallet, join(ARTIFACTS_PATH, 'astroport_lockdrop.wasm'),  bombay_testnet.lockdrop_InitMsg.config)
+    console.log(`Lockdrop Contract Address : ${network.lockdropAddress}`)
+  }
+  
+  /******************************4********* DEPLOYMENT :: AUCTION CONTRACT  *****************************************/
 
-/*************************************** UPDATE :: LOCKDROP CONTRACT  *****************************************/
+  if (!network.auctionAddress) {
+    console.log('Deploy Auction...')
+    
+    let auction_init_timestamp = bombay_testnet.lockdrop_InitMsg.config.init_timestamp + bombay_testnet.lockdrop_InitMsg.config.deposit_window + bombay_testnet.lockdrop_InitMsg.config.withdrawal_window;
+    bombay_testnet.auction_InitMsg.config.owner = wallet.key.accAddress;
+    bombay_testnet.auction_InitMsg.config.astro_token_address = network.astrotokenAddress;
+    bombay_testnet.auction_InitMsg.config.airdrop_contract_address = network.airdropAddress;
+    bombay_testnet.auction_InitMsg.config.lockdrop_contract_address = network.lockdropAddress;
+    bombay_testnet.auction_InitMsg.config.generator_contract = network.generator_contract;
+    bombay_testnet.auction_InitMsg.config.astro_vesting_duration = 86400;
+    bombay_testnet.auction_InitMsg.config.lp_tokens_vesting_duration = 86400;
+    bombay_testnet.auction_InitMsg.config.init_timestamp = auction_init_timestamp;
+    bombay_testnet.auction_InitMsg.config.deposit_window = 86400;
+    bombay_testnet.auction_InitMsg.config.withdrawal_window = 86400;
+    bombay_testnet.auction_InitMsg.config.astro_rewards = String(AUCTION_INCENTIVES);    
+    // console.log(bombay_testnet.auction_InitMsg.config)
 
-   // LOCKDROP :: UPDATE MSG
-   bombay_testnet.lockdropUpdateMsg.config.auction_contract_address = auction_contract_address;
-   bombay_testnet.lockdropUpdateMsg.config.generator_address = GENERATOR_CONTRACT_ADDRESS;
-  //  bombay_testnet.lockdropUpdateMsg.config.lockdrop_incentives = LOCKDROP_INCENTIVES;
-  console.log(bombay_testnet.lockdropUpdateMsg.config)
+    network.auctionAddress = await deployContract(terra, wallet, join(ARTIFACTS_PATH, 'astro_auction.wasm'),  bombay_testnet.auction_InitMsg.config)
+    console.log(`Auction Contract Address : ${network.auctionAddress}`)
 
-   await executeContract(terra, wallet, lockdrop_contract_address,  { "update_config" : { "new_config": bombay_testnet.lockdropUpdateMsg.config}} )
-   console.log('LOCKDROP CONFIG UPDATED')
+    //  ************* Transfer tokens to Auction Contract *************
+    await transferAmount({terra, wallet}, network.astrotokenAddress, network.auctionAddress, String(AUCTION_INCENTIVES))
+
+  }
+
+  /*************************************** UPDATE TRANSACTION :: AIRDROP CONTRACT  *****************************************/
+  if (network.airdropAddress) {
+    console.log('Set auction_address in Airdrop Contract ...')
+
+    await executeContract(terra, wallet, network.airdropAddress,  { "update_config" : { "owner": undefined,
+                                                                                        "auction_contract_address": network.auctionAddress,
+                                                                                        "merkle_roots": undefined,
+                                                                                        "from_timestamp": undefined,
+                                                                                        "to_timestamp": undefined 
+                                                                                      }
+                                                                  }
+                          )
+    console.log(`Airdrop Contract :: auction_address successfully set`)
+  }
+
+  /*************************************** UPDATE TRANSACTION :: LOCKDROP CONTRACT  *****************************************/
+
+  if (network.lockdropAddress) {
+    console.log('Update Lockdrop Contract Configuration ...')
+
+    await executeContract(terra, wallet, network.astrotokenAddress,  { "increase_allowance" : {   "spender":  network.lockdropAddress,
+                                                                                                  "amount": String(LOCKDROP_INCENTIVES),
+                                                                                                  "expires": undefined
+                                                                                              }
+                                                                    }
+                          )
+    await executeContract(terra, wallet, network.lockdropAddress,  { "update_config" : { "new_config" : {    "astro_token_address": network.astrotokenAddress,
+                                                                                                             "auction_contract_address": network.auctionAddress,
+                                                                                                             "generator_address": network.generatorContractAddress,
+                                                                                                             "lockdrop_incentives": String(LOCKDROP_INCENTIVES)                                                                                
+                                                                                                        }
+                                                                                        }
+                                                                    }
+                          )
+    console.log(`Lockdrop Contract :: Configuration successfully updated`)
+  }
+
+  /*************************************** UPDATE TRANSACTION :: AUCTION CONTRACT  *****************************************/
+
+  // if (network.auctionAddress) {
+  //   console.log('Update Auction Contract Configuration ...')
+
+  //   await executeContract(terra, wallet, network.lockdropAddress,  { "update_config" : {  "owner": undefined,
+  //                                                                                         "astroport_lp_pool": network.astroport_lp_pool,
+  //                                                                                         "lp_token_address": network.lp_token_address,
+  //                                                                                         "generator_contract": network.generatorContractAddress,
+  //                                                                                         "astro_rewards":undefined                                                                            
+  //                                                                                       }
+  //                                                                   }
+  //                         )
+  //   console.log(`Lockdrop Contract :: Configuration successfully updated`)
+  // }
+
+  writeArtifact(network, terra.config.chainID)
+  console.log('FINISH')
 }
 
 
