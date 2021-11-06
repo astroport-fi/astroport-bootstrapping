@@ -51,3 +51,4 @@ astroport-token = {git = "https://github.com/astroport-fi/astroport.git", branch
 astroport-vesting = {git = "https://github.com/astroport-fi/astroport.git", branch = "master", package = "astroport-vesting"}
 astroport-generator = {git = "https://github.com/astroport-fi/astroport.git", branch = "master", package = "astroport-generator"}
 astro-auction = {path = "../auction"}
+astro-airdrop = {path = "../airdrop"}

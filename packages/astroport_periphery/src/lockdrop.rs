@@ -230,6 +230,8 @@ pub struct UserInfoResponse {
     pub total_astro_rewards: Uint128,
     /// Total ASTRO tokens user delegated to the LP bootstrap auction pool
     pub delegated_astro_rewards: Uint128,
+    /// ASTRO tokens transferred to user
+    pub astro_transferred: bool,
     /// Lockup positions
     pub lockup_infos: Vec<LockUpInfoResponse>,
 }
@@ -242,13 +244,15 @@ pub struct LockUpInfoResponse {
     pub withdrawal_flag: bool,
     /// ASTRO tokens received as rewards for participation in the lockdrop
     pub astro_rewards: Option<Uint128>,
-    /// ASTRO tokens transferred to user
-    pub astro_transferred: bool,
     pub duration: u64,
     /// Generator ASTRO tokens lockup received as generator rewards
     pub generator_astro_debt: Uint128,
+    /// ASTRO tokens receivable as generator rewards that user can claim
+    pub claimable_generator_astro_debt: Uint128,
     /// Generator Proxy tokens lockup received as generator rewards
     pub generator_proxy_debt: Uint128,
+    /// Proxy tokens receivable as generator rewards that user can claim
+    pub claimable_generator_proxy_debt: Uint128,
     /// Timestamp beyond which this position can be unlocked
     pub unlock_timestamp: u64,
     /// User's Astroport LP units, calculated as lp_units_locked (terraswap) / total LP units locked (terraswap) * Astroport LP units minted post migration

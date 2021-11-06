@@ -743,7 +743,6 @@ pub fn handle_increase_lockup(
             Ok(LockupInfo {
                 lp_units_locked: amount,
                 astro_rewards: None,
-                astro_transferred: false,
                 unlock_timestamp: config.init_timestamp
                     + config.deposit_window
                     + config.withdrawal_window
@@ -879,22 +878,27 @@ pub fn handle_delegate_astro_to_auction(
         return Err(StdError::generic_err("Delegation window over"));
     }
 
-    let total_astro_rewards = update_user_lockup_positions_and_calc_rewards(
-        deps.branch(),
-        &config,
-        &state,
-        &user_address,
-    )?;
-
     let mut user_info = USER_INFO
         .may_load(deps.storage, &user_address)?
         .unwrap_or_default();
 
+    // If user's total ASTRO rewards == 0 :: We update all of the user's lockup positions to calculate ASTRO rewards and for each alongwith their equivalent Astroport LP Shares
+    if user_info.total_astro_rewards == Uint128::zero() {
+        user_info.total_astro_rewards = update_user_lockup_positions_and_calc_rewards(
+            deps.branch(),
+            &config,
+            &state,
+            &user_address,
+        )?;
+    }
+
     // CHECK :: ASTRO to delegate cannot exceed user's unclaimed ASTRO balance
-    let max_deletatable_astro =
-        total_astro_rewards.checked_sub(user_info.delegated_astro_rewards)?;
+    let max_deletatable_astro = user_info
+        .total_astro_rewards
+        .checked_sub(user_info.delegated_astro_rewards)?;
+
     if amount > max_deletatable_astro {
-        return Err(StdError::generic_err(format!("ASTRO to delegate cannot exceed user's unclaimed ASTRO balance. ASTRO to delegate = {}, Max delegatable ASTRO = {} ",amount, max_deletatable_astro)));
+        return Err(StdError::generic_err(format!("ASTRO to delegate cannot exceed user's unclaimed ASTRO balance. ASTRO to delegate = {}, Max delegatable ASTRO = {}. ",amount, max_deletatable_astro)));
     }
 
     // UPDATE STATE
@@ -931,9 +935,11 @@ pub fn handle_delegate_astro_to_auction(
     ]))
 }
 
-// @dev Function to claim user Rewards for a particular Lockup position
-// @param terraswap_lp_token : Terraswap LP token to identify the LP pool whose Token is locked in the lockup position
-// @param duration : Lockup duration (number of weeks)
+/// @dev Function to claim user Rewards for a particular Lockup position
+/// @param terraswap_lp_token : Terraswap LP token to identify the LP pool whose Token is locked in the lockup position
+/// @param duration : Lockup duration (number of weeks)
+/// @param @withdraw_lp_stake : Boolean value indicating if the LP tokens are to be withdrawn or not
+/// @param @force_unlock : Boolean value indicating if the LP tokens are to be forcefully unlocked or not
 pub fn handle_claim_rewards_and_unlock_for_lockup(
     deps: DepsMut,
     env: Env,
@@ -946,7 +952,7 @@ pub fn handle_claim_rewards_and_unlock_for_lockup(
     let state = STATE.load(deps.storage)?;
 
     if !state.are_claims_allowed {
-        return Err(StdError::generic_err("Claim rewards haven't allowed yet!"));
+        return Err(StdError::generic_err("Reward claim not allowed"));
     }
 
     let config = CONFIG.load(deps.storage)?;
@@ -1048,7 +1054,7 @@ pub fn handle_claim_rewards_and_unlock_for_lockup(
                     contract_addr: generator.to_string(),
                     funds: vec![],
                     msg: to_binary(&GenExecuteMsg::Withdraw {
-                        lp_token: terraswap_lp_token.clone(),
+                        lp_token: astroport_lp_token.clone(),
                         amount: Uint128::zero(),
                     })?,
                 }));
@@ -1121,6 +1127,7 @@ pub fn update_pool_on_dual_rewards_claim(
     )?;
 
     let base_reward_received;
+    // Increment claimed Astro rewards per LP share
     pool_info.generator_astro_per_share = pool_info.generator_astro_per_share + {
         let res: BalanceResponse = deps.querier.query_wasm_smart(
             rwi.base_reward_token,
@@ -1132,6 +1139,7 @@ pub fn update_pool_on_dual_rewards_claim(
         Decimal::from_ratio(base_reward_received, lp_balance)
     };
 
+    // Increment claimed Proxy rewards per LP share
     let mut proxy_reward_received = Uint128::zero();
     pool_info.generator_proxy_per_share = pool_info.generator_proxy_per_share + {
         match rwi.proxy_reward_token {
@@ -1189,6 +1197,10 @@ pub fn callback_withdraw_user_rewards_for_lockup_optional_withdraw(
     let lockup_key = (&terraswap_lp_token, &user_address, U64Key::new(duration));
     let mut lockup_info = LOCKUP_INFO.load(deps.storage, lockup_key.clone())?;
 
+    let mut user_info = USER_INFO
+        .may_load(deps.storage, &user_address)?
+        .unwrap_or_default();
+
     let mut cosmos_msgs = vec![];
     let mut attributes = vec![
         attr("action", "withdraw_rewards_and_or_unlock"),
@@ -1201,20 +1213,29 @@ pub fn callback_withdraw_user_rewards_for_lockup_optional_withdraw(
         .astro_rewards
         .expect("Astro reward should be already set!");
 
+    // Transfers claimable one time ASTRO rewards to the user that the user gets for all his lock
     if let Some(astro_token) = &config.astro_token {
-        if !force_unlock && !lockup_info.astro_transferred {
-            cosmos_msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
-                contract_addr: astro_token.to_string(),
-                funds: vec![],
-                msg: to_binary(&Cw20ExecuteMsg::Transfer {
-                    recipient: user_address.to_string(),
-                    amount: astro_rewards,
-                })?,
-            }));
-            lockup_info.astro_transferred = true;
-
-            attributes.push(attr("lockdrop_astro_reward", astro_rewards));
-            LOCKUP_INFO.save(deps.storage, lockup_key.clone(), &lockup_info)?;
+        if !force_unlock && !user_info.astro_transferred {
+            // Calculating how much Astro user can claim (from total one time reward)
+            let total_claimable_astro_rewards = user_info
+                .total_astro_rewards
+                .checked_sub(user_info.delegated_astro_rewards)?;
+            if total_claimable_astro_rewards > Uint128::zero() {
+                cosmos_msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
+                    contract_addr: astro_token.to_string(),
+                    funds: vec![],
+                    msg: to_binary(&Cw20ExecuteMsg::Transfer {
+                        recipient: user_address.to_string(),
+                        amount: total_claimable_astro_rewards,
+                    })?,
+                }));
+            }
+            user_info.astro_transferred = true;
+            attributes.push(attr(
+                "total_claimable_astro_reward",
+                total_claimable_astro_rewards,
+            ));
+            USER_INFO.save(deps.storage, &user_address, &user_info)?;
         }
     }
 
@@ -1222,6 +1243,7 @@ pub fn callback_withdraw_user_rewards_for_lockup_optional_withdraw(
         astroport_lp_token, ..
     }) = &pool_info.migration_info
     {
+        // Calculate Astro LP share for the lockup position
         let astroport_lp_amount: Uint128 = {
             let balance: Uint128 = if pool_info.is_staked {
                 deps.querier.query_wasm_smart(
@@ -1249,6 +1271,7 @@ pub fn callback_withdraw_user_rewards_for_lockup_optional_withdraw(
             .try_into()?
         };
 
+        // If Astro LP tokens are staked with Astro generator
         if pool_info.is_staked {
             let generator = config.generator.expect("Generator should be set");
 
@@ -1259,39 +1282,46 @@ pub fn callback_withdraw_user_rewards_for_lockup_optional_withdraw(
                 },
             )?;
 
+            // Calculate claimable Astro staking rewards for this lockup
             let total_lockup_astro_rewards =
                 pool_info.generator_astro_per_share * astroport_lp_amount;
             let pending_astro_rewards =
                 total_lockup_astro_rewards - lockup_info.generator_astro_debt;
             lockup_info.generator_astro_debt = total_lockup_astro_rewards;
 
-            cosmos_msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
-                contract_addr: rwi.base_reward_token.to_string(),
-                funds: vec![],
-                msg: to_binary(&Cw20ExecuteMsg::Transfer {
-                    recipient: user_address.to_string(),
-                    amount: pending_astro_rewards,
-                })?,
-            }));
-
+            // If claimable Astro staking rewards > 0, claim them
+            if pending_astro_rewards > Uint128::zero() {
+                cosmos_msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
+                    contract_addr: rwi.base_reward_token.to_string(),
+                    funds: vec![],
+                    msg: to_binary(&Cw20ExecuteMsg::Transfer {
+                        recipient: user_address.to_string(),
+                        amount: pending_astro_rewards,
+                    })?,
+                }));
+            }
             attributes.push(attr("generator_astro_reward", pending_astro_rewards));
 
+            // If this LP token is getting dual incentives
             if let Some(proxy_reward_token) = rwi.proxy_reward_token {
+                // Calculate claimable proxy staking rewards for this lockup
                 let total_lockup_proxy_rewards =
                     pool_info.generator_proxy_per_share * astroport_lp_amount;
                 let pending_proxy_rewards =
                     total_lockup_proxy_rewards - lockup_info.generator_proxy_debt;
                 lockup_info.generator_proxy_debt = total_lockup_proxy_rewards;
 
-                cosmos_msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
-                    contract_addr: proxy_reward_token.to_string(),
-                    funds: vec![],
-                    msg: to_binary(&Cw20ExecuteMsg::Transfer {
-                        recipient: user_address.to_string(),
-                        amount: pending_proxy_rewards,
-                    })?,
-                }));
-
+                // If claimable proxy staking rewards > 0, claim them
+                if pending_proxy_rewards > Uint128::zero() {
+                    cosmos_msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
+                        contract_addr: proxy_reward_token.to_string(),
+                        funds: vec![],
+                        msg: to_binary(&Cw20ExecuteMsg::Transfer {
+                            recipient: user_address.to_string(),
+                            amount: pending_proxy_rewards,
+                        })?,
+                    }));
+                }
                 attributes.push(attr("generator_proxy_reward", pending_proxy_rewards));
             }
 
@@ -1310,12 +1340,13 @@ pub fn callback_withdraw_user_rewards_for_lockup_optional_withdraw(
 
         if withdraw_lp_stake {
             // COSMOS MSG :: Transfers ASTRO (that user received as rewards for this lockup position) from user to itself
-            if force_unlock && lockup_info.astro_transferred {
+            if force_unlock {
+                // astro to return = astro rewards + 25% additional fine
                 let astro_to_return = Uint256::from(
                     lockup_info
                         .astro_rewards
                         .expect("Position astro rewards should be set"),
-                ) * Decimal256::from_ratio(UNLOCK_FINE, 100u64);
+                ) * Decimal256::from_ratio(100u64 + UNLOCK_FINE, 100u64);
 
                 let astro_token = config
                     .astro_token
@@ -1350,7 +1381,6 @@ pub fn callback_withdraw_user_rewards_for_lockup_optional_withdraw(
             ASSET_POOLS.save(deps.storage, &terraswap_lp_token, &pool_info)?;
 
             attributes.push(attr("astroport_lp_unlocked", astroport_lp_amount));
-
             LOCKUP_INFO.remove(deps.storage, lockup_key);
         } else {
             LOCKUP_INFO.save(deps.storage, lockup_key, &lockup_info)?;
@@ -1538,6 +1568,7 @@ pub fn query_user_info(deps: Deps, env: Env, user: String) -> StdResult<UserInfo
     Ok(UserInfoResponse {
         total_astro_rewards,
         delegated_astro_rewards: user_info.delegated_astro_rewards,
+        astro_transferred: user_info.astro_transferred,
         lockup_infos,
     })
 }
@@ -1555,17 +1586,21 @@ pub fn query_lockup_info(
     let terraswap_lp_token = deps.api.addr_validate(&terraswap_lp_token)?;
     let user_address = deps.api.addr_validate(user_address)?;
     let lockup_key = (&terraswap_lp_token, &user_address, U64Key::new(duration));
-    let pool_info = ASSET_POOLS.load(deps.storage, &terraswap_lp_token)?;
+    let mut pool_info = ASSET_POOLS.load(deps.storage, &terraswap_lp_token)?;
     let mut lockup_info = LOCKUP_INFO.load(deps.storage, lockup_key)?;
 
-    let mut astroport_lp_units: Option<Uint128> = None;
+    let mut pool_astroport_lp_units = Uint128::zero();
+    let mut lockup_astroport_lp_units: Option<Uint128> = None;
     let mut astroport_lp_token_opt: Option<Addr> = None;
+    let mut claimable_generator_astro_debt = Uint128::zero();
+    let mut claimable_generator_proxy_debt = Uint128::zero();
     if let Some(MigrationInfo {
         astroport_lp_token, ..
-    }) = pool_info.migration_info
+    }) = pool_info.migration_info.clone()
     {
-        astroport_lp_units = Some({
-            let balance: Uint128 = if pool_info.is_staked {
+        lockup_astroport_lp_units = Some({
+            // Query Astro LP Tokens balance for the pool
+            pool_astroport_lp_units = if pool_info.is_staked {
                 deps.querier.query_wasm_smart(
                     &config
                         .generator
@@ -1586,7 +1621,10 @@ pub fn query_lockup_info(
                 )?;
                 res.balance
             };
-            (lockup_info.lp_units_locked.full_mul(balance)
+            // Calculate Lockup Astro LP shares
+            (lockup_info
+                .lp_units_locked
+                .full_mul(pool_astroport_lp_units)
                 / Uint256::from(pool_info.terraswap_amount_in_lockups))
             .try_into()?
         });
@@ -1609,15 +1647,62 @@ pub fn query_lockup_info(
         ));
     }
 
+    // If LP tokens are staked, calculate the rewards claimable by the user for this lockup position
+    if let Some(MigrationInfo {
+        astroport_lp_token, ..
+    }) = &pool_info.migration_info
+    {
+        if pool_info.is_staked
+            && lockup_astroport_lp_units.is_some()
+            && !lockup_astroport_lp_units.unwrap().is_zero()
+        {
+            let generator = config
+                .generator
+                .expect("Generator should be set at this moment!");
+
+            // QUERY :: Check if there are any pending staking rewards
+            let pending_rewards: PendingTokenResponse = deps.querier.query_wasm_smart(
+                &generator,
+                &GenQueryMsg::PendingToken {
+                    lp_token: astroport_lp_token.clone(),
+                    user: env.contract.address.clone(),
+                },
+            )?;
+
+            // Calculate claimable Astro staking rewards for this lockup
+            pool_info.generator_astro_per_share = pool_info.generator_astro_per_share
+                + Decimal::from_ratio(pending_rewards.pending, pool_astroport_lp_units);
+
+            let total_lockup_astro_rewards =
+                pool_info.generator_astro_per_share * lockup_astroport_lp_units.unwrap();
+            claimable_generator_astro_debt =
+                total_lockup_astro_rewards - lockup_info.generator_astro_debt;
+
+            // Calculate claimable Proxy staking rewards for this lockup
+            if !pending_rewards.pending_on_proxy.is_none() {
+                pool_info.generator_proxy_per_share = pool_info.generator_proxy_per_share
+                    + Decimal::from_ratio(
+                        pending_rewards.pending_on_proxy.unwrap(),
+                        pool_astroport_lp_units,
+                    );
+                let total_lockup_proxy_rewards =
+                    pool_info.generator_proxy_per_share * lockup_astroport_lp_units.unwrap();
+                claimable_generator_proxy_debt =
+                    total_lockup_proxy_rewards - lockup_info.generator_proxy_debt;
+            }
+        }
+    }
+
     Ok(LockUpInfoResponse {
         lp_units_locked: lockup_info.lp_units_locked,
         withdrawal_flag: lockup_info.withdrawal_flag,
         astro_rewards: lockup_info.astro_rewards,
-        astro_transferred: lockup_info.astro_transferred,
         generator_astro_debt: lockup_info.generator_astro_debt,
+        claimable_generator_astro_debt: claimable_generator_astro_debt,
         generator_proxy_debt: lockup_info.generator_proxy_debt,
+        claimable_generator_proxy_debt: claimable_generator_proxy_debt,
         unlock_timestamp: lockup_info.unlock_timestamp,
-        astroport_lp_units,
+        astroport_lp_units: lockup_astroport_lp_units,
         astroport_lp_token: astroport_lp_token_opt,
         duration,
     })

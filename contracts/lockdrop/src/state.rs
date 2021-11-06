@@ -74,8 +74,12 @@ pub struct PoolInfo {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema, Default)]
 pub struct UserInfo {
+    /// Total ASTRO tokens user received as rewards for participation in the lockdrop
+    pub total_astro_rewards: Uint128,
     /// Total ASTRO tokens user delegated to the LP bootstrap auction pool
     pub delegated_astro_rewards: Uint128,
+    /// ASTRO tokens transferred to user
+    pub astro_transferred: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -86,8 +90,6 @@ pub struct LockupInfo {
     pub withdrawal_flag: bool,
     /// ASTRO tokens received as rewards for participation in the lockdrop
     pub astro_rewards: Option<Uint128>,
-    /// ASTRO tokens transferred to user
-    pub astro_transferred: bool,
     /// Generator ASTRO tokens loockup received as generator rewards
     pub generator_astro_debt: Uint128,
     /// Generator Proxy tokens lockup received as generator rewards
