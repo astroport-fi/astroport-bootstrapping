@@ -6,7 +6,6 @@
     "are_claims_allowed",
     "supported_pairs_list",
     "total_astro_delegated",
-    "total_astro_returned_available",
     "total_incentives_share"
   ],
   "properties": {
@@ -23,14 +22,6 @@
     },
     "total_astro_delegated": {
       "description": "ASTRO Tokens delegated to the bootstrap auction contract",
-      "allOf": [
-        {
-          "$ref": "#/definitions/Uint128"
-        }
-      ]
-    },
-    "total_astro_returned_available": {
-      "description": "ASTRO returned to forcefully unlock Lockup positions",
       "allOf": [
         {
           "$ref": "#/definitions/Uint128"

@@ -101,30 +101,6 @@
     {
       "type": "object",
       "required": [
-        "transfer_returned_astro"
-      ],
-      "properties": {
-        "transfer_returned_astro": {
-          "type": "object",
-          "required": [
-            "amount",
-            "recepient"
-          ],
-          "properties": {
-            "amount": {
-              "$ref": "#/definitions/Uint128"
-            },
-            "recepient": {
-              "type": "string"
-            }
-          }
-        }
-      },
-      "additionalProperties": false
-    },
-    {
-      "type": "object",
-      "required": [
         "withdraw_from_lockup"
       ],
       "properties": {
@@ -226,7 +202,6 @@
           "type": "object",
           "required": [
             "duration",
-            "force_unlock",
             "terraswap_lp_token",
             "withdraw_lp_stake"
           ],
@@ -235,9 +210,6 @@
               "type": "integer",
               "format": "uint64",
               "minimum": 0.0
-            },
-            "force_unlock": {
-              "type": "boolean"
             },
             "terraswap_lp_token": {
               "type": "string"
@@ -379,7 +351,6 @@
               "type": "object",
               "required": [
                 "duration",
-                "force_unlock",
                 "terraswap_lp_token",
                 "user_address",
                 "withdraw_lp_stake"
@@ -389,9 +360,6 @@
                   "type": "integer",
                   "format": "uint64",
                   "minimum": 0.0
-                },
-                "force_unlock": {
-                  "type": "boolean"
                 },
                 "terraswap_lp_token": {
                   "$ref": "#/definitions/Addr"
