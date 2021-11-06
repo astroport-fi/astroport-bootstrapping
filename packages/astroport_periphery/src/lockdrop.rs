@@ -61,18 +61,12 @@ pub enum ExecuteMsg {
         terraswap_lp_token: String,
         incentives_share: u64,
     },
-    // ADMIN Function ::: To transfer ASTRO Tokens which have been returned to force unlock LP positions
-    TransferReturnedAstro {
-        recepient: String,
-        amount: Uint128,
-    },
     // Function to facilitate LP Token withdrawals from lockups
     WithdrawFromLockup {
         terraswap_lp_token: String,
         duration: u64,
         amount: Uint128,
     },
-
     // ADMIN Function ::: To Migrate liquidity from terraswap to astroport
     MigrateLiquidity {
         terraswap_lp_token: String,
@@ -94,7 +88,6 @@ pub enum ExecuteMsg {
         terraswap_lp_token: String,
         duration: u64,
         withdraw_lp_stake: bool,
-        force_unlock: bool,
     },
     /// Callbacks; only callable by the contract itself.
     Callback(CallbackMsg),
@@ -120,7 +113,6 @@ pub enum CallbackMsg {
         user_address: Addr,
         duration: u64,
         withdraw_lp_stake: bool,
-        force_unlock: bool,
     },
     WithdrawLiquidityFromTerraswapCallback {
         terraswap_lp_token: Addr,
@@ -193,8 +185,6 @@ pub struct StateResponse {
     pub total_incentives_share: u64,
     /// ASTRO Tokens delegated to the bootstrap auction contract
     pub total_astro_delegated: Uint128,
-    /// ASTRO returned to forcefully unlock Lockup positions
-    pub total_astro_returned_available: Uint128,
     /// Boolean value indicating if the user can withdraw thier ASTRO rewards or not
     pub are_claims_allowed: bool,
     /// Vector containing LP addresses for all the supported LP Pools
@@ -238,6 +228,8 @@ pub struct UserInfoResponse {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct LockUpInfoResponse {
+    /// Terraswap LP token
+    pub terraswap_lp_token: Addr,
     /// Terraswap LP units locked by the user
     pub lp_units_locked: Uint128,
     /// Boolean value indicating if the user's has withdrawn funds post the only 1 withdrawal limit cutoff

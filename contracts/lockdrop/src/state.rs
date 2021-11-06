@@ -49,8 +49,6 @@ pub struct State {
     pub total_incentives_share: u64,
     /// ASTRO Tokens delegated to the bootstrap auction contract
     pub total_astro_delegated: Uint128,
-    /// ASTRO returned to forcefully unlock Lockup positions
-    pub total_astro_returned_available: Uint128,
     /// Boolean value indicating if the user can withdraw their ASTRO rewards or not
     pub are_claims_allowed: bool,
 }
