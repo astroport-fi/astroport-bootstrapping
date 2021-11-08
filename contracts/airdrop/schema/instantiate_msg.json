@@ -4,7 +4,7 @@
   "type": "object",
   "required": [
     "astro_token_address",
-    "boostrap_auction_address",
+    "auction_contract_address",
     "to_timestamp",
     "total_airdrop_size"
   ],
@@ -12,17 +12,8 @@
     "astro_token_address": {
       "type": "string"
     },
-    "boostrap_auction_address": {
+    "auction_contract_address": {
       "type": "string"
-    },
-    "evm_merkle_roots": {
-      "type": [
-        "array",
-        "null"
-      ],
-      "items": {
-        "type": "string"
-      }
     },
     "from_timestamp": {
       "type": [
@@ -32,13 +23,7 @@
       "format": "uint64",
       "minimum": 0.0
     },
-    "owner": {
-      "type": [
-        "string",
-        "null"
-      ]
-    },
-    "terra_merkle_roots": {
+    "merkle_roots": {
       "type": [
         "array",
         "null"
@@ -46,6 +31,12 @@
       "items": {
         "type": "string"
       }
+    },
+    "owner": {
+      "type": [
+        "string",
+        "null"
+      ]
     },
     "to_timestamp": {
       "type": "integer",

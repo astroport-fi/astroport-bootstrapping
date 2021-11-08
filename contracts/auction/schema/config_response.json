@@ -6,6 +6,7 @@
     "airdrop_contract_address",
     "astro_rewards",
     "astro_token_address",
+    "astroport_lp_pool",
     "deposit_window",
     "generator_contract",
     "init_timestamp",
@@ -22,6 +23,9 @@
       "$ref": "#/definitions/Uint256"
     },
     "astro_token_address": {
+      "type": "string"
+    },
+    "astroport_lp_pool": {
       "type": "string"
     },
     "deposit_window": {

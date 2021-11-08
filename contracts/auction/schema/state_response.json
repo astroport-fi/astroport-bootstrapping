@@ -5,9 +5,10 @@
   "required": [
     "are_staked",
     "global_reward_index",
-    "lp_shares_claimed",
     "lp_shares_minted",
-    "total_astro_delegated",
+    "lp_shares_withdrawn",
+    "pool_init_timestamp",
+    "total_astro_deposited",
     "total_ust_deposited"
   ],
   "properties": {
@@ -17,13 +18,18 @@
     "global_reward_index": {
       "$ref": "#/definitions/Decimal256"
     },
-    "lp_shares_claimed": {
-      "$ref": "#/definitions/Uint256"
-    },
     "lp_shares_minted": {
       "$ref": "#/definitions/Uint256"
     },
-    "total_astro_delegated": {
+    "lp_shares_withdrawn": {
+      "$ref": "#/definitions/Uint256"
+    },
+    "pool_init_timestamp": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    },
+    "total_astro_deposited": {
       "$ref": "#/definitions/Uint256"
     },
     "total_ust_deposited": {

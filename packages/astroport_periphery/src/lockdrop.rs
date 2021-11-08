@@ -1,49 +1,42 @@
-use cosmwasm_bignumber::{Decimal256, Uint256};
-use cosmwasm_std::{to_binary, Addr, CosmosMsg, StdResult, Uint128, WasmMsg};
+use cosmwasm_std::{
+    to_binary, Addr, CosmosMsg, Decimal, Env, StdResult, Uint128, Uint256, WasmMsg,
+};
 use cw20::Cw20ReceiveMsg;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InstantiateMsg {
-    /// Account who can update config
-    pub owner: String,
-    /// Bootstrap Auction contract address
-    pub auction_contract_address: Option<String>,
-    /// Generator (Staking for dual rewards) contract address
-    pub generator_address: Option<String>,
-    /// Astroport token address
-    pub astro_token_address: Option<String>,
+    /// Account which can update config
+    pub owner: Option<String>,
     /// Timestamp when Contract will start accepting LP Token deposits
     pub init_timestamp: u64,
-    /// Number of seconds for which lockup deposits will be accepted
+    /// Number of seconds during which lockup deposits will be accepted
     pub deposit_window: u64,
     /// Withdrawal Window Length :: Post the deposit window
     pub withdrawal_window: u64,
     /// Min. no. of weeks allowed for lockup
-    pub min_duration: u64,
+    pub min_lock_duration: u64,
     /// Max. no. of weeks allowed for lockup
-    pub max_duration: u64,
-    /// Number of seconds per week
-    pub seconds_per_week: u64,
+    pub max_lock_duration: u64,
     /// Lockdrop Reward multiplier
-    pub weekly_multiplier: Decimal256,
-    /// Total MARS lockdrop incentives to be distributed among the users
-    pub lockdrop_incentives: Uint256,
+    pub weekly_multiplier: u64,
+    /// Lockdrop Reward divider
+    pub weekly_divider: u64,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct UpdateConfigMsg {
-    /// Account who can update config
+    /// Account which can update config
     pub owner: Option<String>,
+    /// Astroport token address
+    pub astro_token_address: Option<String>,
     /// Bootstrap Auction contract address
     pub auction_contract_address: Option<String>,
     /// Generator (Staking for dual rewards) contract address
     pub generator_address: Option<String>,
-    /// Astroport token address
-    pub astro_token_address: Option<String>,
-    /// Total MARS lockdrop incentives to be distributed among the users
-    pub lockdrop_incentives: Option<Uint256>,
+    /// Total ASTRO lockdrop incentives to be distributed among the users
+    pub lockdrop_incentives: Option<Uint128>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -56,59 +49,52 @@ pub enum ExecuteMsg {
         new_config: UpdateConfigMsg,
     },
     // Called by the bootstrap auction contract when liquidity is added to the
-    // ASTRO-UST Pool to enable ASTRO withdrawals by users
+    // Pool to enable ASTRO withdrawals by users
     EnableClaims {},
     // ADMIN Function ::: Add new Pool (Only Terraswap Pools)
     InitializePool {
-        terraswap_pool: LiquidityPool,
-        incentives_percent: Option<Decimal256>,
+        terraswap_lp_token: String,
+        incentives_share: u64,
     },
-    // ADMIN Function ::: To set incentives_percent for the Pool
+    // ADMIN Function ::: To set incentives_share for the Pool
     UpdatePool {
-        pool_identifier: String,
-        incentives_percent: Decimal256,
+        terraswap_lp_token: String,
+        incentives_share: u64,
     },
     // ADMIN Function ::: To transfer ASTRO Tokens which have been returned to force unlock LP positions
     TransferReturnedAstro {
         recepient: String,
-        amount: Uint256,
+        amount: Uint128,
     },
     // Function to facilitate LP Token withdrawals from lockups
     WithdrawFromLockup {
-        pool_identifer: String,
+        terraswap_lp_token: String,
         duration: u64,
-        amount: Uint256,
+        amount: Uint128,
     },
 
     // ADMIN Function ::: To Migrate liquidity from terraswap to astroport
     MigrateLiquidity {
-        pool_identifer: String,
-        astroport_pool_address: String,
-        astroport_lp_address: String,
+        terraswap_lp_token: String,
+        astroport_pool_addr: String,
     },
-    // // ADMIN Function ::: To stake LP Tokens with the guage generator contract
+    // ADMIN Function ::: To stake LP Tokens with the generator contract
     StakeLpTokens {
-        pool_identifer: String,
+        terraswap_lp_token: String,
     },
     // Delegate ASTRO to Bootstrap via auction contract
     DelegateAstroToAuction {
-        amount: Uint256,
+        amount: Uint128,
     },
-    // Facilitates ASTRO reward withdrawal which have not been delegated to bootstrap auction
-    ClaimRewardsForLockup {
-        pool_identifer: String,
+    // Facilitates ASTRO reward withdrawal which have not been delegated to bootstrap auction along with optional Unlock (can be forceful)
+    // If withdraw_lp_stake is true and force_unlock is false, it Unlocks the lockup position if its lockup duration has concluded
+    // If both withdraw_lp_stake and force_unlock are true, it forcefully unlocks the positon. user needs to approve ASTRO Token to
+    // be transferred by the lockdrop contract to itself for forceful unlock
+    ClaimRewardsAndOptionallyUnlock {
+        terraswap_lp_token: String,
         duration: u64,
-    },
-    // Unlocks a lockup position whose lockup duration has concluded
-    UnlockPosition {
-        pool_identifer: String,
-        duration: u64,
-    },
-    // Unlocks a lockup position whose lockup duration has not concluded. user needs to approve ASTRO Token to
-    // be transferred by the lockdrop contract before calling this function
-    ForceUnlockPosition {
-        pool_identifer: String,
-        duration: u64,
+        withdraw_lp_stake: bool,
+        force_unlock: bool,
     },
     /// Callbacks; only callable by the contract itself.
     Callback(CallbackMsg),
@@ -125,39 +111,31 @@ pub enum Cw20HookMsg {
 #[serde(rename_all = "snake_case")]
 pub enum CallbackMsg {
     UpdatePoolOnDualRewardsClaim {
-        pool_identifer: String,
-        prev_astro_balance: Uint256,
-        prev_dual_reward_balance: Uint256,
+        terraswap_lp_token: Addr,
+        prev_astro_balance: Uint128,
+        prev_proxy_reward_balance: Option<Uint128>,
     },
     WithdrawUserLockupRewardsCallback {
+        terraswap_lp_token: Addr,
         user_address: Addr,
-        pool_identifer: String,
         duration: u64,
         withdraw_lp_stake: bool,
         force_unlock: bool,
     },
     WithdrawLiquidityFromTerraswapCallback {
-        pool_identifer: String,
-        native_asset: NativeAsset,
-        native_asset_balance: Uint128,
-        cw20_asset: Cw20Asset,
-        cw20_asset_balance: Uint128,
-        astroport_pool: LiquidityPool,
-    },
-    UpdateStateLiquidityMigrationCallback {
-        pool_identifer: String,
-        astroport_pool: LiquidityPool,
-        astroport_lp_balance: Uint128,
+        terraswap_lp_token: Addr,
+        astroport_pool: Addr,
+        prev_assets: [terraswap::asset::Asset; 2],
     },
 }
 
 // Modified from
 // https://github.com/CosmWasm/cosmwasm-plus/blob/v0.2.3/packages/cw20/src/receiver.rs#L15
 impl CallbackMsg {
-    pub fn to_cosmos_msg(&self, contract_addr: &Addr) -> StdResult<CosmosMsg> {
+    pub fn to_cosmos_msg(self, env: &Env) -> StdResult<CosmosMsg> {
         Ok(CosmosMsg::Wasm(WasmMsg::Execute {
-            contract_addr: String::from(contract_addr),
-            msg: to_binary(&ExecuteMsg::Callback(self.clone()))?,
+            contract_addr: env.contract.address.to_string(),
+            msg: to_binary(&ExecuteMsg::Callback(self))?,
             funds: vec![],
         }))
     }
@@ -169,34 +147,31 @@ pub enum QueryMsg {
     Config {},
     State {},
     Pool {
-        pool_identifier: String,
+        terraswap_lp_token: String,
     },
     UserInfo {
         address: String,
     },
     LockUpInfo {
         user_address: String,
-        pool_identifier: String,
+        terraswap_lp_token: String,
         duration: u64,
-    },
-    LockUpInfoWithId {
-        lockup_id: String,
     },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct ConfigResponse {
-    /// Account who can update config
-    pub owner: String,
-    /// Bootstrap Auction contract address
-    pub auction_contract_address: String,
-    /// Generator (ASTRO-UST Staking) contract address
-    pub generator_address: String,
+    /// Account which can update config
+    pub owner: Addr,
     /// ASTRO Token address
-    pub astro_token_address: String,
+    pub astro_token: Option<Addr>,
+    /// Bootstrap Auction contract address
+    pub auction_contract: Option<Addr>,
+    /// Generator (Staking for dual rewards) contract address
+    pub generator: Option<Addr>,
     /// Timestamp when Contract will start accepting LP Token deposits
     pub init_timestamp: u64,
-    /// Deposit Window Length
+    /// Number of seconds during which lockup deposits will be accepted
     pub deposit_window: u64,
     /// Withdrawal Window Length :: Post the deposit window
     pub withdrawal_window: u64,
@@ -204,78 +179,79 @@ pub struct ConfigResponse {
     pub min_lock_duration: u64,
     /// Max. no. of weeks allowed for lockup
     pub max_lock_duration: u64,
-    /// Number of seconds per week
-    pub seconds_per_week: u64,
     /// Lockdrop Reward multiplier
-    pub weekly_multiplier: Decimal256,
+    pub weekly_multiplier: u64,
+    /// Lockdrop Reward divider
+    pub weekly_divider: u64,
     /// Total ASTRO lockdrop incentives to be distributed among the users
-    pub lockdrop_incentives: Uint256,
+    pub lockdrop_incentives: Option<Uint128>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct StateResponse {
+    /// Total ASTRO incentives share
+    pub total_incentives_share: u64,
     /// ASTRO Tokens delegated to the bootstrap auction contract
-    pub total_astro_delegated: Uint256,
+    pub total_astro_delegated: Uint128,
     /// ASTRO returned to forcefully unlock Lockup positions
-    pub total_astro_returned_available: Uint256,
+    pub total_astro_returned_available: Uint128,
     /// Boolean value indicating if the user can withdraw thier ASTRO rewards or not
     pub are_claims_allowed: bool,
     /// Vector containing LP addresses for all the supported LP Pools
-    pub supported_pairs_list: Vec<String>,
+    pub supported_pairs_list: Vec<Addr>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct MigrationInfo {
+    pub terraswap_migrated_amount: Uint128,
+    pub astroport_lp_token: Addr,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct PoolResponse {
-    /// Terraswap Pool Details
-    pub terraswap_pair: LiquidityPool,
-    /// Astroport Pool Details
-    pub astroport_pair: LiquidityPool,
-    /// Pair's cw20 token
-    pub cw20_asset: Cw20Asset,
-    /// Pair's Native token (uusd/uluna)
-    pub native_asset: NativeAsset,
-    /// % of total ASTRO incentives allocated to this pool
-    pub incentives_percent: Decimal256,
-    /// Boolean value indicating if the LP Tokens are staked with the Generator contract or not
-    pub is_staked: bool,
-    /// Boolean value indicating if the liquidity has been migrated or not
-    pub is_migrated: bool,
+    pub terraswap_pool: Addr,
+    pub terraswap_amount_in_lockups: Uint128,
+    pub migration_info: Option<MigrationInfo>,
+    /// Share of total ASTRO incentives allocated to this pool
+    pub incentives_share: u64,
     /// Weighted LP Token balance used to calculate ASTRO rewards a particular user can claim
     pub weighted_amount: Uint256,
-    /// Ratio of ASTRO rewards accured to total_lp_deposited. Used to calculate ASTRO incentives accured by each user
-    pub astro_global_reward_index: Decimal256,
-    /// Ratio of ASSET rewards accured to total_lp_deposited. Used to calculate ASSET incentives accured by each user
-    pub asset_global_reward_index: Decimal256,
+    /// Ratio of ASTRO rewards accured to weighted_amount. Used to calculate ASTRO incentives accured by each user
+    pub generator_astro_per_share: Decimal,
+    /// Ratio of ASSET rewards accured to weighted. Used to calculate ASSET incentives accured by each user
+    pub generator_proxy_per_share: Decimal,
+    /// Boolean value indicating if the LP Tokens are staked with the Generator contract or not
+    pub is_staked: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct UserInfoResponse {
     /// Total ASTRO tokens user received as rewards for participation in the lockdrop
-    pub total_astro_rewards: Uint256,
+    pub total_astro_rewards: Uint128,
     /// Total ASTRO tokens user delegated to the LP bootstrap auction pool
-    pub delegated_astro_rewards: Uint256,
-    /// Contains lockup Ids of the User's lockup positions with different pools having different durations / deposit amounts
-    pub lockup_positions: Vec<String>,
+    pub delegated_astro_rewards: Uint128,
+    /// Lockup positions
+    pub lockup_infos: Vec<LockUpInfoResponse>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct LockUpInfoResponse {
-    /// LP Pool identifer whose LP tokens this Lockdrop position accounts for
-    pub pool_identifier: String,
-    /// Lockup Duration
-    pub duration: u64,
-    /// UST locked as part of this lockup position
-    pub lp_units_locked: Uint256,
-    /// UST locked as part of this lockup position
-    pub astro_rewards: Uint256,
-    /// Boolean value indicating if the user's LP units have been updated post liquidity migration
-    pub is_migrated: bool,
+    /// Terraswap LP units locked by the user
+    pub lp_units_locked: Uint128,
     /// Boolean value indicating if the user's has withdrawn funds post the only 1 withdrawal limit cutoff
-    pub withdrawal_counter: bool,
+    pub withdrawal_flag: bool,
+    /// ASTRO tokens received as rewards for participation in the lockdrop
+    pub astro_rewards: Option<Uint128>,
+    /// ASTRO tokens transferred to user
+    pub astro_transferred: bool,
+    pub duration: u64,
+    /// Generator ASTRO tokens loockup received as generator rewards
+    pub generator_astro_debt: Uint128,
+    /// Generator Proxy tokens lockup received as generator rewards
+    pub generator_proxy_debt: Uint128,
     /// Timestamp beyond which this position can be unlocked
     pub unlock_timestamp: u64,
-    /// Used to calculate user's pending ASTRO rewards from the generator (staking) contract
-    pub astro_reward_index: Decimal256,
-    /// Used to calculate user's pending DUAL rewards from the generator (staking) contract
-    pub dual_reward_index: Decimal256,
+    /// User's Astroport LP units, calculated as lp_units_locked (terraswap) / total LP units locked (terraswap) * Astroport LP units minted post migration
+    pub astroport_lp_units: Option<Uint128>,
+    pub astroport_lp_token: Option<Addr>,
 }

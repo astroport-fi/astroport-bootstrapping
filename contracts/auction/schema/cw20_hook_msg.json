@@ -1,14 +1,14 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Cw20HookMsg",
-  "anyOf": [
+  "oneOf": [
     {
       "type": "object",
       "required": [
-        "delegate_astro_tokens"
+        "deposit_astro_tokens"
       ],
       "properties": {
-        "delegate_astro_tokens": {
+        "deposit_astro_tokens": {
           "type": "object",
           "required": [
             "user_address"

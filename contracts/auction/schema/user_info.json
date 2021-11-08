@@ -3,23 +3,18 @@
   "title": "UserInfo",
   "type": "object",
   "required": [
-    "astro_delegated",
-    "claimed_auction_incentives",
-    "claimed_lp_shares",
+    "astro_deposited",
     "lp_shares",
     "total_auction_incentives",
     "user_reward_index",
     "ust_deposited",
-    "withdrawl_counter"
+    "withdrawl_counter",
+    "withdrawn_auction_incentives",
+    "withdrawn_lp_shares",
+    "withdrawn_staking_incentives"
   ],
   "properties": {
-    "astro_delegated": {
-      "$ref": "#/definitions/Uint256"
-    },
-    "claimed_auction_incentives": {
-      "$ref": "#/definitions/Uint256"
-    },
-    "claimed_lp_shares": {
+    "astro_deposited": {
       "$ref": "#/definitions/Uint256"
     },
     "lp_shares": {
@@ -36,6 +31,15 @@
     },
     "withdrawl_counter": {
       "type": "boolean"
+    },
+    "withdrawn_auction_incentives": {
+      "$ref": "#/definitions/Uint256"
+    },
+    "withdrawn_lp_shares": {
+      "$ref": "#/definitions/Uint256"
+    },
+    "withdrawn_staking_incentives": {
+      "$ref": "#/definitions/Uint256"
     }
   },
   "definitions": {

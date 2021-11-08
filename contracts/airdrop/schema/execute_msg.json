@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "ExecuteMsg",
-  "anyOf": [
+  "oneOf": [
     {
       "description": "Admin function to update the configuration parameters",
       "type": "object",
@@ -12,20 +12,11 @@
         "update_config": {
           "type": "object",
           "properties": {
-            "boostrap_auction_address": {
+            "auction_contract_address": {
               "type": [
                 "string",
                 "null"
               ]
-            },
-            "evm_merkle_roots": {
-              "type": [
-                "array",
-                "null"
-              ],
-              "items": {
-                "type": "string"
-              }
             },
             "from_timestamp": {
               "type": [
@@ -35,13 +26,7 @@
               "format": "uint64",
               "minimum": 0.0
             },
-            "owner": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "terra_merkle_roots": {
+            "merkle_roots": {
               "type": [
                 "array",
                 "null"
@@ -49,6 +34,12 @@
               "items": {
                 "type": "string"
               }
+            },
+            "owner": {
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "to_timestamp": {
               "type": [
@@ -79,10 +70,10 @@
       "description": "Allows Terra users to claim their ASTRO Airdrop",
       "type": "object",
       "required": [
-        "claim_by_terra_user"
+        "claim"
       ],
       "properties": {
-        "claim_by_terra_user": {
+        "claim": {
           "type": "object",
           "required": [
             "claim_amount",
@@ -103,52 +94,6 @@
               "type": "integer",
               "format": "uint32",
               "minimum": 0.0
-            }
-          }
-        }
-      },
-      "additionalProperties": false
-    },
-    {
-      "description": "Allows EVM users to claim their ASTRO Airdrop",
-      "type": "object",
-      "required": [
-        "claim_by_evm_user"
-      ],
-      "properties": {
-        "claim_by_evm_user": {
-          "type": "object",
-          "required": [
-            "claim_amount",
-            "eth_address",
-            "merkle_proof",
-            "root_index",
-            "signature",
-            "signed_msg_hash"
-          ],
-          "properties": {
-            "claim_amount": {
-              "$ref": "#/definitions/Uint128"
-            },
-            "eth_address": {
-              "type": "string"
-            },
-            "merkle_proof": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "root_index": {
-              "type": "integer",
-              "format": "uint32",
-              "minimum": 0.0
-            },
-            "signature": {
-              "type": "string"
-            },
-            "signed_msg_hash": {
-              "type": "string"
             }
           }
         }
