@@ -254,4 +254,5 @@ pub struct LockUpInfoResponse {
     /// User's Astroport LP units, calculated as lp_units_locked (terraswap) / total LP units locked (terraswap) * Astroport LP units minted post migration
     pub astroport_lp_units: Option<Uint128>,
     pub astroport_lp_token: Option<Addr>,
+    pub terraswap_lp_token: Addr,
 }

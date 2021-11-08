@@ -1047,7 +1047,7 @@ pub fn handle_claim_rewards_and_unlock_for_lockup(
                     contract_addr: generator.to_string(),
                     funds: vec![],
                     msg: to_binary(&GenExecuteMsg::Withdraw {
-                        lp_token: terraswap_lp_token.clone(),
+                        lp_token: astroport_lp_token.clone(),
                         amount: Uint128::zero(),
                     })?,
                 }));
@@ -1613,6 +1613,7 @@ pub fn query_lockup_info(
         astroport_lp_units,
         astroport_lp_token: astroport_lp_token_opt,
         duration,
+        terraswap_lp_token,
     })
 }
 
