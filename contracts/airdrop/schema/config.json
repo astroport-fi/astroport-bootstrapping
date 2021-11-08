@@ -5,7 +5,6 @@
   "required": [
     "are_claims_enabled",
     "astro_token_address",
-    "auction_contract_address",
     "from_timestamp",
     "merkle_roots",
     "owner",
@@ -26,9 +25,12 @@
     },
     "auction_contract_address": {
       "description": "Boostrap auction contract address",
-      "allOf": [
+      "anyOf": [
         {
           "$ref": "#/definitions/Addr"
+        },
+        {
+          "type": "null"
         }
       ]
     },

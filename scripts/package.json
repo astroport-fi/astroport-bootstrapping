@@ -12,11 +12,9 @@
     "bignumber.js": "^9.0.1",
     "chai": "^4.3.4",
     "dotenv": "^8.2.0",
-    "ethereumjs-wallet": "^1.0.1",
     "keccak": "^3.0.2",
     "keccak256": "^1.0.3",
-    "merkletreejs": "^0.2.20",
-    "web3": "^1.5.2"
+    "merkletreejs": "^0.2.20"
   },
   "devDependencies": {
     "@types/chai": "^4.2.21",

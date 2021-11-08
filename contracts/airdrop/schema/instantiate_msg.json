@@ -4,15 +4,11 @@
   "type": "object",
   "required": [
     "astro_token_address",
-    "auction_contract_address",
     "to_timestamp",
     "total_airdrop_size"
   ],
   "properties": {
     "astro_token_address": {
-      "type": "string"
-    },
-    "auction_contract_address": {
       "type": "string"
     },
     "from_timestamp": {

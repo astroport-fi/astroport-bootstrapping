@@ -245,7 +245,7 @@ pub struct LockUpInfoResponse {
     /// ASTRO tokens transferred to user
     pub astro_transferred: bool,
     pub duration: u64,
-    /// Generator ASTRO tokens loockup received as generator rewards
+    /// Generator ASTRO tokens lockup received as generator rewards
     pub generator_astro_debt: Uint128,
     /// Generator Proxy tokens lockup received as generator rewards
     pub generator_proxy_debt: Uint128,
@@ -254,4 +254,5 @@ pub struct LockUpInfoResponse {
     /// User's Astroport LP units, calculated as lp_units_locked (terraswap) / total LP units locked (terraswap) * Astroport LP units minted post migration
     pub astroport_lp_units: Option<Uint128>,
     pub astroport_lp_token: Option<Addr>,
+    pub terraswap_lp_token: Addr,
 }

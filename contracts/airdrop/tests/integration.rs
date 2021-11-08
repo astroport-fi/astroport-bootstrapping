@@ -67,7 +67,6 @@ fn init_contracts(app: &mut App) -> (Addr, Addr, InstantiateMsg) {
         merkle_roots: Some(vec!["merkle_roots".to_string()]),
         from_timestamp: Some(1_000_00),
         to_timestamp: 100_000_00,
-        auction_contract_address: String::from("auction_contract_address"),
         total_airdrop_size: Uint128::new(100_000_000_000),
     };
 
@@ -110,15 +109,33 @@ fn mint_some_astro(
 }
 
 // Helper function. Enables claims (ASTRO Withdrawals) from the Airdrop contract
-fn enable_claims(app: &mut App, airdrop_instance: Addr, auction_contract_address: Addr) {
+fn enable_claims(app: &mut App, airdrop_instance: Addr, owner: Addr) {
     let msg = ExecuteMsg::EnableClaims {};
+    let auction_contract_address = String::from("auction_contract_address");
+
+    // should successfully set auction contract address
     app.execute_contract(
-        auction_contract_address.clone(),
+        owner,
+        airdrop_instance.clone(),
+        &ExecuteMsg::UpdateConfig {
+            owner: None,
+            auction_contract_address: Some(auction_contract_address.clone()),
+            merkle_roots: None,
+            from_timestamp: None,
+            to_timestamp: None,
+        },
+        &[],
+    )
+    .unwrap();
+
+    app.execute_contract(
+        Addr::unchecked(auction_contract_address.clone()),
         airdrop_instance.clone(),
         &msg,
         &[],
     )
     .unwrap();
+
     let resp: ConfigResponse = app
         .wrap()
         .query_wasm_smart(&airdrop_instance, &QueryMsg::Config {})
@@ -138,10 +155,7 @@ fn proper_initialization() {
 
     // Check config
     assert_eq!(init_msg.astro_token_address, resp.astro_token_address);
-    assert_eq!(
-        init_msg.auction_contract_address,
-        resp.auction_contract_address
-    );
+    assert_eq!(None, resp.auction_contract_address);
     assert_eq!(init_msg.owner.unwrap(), resp.owner);
     assert_eq!(init_msg.merkle_roots.unwrap(), resp.merkle_roots);
     assert_eq!(init_msg.from_timestamp.unwrap(), resp.from_timestamp);
@@ -185,13 +199,14 @@ fn update_config() {
     );
 
     let new_owner = String::from("new_owner");
+    let auction_contract_address = String::from("auction_contract_address");
     let merkle_roots = vec!["new_merkle_roots".to_string()];
     let from_timestamp = 2_000_00;
     let to_timestamp = 200_000_00;
 
     let update_msg = ExecuteMsg::UpdateConfig {
         owner: Some(new_owner.clone()),
-        auction_contract_address: None,
+        auction_contract_address: Some(auction_contract_address.clone()),
         merkle_roots: Some(merkle_roots.clone()),
         from_timestamp: Some(from_timestamp),
         to_timestamp: Some(to_timestamp),
@@ -213,6 +228,10 @@ fn update_config() {
 
     // Check config and make sure all fields are updated
     assert_eq!(new_owner, resp.owner);
+    assert_eq!(
+        auction_contract_address,
+        resp.auction_contract_address.unwrap().to_string()
+    );
     assert_eq!(merkle_roots, resp.merkle_roots);
     assert_eq!(from_timestamp, resp.from_timestamp);
     assert_eq!(to_timestamp, resp.to_timestamp);
@@ -586,7 +605,7 @@ fn test_claim_by_terra_user() {
     enable_claims(
         &mut app,
         Addr::unchecked(airdrop_instance.clone()),
-        Addr::unchecked(init_msg.auction_contract_address),
+        Addr::unchecked(init_msg.owner.unwrap()),
     );
 
     // ################################
@@ -790,6 +809,22 @@ fn test_claim_by_terra_user() {
 fn test_enable_claims() {
     let mut app = mock_app();
     let (airdrop_instance, _, init_msg) = init_contracts(&mut app);
+    let auction_contract_address = String::from("auction_contract_address");
+
+    // should successfully set auction contract address
+    app.execute_contract(
+        Addr::unchecked(init_msg.owner.unwrap()),
+        airdrop_instance.clone(),
+        &ExecuteMsg::UpdateConfig {
+            owner: None,
+            auction_contract_address: Some(auction_contract_address.clone()),
+            merkle_roots: None,
+            from_timestamp: None,
+            to_timestamp: None,
+        },
+        &[],
+    )
+    .unwrap();
 
     let msg = ExecuteMsg::EnableClaims {};
 
@@ -808,7 +843,7 @@ fn test_enable_claims() {
     // ###### Should successfully enable claims ######
 
     app.execute_contract(
-        Addr::unchecked(init_msg.auction_contract_address.clone()),
+        Addr::unchecked(auction_contract_address.clone()),
         airdrop_instance.clone(),
         &msg,
         &[],
@@ -825,7 +860,7 @@ fn test_enable_claims() {
 
     resp_f = app
         .execute_contract(
-            Addr::unchecked(init_msg.auction_contract_address.clone()),
+            Addr::unchecked(auction_contract_address.clone()),
             airdrop_instance.clone(),
             &msg,
             &[],
@@ -1012,7 +1047,7 @@ fn test_withdraw_airdrop_rewards() {
     enable_claims(
         &mut app,
         Addr::unchecked(airdrop_instance.clone()),
-        Addr::unchecked(init_msg.auction_contract_address),
+        Addr::unchecked(init_msg.owner.clone().unwrap()),
     );
 
     // Should be a success

@@ -219,14 +219,16 @@
     {
       "type": "object",
       "required": [
-        "claim_rewards_for_lockup"
+        "claim_rewards_and_optionally_unlock"
       ],
       "properties": {
-        "claim_rewards_for_lockup": {
+        "claim_rewards_and_optionally_unlock": {
           "type": "object",
           "required": [
             "duration",
-            "terraswap_lp_token"
+            "force_unlock",
+            "terraswap_lp_token",
+            "withdraw_lp_stake"
           ],
           "properties": {
             "duration": {
@@ -234,60 +236,14 @@
               "format": "uint64",
               "minimum": 0.0
             },
-            "terraswap_lp_token": {
-              "type": "string"
-            }
-          }
-        }
-      },
-      "additionalProperties": false
-    },
-    {
-      "type": "object",
-      "required": [
-        "unlock_position"
-      ],
-      "properties": {
-        "unlock_position": {
-          "type": "object",
-          "required": [
-            "duration",
-            "terraswap_lp_token"
-          ],
-          "properties": {
-            "duration": {
-              "type": "integer",
-              "format": "uint64",
-              "minimum": 0.0
+            "force_unlock": {
+              "type": "boolean"
             },
             "terraswap_lp_token": {
               "type": "string"
-            }
-          }
-        }
-      },
-      "additionalProperties": false
-    },
-    {
-      "type": "object",
-      "required": [
-        "force_unlock_position"
-      ],
-      "properties": {
-        "force_unlock_position": {
-          "type": "object",
-          "required": [
-            "duration",
-            "terraswap_lp_token"
-          ],
-          "properties": {
-            "duration": {
-              "type": "integer",
-              "format": "uint64",
-              "minimum": 0.0
             },
-            "terraswap_lp_token": {
-              "type": "string"
+            "withdraw_lp_stake": {
+              "type": "boolean"
             }
           }
         }
