@@ -41,3 +41,4 @@ terra-multi-test = {git = "https://github.com/astroport-fi/terra-plus.git"}
 astroport-token = {git = "https://github.com/astroport-fi/astroport.git", branch = "master", package = "astroport-token"}
 astroport = {git = "https://github.com/astroport-fi/astroport.git", branch = "master"}
 astro-auction = {path = "../auction"}
+astroport-pair = {git = "https://github.com/astroport-fi/astroport.git", branch = "master", package = "astroport-pair"}

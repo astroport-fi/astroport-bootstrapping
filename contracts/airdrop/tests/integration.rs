@@ -2,7 +2,6 @@ use astroport_periphery::airdrop::{
     ClaimResponse, ConfigResponse, ExecuteMsg, InstantiateMsg, QueryMsg, StateResponse,
     UserInfoResponse,
 };
-use cosmwasm_bignumber::Uint256;
 use cosmwasm_std::testing::{mock_env, MockApi, MockQuerier, MockStorage};
 use cosmwasm_std::{attr, Addr, Timestamp, Uint128};
 use terra_multi_test::{App, BankKeeper, ContractWrapper, Executor, TerraMockQuerier};
@@ -17,7 +16,7 @@ fn mock_app() -> App {
     App::new(api, env.block, bank, storage, tmq)
 }
 
-fn init_contracts(app: &mut App) -> (Addr, Addr, InstantiateMsg) {
+fn init_contracts(app: &mut App) -> (Addr, Addr, InstantiateMsg, u64) {
     let owner = Addr::unchecked("contract_owner");
 
     // Instantiate ASTRO Token Contract
@@ -86,6 +85,7 @@ fn init_contracts(app: &mut App) -> (Addr, Addr, InstantiateMsg) {
         airdrop_instance,
         astro_token_instance,
         aidrop_instantiate_msg,
+        astro_token_code_id,
     )
 }
 
@@ -146,7 +146,7 @@ fn enable_claims(app: &mut App, airdrop_instance: Addr, owner: Addr) {
 #[test]
 fn proper_initialization() {
     let mut app = mock_app();
-    let (airdrop_instance, _, init_msg) = init_contracts(&mut app);
+    let (airdrop_instance, _, init_msg, _) = init_contracts(&mut app);
 
     let resp: ConfigResponse = app
         .wrap()
@@ -175,7 +175,7 @@ fn proper_initialization() {
 #[test]
 fn update_config() {
     let mut app = mock_app();
-    let (airdrop_instance, _, init_msg) = init_contracts(&mut app);
+    let (airdrop_instance, _, init_msg, _) = init_contracts(&mut app);
 
     // Only owner can update
     let err = app
@@ -241,7 +241,7 @@ fn update_config() {
 #[test]
 fn test_transfer_unclaimed_tokens() {
     let mut app = mock_app();
-    let (airdrop_instance, astro_instance, init_msg) = init_contracts(&mut app);
+    let (airdrop_instance, astro_instance, init_msg, _) = init_contracts(&mut app);
 
     // mint ASTRO for to Airdrop Contract
     mint_some_astro(
@@ -357,7 +357,7 @@ fn test_transfer_unclaimed_tokens() {
 #[test]
 fn test_claim_by_terra_user() {
     let mut app = mock_app();
-    let (airdrop_instance, astro_instance, init_msg) = init_contracts(&mut app);
+    let (airdrop_instance, astro_instance, init_msg, _) = init_contracts(&mut app);
 
     // mint ASTRO for to Airdrop Contract
     mint_some_astro(
@@ -808,7 +808,7 @@ fn test_claim_by_terra_user() {
 #[test]
 fn test_enable_claims() {
     let mut app = mock_app();
-    let (airdrop_instance, _, init_msg) = init_contracts(&mut app);
+    let (airdrop_instance, _, init_msg, _) = init_contracts(&mut app);
     let auction_contract_address = String::from("auction_contract_address");
 
     // should successfully set auction contract address
@@ -873,7 +873,7 @@ fn test_enable_claims() {
 #[test]
 fn test_withdraw_airdrop_rewards() {
     let mut app = mock_app();
-    let (airdrop_instance, astro_instance, init_msg) = init_contracts(&mut app);
+    let (airdrop_instance, astro_instance, init_msg, _) = init_contracts(&mut app);
 
     // mint ASTRO for to Airdrop Contract
     mint_some_astro(
@@ -1080,8 +1080,13 @@ fn test_withdraw_airdrop_rewards() {
 #[cfg(test)]
 #[test]
 fn test_delegate_astro_to_bootstrap_auction() {
+    use astroport::asset::AssetInfo;
+    use cosmwasm_std::testing::MOCK_CONTRACT_ADDR;
+
     let mut app = mock_app();
-    let (airdrop_instance, astro_instance, init_msg) = init_contracts(&mut app);
+    let (airdrop_instance, astro_instance, init_msg, token_code_id) = init_contracts(&mut app);
+
+    let owner = Addr::unchecked(init_msg.owner.clone().unwrap());
 
     // mint ASTRO for to Airdrop Contract
     mint_some_astro(
@@ -1092,6 +1097,39 @@ fn test_delegate_astro_to_bootstrap_auction() {
         airdrop_instance.clone().to_string(),
     );
 
+    let pair_contract = Box::new(ContractWrapper::new(
+        astroport_pair::contract::execute,
+        astroport_pair::contract::instantiate,
+        astroport_pair::contract::query,
+    ));
+
+    let pair_code_id = app.store_code(pair_contract);
+
+    let init_pair_msg = astroport::pair::InstantiateMsg {
+        asset_infos: [
+            AssetInfo::NativeToken {
+                denom: "uusd".to_string(),
+            },
+            AssetInfo::Token {
+                contract_addr: astro_instance.clone(),
+            },
+        ],
+        factory_addr: Addr::unchecked("factory_addr"),
+        init_hook: None,
+        pair_type: astroport::factory::PairType::Xyk {},
+        token_code_id,
+    };
+    let pair_instance = app
+        .instantiate_contract(
+            pair_code_id,
+            owner.clone(),
+            &init_pair_msg,
+            &[],
+            String::from("pair"),
+            None,
+        )
+        .unwrap();
+
     // Initialize Bootstrap Auction contract
     let auction_contract = Box::new(ContractWrapper::new(
         astro_auction::contract::execute,
@@ -1100,15 +1138,12 @@ fn test_delegate_astro_to_bootstrap_auction() {
     ));
     let auction_contract_code_id = app.store_code(auction_contract);
     let auction_init_msg = astroport_periphery::auction::InstantiateMsg {
-        owner: init_msg.owner.clone().unwrap(),
+        owner: init_msg.owner.clone(),
         astro_token_address: astro_instance.clone().to_string(),
         airdrop_contract_address: airdrop_instance.clone().to_string(),
         lockdrop_contract_address: "lockdrop_contract_address".to_string(),
-        astro_ust_pair_address: None,
-        lp_token_address: None,
-        generator_contract_address: None,
-        astro_rewards: Uint256::from(10000000000000u64),
-        astro_vesting_duration: 2592000u64,
+        astro_ust_pair_address: pair_instance.to_string(),
+        generator_contract_address: MOCK_CONTRACT_ADDR.to_string(),
         lp_tokens_vesting_duration: 2592000u64,
         init_timestamp: 100000u64,
         deposit_window: 2592000u64,

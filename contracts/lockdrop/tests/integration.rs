@@ -1,3 +1,4 @@
+use astroport::generator;
 use astroport_periphery::lockdrop::{
     self, ConfigResponse, ExecuteMsg, InstantiateMsg, PoolResponse, QueryMsg, StateResponse,
     UpdateConfigMsg, UserInfoResponse,
@@ -346,6 +347,7 @@ fn instantiate_auction_contract(
     lockdrop_instance: Addr,
     pair_instance: Addr,
     lp_token_instance: Addr,
+    generator_instance: Addr,
 ) -> (Addr, astroport_periphery::auction::InstantiateMsg) {
     let auction_contract = Box::new(ContractWrapper::new(
         astro_auction::contract::execute,
@@ -356,15 +358,12 @@ fn instantiate_auction_contract(
     let auction_code_id = app.store_code(auction_contract);
 
     let auction_instantiate_msg = astroport_periphery::auction::InstantiateMsg {
-        owner: owner.clone().to_string(),
+        owner: Some(owner.to_string()),
         astro_token_address: astro_token_instance.clone().into_string(),
         airdrop_contract_address: airdrop_instance.to_string(),
         lockdrop_contract_address: lockdrop_instance.to_string(),
-        astroport_lp_pool: Some(pair_instance.to_string()),
-        lp_token_address: Some(lp_token_instance.to_string()),
-        generator_contract: None,
-        astro_rewards: Uint256::from(1000000000000u64),
-        astro_vesting_duration: 7776000u64,
+        astro_ust_pair_address: pair_instance.to_string(),
+        generator_contract_address: generator_instance.to_string(),
         lp_tokens_vesting_duration: 7776000u64,
         init_timestamp: 1_000_00,
         deposit_window: 100_000_00,
@@ -471,6 +470,9 @@ fn instantiate_all_contracts(
     let pool_address = pair_resp.contract_addr;
     let lp_token_address = pair_resp.liquidity_token;
 
+    let (generator_address, _) =
+        instantiate_generator_and_vesting(&mut app, owner.clone(), astro_token.clone());
+
     // Initiate Auction contract
     let (auction_contract, _) = instantiate_auction_contract(
         &mut app,
@@ -480,10 +482,8 @@ fn instantiate_all_contracts(
         lockdrop_instance.clone(),
         pool_address,
         lp_token_address,
+        generator_address.clone(),
     );
-
-    let (generator_address, _) =
-        instantiate_generator_and_vesting(&mut app, owner.clone(), astro_token.clone());
 
     let update_msg = UpdateConfigMsg {
         owner: None,
@@ -620,6 +620,9 @@ fn test_update_config() {
     let pool_address = pair_resp.contract_addr;
     let lp_token_address = pair_resp.liquidity_token;
 
+    let (generator_address, _) =
+        instantiate_generator_and_vesting(&mut app, owner.clone(), astro_token.clone());
+
     // Initiate Auction contract
     let (auction_contract, _) = instantiate_auction_contract(
         &mut app,
@@ -629,10 +632,8 @@ fn test_update_config() {
         lockdrop_instance.clone(),
         pool_address,
         lp_token_address,
+        generator_address.clone(),
     );
-
-    let (generator_address, _) =
-        instantiate_generator_and_vesting(&mut app, owner.clone(), astro_token.clone());
 
     let update_msg = UpdateConfigMsg {
         owner: Some("new_owner".to_string()),
