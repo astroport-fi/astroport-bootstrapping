@@ -21,7 +21,6 @@ pub struct InstantiateMsg {
 pub struct UpdateConfigMsg {
     pub owner: Option<String>,
     pub generator_contract: Option<String>,
-    pub astro_incentive_amount: Option<Uint128>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -44,6 +43,7 @@ pub enum ExecuteMsg {
 #[serde(rename_all = "snake_case")]
 pub enum Cw20HookMsg {
     DelegateAstroTokens { user_address: String },
+    IncreaseAstroIncentives {},
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

@@ -1,5 +1,3 @@
-use std::cmp::Ordering;
-
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
@@ -77,9 +75,7 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, StdError> {
     match msg {
-        ExecuteMsg::UpdateConfig { new_config } => {
-            handle_update_config(deps, env, info, new_config)
-        }
+        ExecuteMsg::UpdateConfig { new_config } => handle_update_config(deps, info, new_config),
         ExecuteMsg::Receive(msg) => receive_cw20(deps, env, msg),
         ExecuteMsg::DepositUst {} => handle_deposit_ust(deps, env, info),
         ExecuteMsg::WithdrawUst { amount } => handle_withdraw_ust(deps, env, info, amount),
@@ -103,6 +99,8 @@ pub fn receive_cw20(
     // CHECK :: Delegation can happen only via airdrop / lockdrop contracts
     if cw20_msg.sender != config.airdrop_contract_address
         && cw20_msg.sender != config.lockdrop_contract_address
+        // Increasing incentives can happen only with ASTRO token
+        && cw20_msg.sender != config.astro_token_address
     {
         return Err(StdError::generic_err("Unauthorized"));
     }
@@ -115,6 +113,9 @@ pub fn receive_cw20(
     match from_binary(&cw20_msg.msg)? {
         Cw20HookMsg::DelegateAstroTokens { user_address } => {
             handle_delegate_astro_tokens(deps, env, user_address, cw20_msg.amount)
+        }
+        Cw20HookMsg::IncreaseAstroIncentives {} => {
+            handle_increasing_astro_incentives(deps, cw20_msg.amount)
         }
     }
 }
@@ -165,13 +166,10 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 /// @param new_config : Same as UpdateConfigMsg struct
 pub fn handle_update_config(
     deps: DepsMut,
-    env: Env,
     info: MessageInfo,
     new_config: UpdateConfigMsg,
 ) -> StdResult<Response> {
     let mut config = CONFIG.load(deps.storage)?;
-    let state = STATE.load(deps.storage)?;
-    let mut messages: Vec<WasmMsg> = vec![];
     let mut attributes = vec![attr("action", "update_config")];
 
     // CHECK :: ONLY OWNER CAN CALL THIS FUNCTION
@@ -182,52 +180,39 @@ pub fn handle_update_config(
     // UPDATE :: ADDRESSES IF PROVIDED
     if let Some(owner) = new_config.owner {
         config.owner = deps.api.addr_validate(&owner)?;
+        attributes.push(attr("owner", config.owner.to_string()));
     }
 
     if let Some(generator_contract) = new_config.generator_contract {
         config.generator_contract = deps.api.addr_validate(&generator_contract)?;
-    }
-
-    if let Some(new_incentives) = new_config.astro_incentive_amount {
-        if state.lp_shares_minted.is_some() {
-            return Err(StdError::generic_err("ASTRO is already being distributed"));
-        };
-        let prev_incentives = config.astro_incentive_amount.unwrap_or_default();
-        match prev_incentives.cmp(&new_incentives) {
-            Ordering::Equal => {}
-            Ordering::Greater => {
-                let amount = prev_incentives - new_incentives;
-                messages.push(WasmMsg::Execute {
-                    contract_addr: config.astro_token_address.to_string(),
-                    funds: vec![],
-                    msg: to_binary(&Cw20ExecuteMsg::Transfer {
-                        recipient: info.sender.to_string(),
-                        amount,
-                    })?,
-                });
-                attributes.push(attr("incentives returned", amount));
-            }
-            Ordering::Less => {
-                let amount = new_incentives - prev_incentives;
-                messages.push(WasmMsg::Execute {
-                    contract_addr: config.astro_token_address.to_string(),
-                    funds: vec![],
-                    msg: to_binary(&Cw20ExecuteMsg::TransferFrom {
-                        owner: info.sender.to_string(),
-                        recipient: env.contract.address.to_string(),
-                        amount,
-                    })?,
-                });
-                attributes.push(attr("incentives received", amount));
-            }
-        };
-        config.astro_incentive_amount = Some(new_incentives);
+        attributes.push(attr("generator", config.generator_contract.to_string()));
     }
 
     CONFIG.save(deps.storage, &config)?;
+    Ok(Response::new().add_attributes(attributes))
+}
+
+pub fn handle_increasing_astro_incentives(
+    deps: DepsMut,
+    amount: Uint128,
+) -> Result<Response, StdError> {
+    let state = STATE.load(deps.storage)?;
+    let mut config = CONFIG.load(deps.storage)?;
+
+    if state.lp_shares_minted.is_some() {
+        return Err(StdError::generic_err("ASTRO is already being distributed"));
+    };
+
+    // Anyone can increase astro incentives
+
+    config.astro_incentive_amount = config
+        .astro_incentive_amount
+        .map_or(Some(amount), |v| Some(v + amount));
+
+    CONFIG.save(deps.storage, &config)?;
     Ok(Response::new()
-        .add_messages(messages)
-        .add_attributes(attributes))
+        .add_attribute("action", "astro_incentives_increased")
+        .add_attribute("amount", amount))
 }
 
 /// @dev Accepts ASTRO tokens to be used for the LP Bootstrapping via auction. Callable only by Airdrop / Lockdrop contracts
