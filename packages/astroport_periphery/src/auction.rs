@@ -36,7 +36,7 @@ pub enum ExecuteMsg {
     InitPool { slippage: Option<Decimal> },
     StakeLpTokens {},
 
-    ClaimRewardsAndOptionallyWithdrawLpShares { withdraw_lp_shares: Option<Uint128> },
+    ClaimRewards { withdraw_lp_shares: Option<Uint128> },
     Callback(CallbackMsg),
 }
 

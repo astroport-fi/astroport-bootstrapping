@@ -86,7 +86,7 @@ pub fn execute(
         ExecuteMsg::InitPool { slippage } => handle_init_pool(deps, env, info, slippage),
         ExecuteMsg::StakeLpTokens {} => handle_stake_lp_tokens(deps, env, info),
 
-        ExecuteMsg::ClaimRewardsAndOptionallyWithdrawLpShares { withdraw_lp_shares } => {
+        ExecuteMsg::ClaimRewards { withdraw_lp_shares } => {
             handle_claim_rewards_and_withdraw_lp_shares(deps, env, info, withdraw_lp_shares)
         }
         ExecuteMsg::Callback(msg) => handle_callback(deps, env, info, msg),
