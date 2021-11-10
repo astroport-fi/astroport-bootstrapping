@@ -876,7 +876,7 @@ pub fn handle_delegate_astro_to_auction(
 /// @param duration : Lockup duration (number of weeks)
 /// @param @withdraw_lp_stake : Boolean value indicating if the LP tokens are to be withdrawn or not
 pub fn handle_claim_rewards_and_unlock_for_lockup(
-    deps: DepsMut,
+    mut deps: DepsMut,
     env: Env,
     info: MessageInfo,
     terraswap_lp_token: String,
@@ -897,23 +897,25 @@ pub fn handle_claim_rewards_and_unlock_for_lockup(
     // CHECK ::: Is LP Token Pool supported or not ?
     let pool_info = ASSET_POOLS.load(deps.storage, &terraswap_lp_token)?;
 
+    let mut user_info = USER_INFO
+        .may_load(deps.storage, &user_address)?
+        .unwrap_or_default();
+
+    // If user's total ASTRO rewards == 0 :: We update all of the user's lockup positions to calculate ASTRO rewards and for each alongwith their equivalent Astroport LP Shares
+    if user_info.total_astro_rewards == Uint128::zero() {
+        user_info.total_astro_rewards = update_user_lockup_positions_and_calc_rewards(
+            deps.branch(),
+            &config,
+            &state,
+            &user_address,
+        )?;
+    }
+
+    USER_INFO.save(deps.storage, &user_address, &user_info)?;
+
     // Check is there lockup or not ?
     let lockup_key = (&terraswap_lp_token, &user_address, U64Key::new(duration));
     let mut lockup_info = LOCKUP_INFO.load(deps.storage, lockup_key.clone())?;
-    if lockup_info.astro_rewards.is_none() {
-        let weighted_lockup_balance =
-            calculate_weight(lockup_info.lp_units_locked, duration, &config);
-        lockup_info.astro_rewards = Some(calculate_astro_incentives_for_lockup(
-            weighted_lockup_balance,
-            pool_info.weighted_amount,
-            pool_info.incentives_share,
-            state.total_incentives_share,
-            config
-                .lockdrop_incentives
-                .expect("Lockdrop incentives should be set!"),
-        ));
-        LOCKUP_INFO.save(deps.storage, lockup_key, &lockup_info)?;
-    }
 
     // CHECK :: Can the Lockup position be unlocked or not ?
     if withdraw_lp_stake {
