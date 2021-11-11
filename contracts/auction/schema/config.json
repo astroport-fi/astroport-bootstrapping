@@ -27,7 +27,7 @@
       ]
     },
     "astro_rewards": {
-      "description": "Total ASTRO token rewards to be used to incentivize boostrap auction participants",
+      "description": "Total ASTRO token rewards to be used to incentivize bootstrap auction participants",
       "allOf": [
         {
           "$ref": "#/definitions/Uint256"

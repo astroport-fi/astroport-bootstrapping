@@ -270,7 +270,7 @@ fn test_transfer_unclaimed_tokens() {
             Addr::unchecked("wrong_owner"),
             airdrop_instance.clone(),
             &ExecuteMsg::TransferUnclaimedTokens {
-                recepient: "recepient".to_string(),
+                recipient: "recipient".to_string(),
                 amount: Uint128::from(1000000 as u64),
             },
             &[],
@@ -291,7 +291,7 @@ fn test_transfer_unclaimed_tokens() {
             Addr::unchecked(init_msg.owner.clone().unwrap()),
             airdrop_instance.clone(),
             &ExecuteMsg::TransferUnclaimedTokens {
-                recepient: "recepient".to_string(),
+                recipient: "recipient".to_string(),
                 amount: Uint128::from(1000000 as u64),
             },
             &[],
@@ -315,7 +315,7 @@ fn test_transfer_unclaimed_tokens() {
             Addr::unchecked(init_msg.owner.clone().unwrap()),
             airdrop_instance.clone(),
             &ExecuteMsg::TransferUnclaimedTokens {
-                recepient: "recepient".to_string(),
+                recipient: "recipient".to_string(),
                 amount: Uint128::from(100_000_000_0000 as u64),
             },
             &[],
@@ -332,7 +332,7 @@ fn test_transfer_unclaimed_tokens() {
         Addr::unchecked(init_msg.owner.clone().unwrap()),
         airdrop_instance.clone(),
         &ExecuteMsg::TransferUnclaimedTokens {
-            recepient: "recepient".to_string(),
+            recipient: "recipient".to_string(),
             amount: Uint128::from(100_000_00 as u64),
         },
         &[],
@@ -1201,7 +1201,7 @@ fn test_delegate_astro_to_bootstrap_auction() {
         attr("airdrop", "250000000")
     );
 
-    // **** "Total amount being delegated for boostrap auction cannot exceed your claimable airdrop balance" Error should be returned ****
+    // **** "Total amount being delegated for bootstrap auction cannot exceed your claimable airdrop balance" Error should be returned ****
 
     let claim_f = app
         .execute_contract(
@@ -1213,7 +1213,7 @@ fn test_delegate_astro_to_bootstrap_auction() {
             &[],
         )
         .unwrap_err();
-    assert_eq!(claim_f.to_string(), "Generic error: Total amount being delegated for boostrap auction cannot exceed your claimable airdrop balance");
+    assert_eq!(claim_f.to_string(), "Generic error: Total amount being delegated for bootstrap auction cannot exceed your claimable airdrop balance");
 
     // **** Should successfully delegate ASTRO ****
 

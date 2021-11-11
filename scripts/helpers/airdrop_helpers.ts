@@ -35,9 +35,9 @@ export async function claimAirdrop( terra: LocalTerra | LCDClient, wallet:Wallet
   
 
 // TRANSFER ASTRO TOKENS : EXECUTE TX
-export async function transferAstroByAdminFromAirdropContract( terra: LocalTerra | LCDClient, wallet:Wallet, airdropContractAdr: string, recepient: string, amount: number) {
+export async function transferAstroByAdminFromAirdropContract( terra: LocalTerra | LCDClient, wallet:Wallet, airdropContractAdr: string, recipient: string, amount: number) {
     try {
-        let transfer_astro_msg = { "transfer_astro_tokens": {'recepient': recepient, 'amount': amount.toString() }};
+        let transfer_astro_msg = { "transfer_astro_tokens": {'recipient': recipient, 'amount': amount.toString() }};
         let resp = await executeContract(terra, wallet, airdropContractAdr, transfer_astro_msg );
         return resp;        
     }

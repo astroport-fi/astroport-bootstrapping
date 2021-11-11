@@ -98,8 +98,8 @@ pub fn execute(
         }
         ExecuteMsg::EnableClaims {} => handle_enable_claims(deps, info),
         ExecuteMsg::WithdrawAirdropReward {} => handle_withdraw_airdrop_rewards(deps, env, info),
-        ExecuteMsg::TransferUnclaimedTokens { recepient, amount } => {
-            handle_transfer_unclaimed_tokens(deps, env, info, recepient, amount)
+        ExecuteMsg::TransferUnclaimedTokens { recipient, amount } => {
+            handle_transfer_unclaimed_tokens(deps, env, info, recipient, amount)
         }
     }
 }
@@ -157,6 +157,12 @@ pub fn handle_update_config(
     }
 
     if let Some(from_timestamp) = from_timestamp {
+        if config.to_timestamp <= from_timestamp {
+            return Err(StdError::generic_err(
+                "Invalid airdrop claim window closure timestamp",
+            ));
+        }
+
         config.from_timestamp = from_timestamp
     }
 
@@ -247,7 +253,7 @@ pub fn handle_claim(
 
     let mut messages = vec![];
 
-    // TRANSFER ASTRO IF CLAIMS ARE ALLOWED (i.e LP Boostrap auction has concluded)
+    // TRANSFER ASTRO IF CLAIMS ARE ALLOWED (i.e LP Bootstrap auction has concluded)
     if config.are_claims_enabled {
         messages.push(build_transfer_cw20_token_msg(
             recipient.clone(),
@@ -296,7 +302,7 @@ pub fn handle_delegate_astro_to_bootstrap_auction(
 
     // CHECK :: TOKENS BEING DELEGATED SHOULD NOT EXCEED USER'S CLAIMABLE AIRDROP AMOUNT
     if user_info.delegated_amount > user_info.claimed_amount {
-        return Err(StdError::generic_err("Total amount being delegated for boostrap auction cannot exceed your claimable airdrop balance"));
+        return Err(StdError::generic_err("Total amount being delegated for bootstrap auction cannot exceed your claimable airdrop balance"));
     }
 
     // COSMOS MSG :: DELEGATE ASTRO TOKENS TO LP BOOTSTRAP AUCTION CONTRACT
@@ -342,16 +348,16 @@ pub fn handle_withdraw_airdrop_rewards(
     // CHECK :: HAS THE BOOTSTRAP AUCTION CONCLUDED ?
     if !config.are_claims_enabled {
         return Err(StdError::generic_err(
-            "LP Boostrap auction in progress. Claims not allowed during this period",
+            "LP bootstrap auction in progress. Claims not allowed during this period",
         ));
     }
 
     // CHECK :: HAS USER ALREADY WITHDRAWN THEIR REWARDS ?
     if user_info.tokens_withdrawn {
-        return Err(StdError::generic_err("Already claimed"));
+        return Err(StdError::generic_err("Tokens have already been withdrawn"));
     }
 
-    // TRANSFER ASTRO IF CLAIMS ARE ALLOWED (i.e LP Boostrap auction has concluded)
+    // TRANSFER ASTRO IF CLAIMS ARE ALLOWED (i.e LP bootstrap auction has concluded)
     user_info.tokens_withdrawn = true;
 
     let tokens_to_withdraw = user_info.claimed_amount - user_info.delegated_amount;
@@ -377,12 +383,12 @@ pub fn handle_withdraw_airdrop_rewards(
         ]))
 }
 
-/// @dev Admin function to transfer ASTRO Tokens to the recepient address
-/// @param recepient Recepient receiving the ASTRO tokens
+/// @dev Admin function to transfer ASTRO Tokens to the recipient address
+/// @param recipient Recipient receiving the ASTRO tokens
 /// @param amount Amount of ASTRO to be transferred
 pub fn handle_transfer_unclaimed_tokens(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
     recipient: String,
     amount: Uint128,
@@ -396,10 +402,10 @@ pub fn handle_transfer_unclaimed_tokens(
     }
 
     // CHECK :: CAN ONLY BE CALLED AFTER THE CLAIM PERIOD IS OVER
-    if config.to_timestamp > _env.block.time.seconds() {
+    if config.to_timestamp > env.block.time.seconds() {
         return Err(StdError::generic_err(format!(
             "{} seconds left before unclaimed tokens can be transferred",
-            { config.to_timestamp - _env.block.time.seconds() }
+            { config.to_timestamp - env.block.time.seconds() }
         )));
     }
 

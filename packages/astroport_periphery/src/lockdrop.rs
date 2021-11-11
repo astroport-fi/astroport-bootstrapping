@@ -63,7 +63,7 @@ pub enum ExecuteMsg {
     },
     // ADMIN Function ::: To transfer ASTRO Tokens which have been returned to force unlock LP positions
     TransferReturnedAstro {
-        recepient: String,
+        recipient: String,
         amount: Uint128,
     },
     // Function to facilitate LP Token withdrawals from lockups

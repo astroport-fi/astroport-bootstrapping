@@ -317,7 +317,7 @@ fn instantiate_generator_and_vesting(
     (generator_instance, vesting_instance)
 }
 
-// Mints some ASTRO to "to" recepient
+// Mints some ASTRO to "to" recipient
 fn mint_some_astro(
     app: &mut App,
     owner: Addr,

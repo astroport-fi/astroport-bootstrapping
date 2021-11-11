@@ -117,8 +117,8 @@ export function initialize(terra: LCDClient) {
   return terra.wallet(mk);
 }
 
-export async function transferCW20Tokens(terra:LCDClient, wallet: Wallet, tokenAddress: string, recepient: string, amount: number) {
-  let transfer_msg = {"transfer":{"recipient":recepient , "amount":amount.toString() }}
+export async function transferCW20Tokens(terra:LCDClient, wallet: Wallet, tokenAddress: string, recipient: string, amount: number) {
+  let transfer_msg = {"transfer":{"recipient":recipient , "amount":amount.toString() }}
   let resp = await executeContract(terra, wallet, tokenAddress, transfer_msg );
 }
 

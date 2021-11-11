@@ -139,11 +139,11 @@
 // // Airdrop Claim By EVM User : Test
 // //----------------------------------------------------------------------------------------
 
-// async function testClaimByEvmUser(recepientWallet:Wallet, evm_address:string, amountClaimed:number, public_key:string, signed_msg_hash:string, signature:string, merkle_proof: any, root_index: number ) {
+// async function testClaimByEvmUser(recipientWallet:Wallet, evm_address:string, amountClaimed:number, public_key:string, signed_msg_hash:string, signature:string, merkle_proof: any, root_index: number ) {
 //     process.stdout.write(`Should process claim by evm user ${chalk.cyan(evm_address)} correctly... `);
 
 //     var contract_astro_balance_before_claim = await getCW20Balance(terra, astro_token_address, airdrop_contract_address);
-//     var recepient_astro_balance_before_claim = await getCW20Balance(terra, astro_token_address, recepientWallet.key.accAddress );
+//     var recipient_astro_balance_before_claim = await getCW20Balance(terra, astro_token_address, recipientWallet.key.accAddress );
 
 //     let is_claimed_before = await isAirdropClaimed(terra, airdrop_contract_address, evm_address.replace('0x','').toLowerCase() );
 //     expect( is_claimed_before ).to.deep.equal( { is_claimed: false } ); 
@@ -154,16 +154,16 @@
 //                                                     recovered_address: evm_address.replace('0x','').toLowerCase()
 //                                                 });
 
-//     await claimAirdropForEVMUser(terra,recepientWallet, airdrop_contract_address, evm_address, amountClaimed, merkle_proof, root_index, signature, signed_msg_hash);
+//     await claimAirdropForEVMUser(terra,recipientWallet, airdrop_contract_address, evm_address, amountClaimed, merkle_proof, root_index, signature, signed_msg_hash);
 
 //     var contract_astro_balance_after_claim = await getCW20Balance(terra, astro_token_address, airdrop_contract_address);
-//     var recepientWallet_astro_balance_after_claim = await getCW20Balance(terra, astro_token_address, recepientWallet.key.accAddress);
+//     var recipientWallet_astro_balance_after_claim = await getCW20Balance(terra, astro_token_address, recipientWallet.key.accAddress);
 
 //     let is_claimed_after = await isAirdropClaimed(terra, airdrop_contract_address, evm_address.replace('0x','').toLowerCase() );
 //     expect( is_claimed_after ).to.deep.equal( { is_claimed: true } ); 
 
 //     expect(Number(contract_astro_balance_before_claim) - Number(contract_astro_balance_after_claim)).to.equal(amountClaimed);
-//     expect(Number(recepientWallet_astro_balance_after_claim) - Number(recepient_astro_balance_before_claim)).to.equal(amountClaimed);
+//     expect(Number(recipientWallet_astro_balance_after_claim) - Number(recipient_astro_balance_before_claim)).to.equal(amountClaimed);
 
 //     console.log(chalk.green(`\nClaim by evm user ${chalk.cyan(evm_address)} processed successfully`));                                
 // }
@@ -173,19 +173,19 @@
 // // (ADMIN FUNCTION) Transfer ASTRO Tokens : Test
 // //----------------------------------------------------------------------------------------
 
-// async function testTransferAstroByAdmin(recepient_address:string, amountToTransfer:number) {
+// async function testTransferAstroByAdmin(recipient_address:string, amountToTransfer:number) {
 //     process.stdout.write("Should transfer ASTRO from the Airdrop Contract correctly... ");
     
 //     var contract_astro_balance_before_claim = await getCW20Balance(terra, astro_token_address, airdrop_contract_address);
-//     var recepient_astro_balance_before_claim = await getCW20Balance(terra, astro_token_address, recepient_address );
+//     var recipient_astro_balance_before_claim = await getCW20Balance(terra, astro_token_address, recipient_address );
 
-//     await transferAstroByAdminFromAirdropContract(terra,deployer, airdrop_contract_address, recepient_address, amountToTransfer);
+//     await transferAstroByAdminFromAirdropContract(terra,deployer, airdrop_contract_address, recipient_address, amountToTransfer);
 
 //     var contract_astro_balance_after_claim = await getCW20Balance(terra, astro_token_address, airdrop_contract_address);
-//     var recepientWallet_astro_balance_after_claim = await getCW20Balance(terra, astro_token_address, recepient_address );
+//     var recipientWallet_astro_balance_after_claim = await getCW20Balance(terra, astro_token_address, recipient_address );
 
 //     expect(Number(contract_astro_balance_before_claim) - Number(contract_astro_balance_after_claim)).to.equal(amountToTransfer);
-//     expect(Number(recepientWallet_astro_balance_after_claim) - Number(recepient_astro_balance_before_claim)).to.equal(amountToTransfer);
+//     expect(Number(recipientWallet_astro_balance_after_claim) - Number(recipient_astro_balance_before_claim)).to.equal(amountToTransfer);
 
 //     console.log(chalk.green("\nTransfer of ASTRO tokens by the deployer with admin privileges processed successfully"));                                
 // }

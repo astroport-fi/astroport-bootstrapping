@@ -45,6 +45,7 @@
         "generator_astro_debt",
         "generator_proxy_debt",
         "lp_units_locked",
+        "terraswap_lp_token",
         "unlock_timestamp",
         "withdrawal_flag"
       ],
@@ -91,7 +92,7 @@
           "minimum": 0.0
         },
         "generator_astro_debt": {
-          "description": "Generator ASTRO tokens loockup received as generator rewards",
+          "description": "Generator ASTRO tokens lockup received as generator rewards",
           "allOf": [
             {
               "$ref": "#/definitions/Uint128"
@@ -113,6 +114,9 @@
               "$ref": "#/definitions/Uint128"
             }
           ]
+        },
+        "terraswap_lp_token": {
+          "$ref": "#/definitions/Addr"
         },
         "unlock_timestamp": {
           "description": "Timestamp beyond which this position can be unlocked",

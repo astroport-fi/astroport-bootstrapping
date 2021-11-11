@@ -106,6 +106,11 @@ pub fn receive_cw20(
 ) -> Result<Response, StdError> {
     let config = CONFIG.load(deps.storage)?;
 
+    // CHECK :: receive_cw20 only can be executed from astro_token
+    if config.astro_token_address != info.sender {
+        return Err(StdError::generic_err("Unauthorized"));
+    }
+
     // CHECK :: ASTRO deposits can happen only via airdrop / lockdrop contracts
     if config.airdrop_contract_address != cw20_msg.sender
         && config.lockdrop_contract_address != cw20_msg.sender
@@ -213,15 +218,15 @@ pub fn handle_update_config(
 /// @param amount : Number of ASTRO Tokens being deposited
 pub fn handle_deposit_astro_tokens(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     _info: MessageInfo,
     user_address: Addr,
     amount: Uint256,
 ) -> Result<Response, StdError> {
     let config = CONFIG.load(deps.storage)?;
 
-    // CHECK :: Lockdrop deposit window open
-    if !is_deposit_open(_env.block.time.seconds(), &config) {
+    // CHECK :: Auction deposit window open
+    if !is_deposit_open(env.block.time.seconds(), &config) {
         return Err(StdError::generic_err("Deposit window closed"));
     }
 
@@ -248,13 +253,13 @@ pub fn handle_deposit_astro_tokens(
 /// @dev Facilitates UST deposits by users to be used for LP Bootstrapping via auction
 pub fn handle_deposit_ust(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
 ) -> Result<Response, StdError> {
     let config = CONFIG.load(deps.storage)?;
 
-    // CHECK :: Lockdrop deposit window open
-    if !is_deposit_open(_env.block.time.seconds(), &config) {
+    // CHECK :: Auction deposit window open
+    if !is_deposit_open(env.block.time.seconds(), &config) {
         return Err(StdError::generic_err("Deposit window closed"));
     }
 
@@ -303,7 +308,7 @@ pub fn handle_withdraw_ust(
         .unwrap_or_default();
 
     // CHECK :: Has the user already withdrawn during the current window
-    if user_info.withdrawl_counter {
+    if user_info.withdrawal_counter {
         return Err(StdError::generic_err(
             "Max 1 withdrawal allowed during current window",
         ));
@@ -319,9 +324,9 @@ pub fn handle_withdraw_ust(
             max_withdrawal_percent
         )));
     }
-    // Set user's withdrawl_counter to true incase no further withdrawals are allowed for the user
+    // Set user's withdrawal_counter to true incase no further withdrawals are allowed for the user
     if max_withdrawal_percent <= Decimal256::from_ratio(50u32, 100u32) {
-        user_info.withdrawl_counter = true;
+        user_info.withdrawal_counter = true;
     }
 
     // UPDATE STATE
@@ -349,14 +354,14 @@ pub fn handle_withdraw_ust(
 /// @param slippage Optional, to handle slippage that may be there when adding liquidity to the pool
 pub fn handle_add_liquidity_to_astroport_pool(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
     slippage: Option<Decimal>,
 ) -> Result<Response, StdError> {
     let config = CONFIG.load(deps.storage)?;
     let state = STATE.load(deps.storage)?;
 
-    // CHECK :: Only admin can call this function
+    // CHECK :: Can be executed once
     if state.lp_shares_minted != Uint256::zero() {
         return Err(StdError::generic_err("Liquidity already added"));
     }
@@ -367,7 +372,7 @@ pub fn handle_add_liquidity_to_astroport_pool(
     }
 
     // CHECK :: Deposit / withdrawal windows need to be over
-    if !are_windows_closed(_env.block.time.seconds(), &config) {
+    if !are_windows_closed(env.block.time.seconds(), &config) {
         return Err(StdError::generic_err(
             "Deposit/withdrawal windows are still open",
         ));
@@ -381,7 +386,7 @@ pub fn handle_add_liquidity_to_astroport_pool(
     let cur_lp_balance = cw20_get_balance(
         &deps.querier,
         config.lp_token_address.clone(),
-        _env.contract.address.clone(),
+        env.contract.address.clone(),
     )?;
 
     // COSMOS MSGS
@@ -398,7 +403,7 @@ pub fn handle_add_liquidity_to_astroport_pool(
     let update_state_msg = CallbackMsg::UpdateStateOnLiquidityAdditionToPool {
         prev_lp_balance: cur_lp_balance.into(),
     }
-    .to_cosmos_msg(&_env.contract.address)?;
+    .to_cosmos_msg(&env.contract.address)?;
     response = response
         .add_messages(vec![approve_astro_msg, add_liquidity_msg, update_state_msg])
         .add_attribute("astro_deposited", state.total_astro_deposited)
@@ -474,7 +479,7 @@ pub fn handle_claim_rewards(
 
     // Init response
     let mut response = Response::new()
-        .add_attribute("action", "Auction::ExecuteMsg::StakeLPTokens")
+        .add_attribute("action", "Auction::ExecuteMsg::ClaimRewards")
         .add_attribute("user_address", user_address.to_string());
 
     // User's LP shares :: Calculate if not already calculated
@@ -687,7 +692,6 @@ pub fn update_state_on_reward_claim(
     let astro_claimed = Uint256::from(cur_astro_balance) - prev_astro_balance;
 
     let mut user_astro_rewards = Uint256::zero();
-    let staking_reward: Uint256;
 
     // ASTRO Incentives :: Calculate the unvested amount which can be claimed by the user
     user_astro_rewards += calculate_withdrawable_auction_reward_for_user(
@@ -702,10 +706,16 @@ pub fn update_state_on_reward_claim(
         user_astro_rewards.to_string(),
     );
 
-    // ASTRO Generator (Staking) rewards :: Calculate the astro amount (from LP staking incentives) which can be claimed by the user
+    // ASTRO Generator (Staking) rewards :: Update the astro rewards index
     if astro_claimed > Uint256::zero() {
         update_astro_rewards_index(&mut state, astro_claimed);
-        staking_reward = compute_user_accrued_reward(&state, &mut user_info);
+    }
+
+    // ASTRO Generator (Staking) rewards :: Calculate the astro amount (from LP staking incentives) which can be claimed by the user
+    // Moved out from the if block to prevent the following case:
+    // When multiple users execute this function in a block, only first executor can claim the rewards
+    let staking_reward = compute_user_accrued_reward(&state, &mut user_info);
+    if staking_reward > Uint256::zero() {
         user_info.withdrawn_staking_incentives += staking_reward;
         user_astro_rewards += staking_reward;
         response =
@@ -802,16 +812,18 @@ fn query_user_info(deps: Deps, _env: Env, user_address: String) -> StdResult<Use
         &state,
         &user_info,
     );
-    let mut claimable_staking_reward = Uint256::zero();
 
-    if state.are_staked {
+    let claimable_staking_reward = if state.are_staked {
         let unclaimed_rewards_response =
             query_unclaimed_staking_rewards(deps, &config, _env.contract.address);
         if unclaimed_rewards_response > Uint128::zero() {
             update_astro_rewards_index(&mut state, unclaimed_rewards_response.into());
-            claimable_staking_reward = compute_user_accrued_reward(&state, &mut user_info);
         }
-    }
+
+        compute_user_accrued_reward(&state, &mut user_info)
+    } else {
+        Uint256::zero()
+    };
 
     Ok(UserInfoResponse {
         astro_deposited: user_info.astro_deposited,
@@ -854,7 +866,7 @@ fn calculate_user_lp_share(state: &State, user_info: &UserInfo) -> Uint256 {
     user_total_share_percent.div(Decimal256::from_ratio(2u64, 1u64)) * state.lp_shares_minted
 }
 
-/// @dev Calculates ASTRO tokens receivable by a user for participating (providing UST & ASTRO) in the bootstraping phase of the ASTRO-UST Pool
+/// @dev Calculates ASTRO tokens receivable by a user for participating (providing UST & ASTRO) in the bootstrapping phase of the ASTRO-UST Pool
 /// Formula - ASTRO per LP share = total ASTRO Incentives / Total LP shares minted
 /// user's LP receivable = user's LP share * ASTRO per LP share
 /// @param config : Configuration
@@ -868,6 +880,7 @@ fn calculate_auction_reward_for_user(
     if user_info.total_auction_incentives > Uint256::zero()
         || state.total_astro_deposited == Uint256::zero()
         || state.total_ust_deposited == Uint256::zero()
+        || state.lp_shares_minted == Uint256::zero()
     {
         return Uint256::zero();
     }

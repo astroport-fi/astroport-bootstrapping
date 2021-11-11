@@ -8,7 +8,7 @@
     "total_auction_incentives",
     "user_reward_index",
     "ust_deposited",
-    "withdrawl_counter",
+    "withdrawal_counter",
     "withdrawn_auction_incentives",
     "withdrawn_lp_shares",
     "withdrawn_staking_incentives"
@@ -29,7 +29,7 @@
     "ust_deposited": {
       "$ref": "#/definitions/Uint256"
     },
-    "withdrawl_counter": {
+    "withdrawal_counter": {
       "type": "boolean"
     },
     "withdrawn_auction_incentives": {

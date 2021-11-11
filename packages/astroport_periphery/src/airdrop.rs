@@ -40,7 +40,7 @@ pub enum ExecuteMsg {
     WithdrawAirdropReward {},
     /// Admin function to facilitate transfer of the unclaimed ASTRO Tokens
     TransferUnclaimedTokens {
-        recepient: String,
+        recipient: String,
         amount: Uint128,
     },
 }

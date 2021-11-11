@@ -105,8 +105,8 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
             handle_stake_lp_tokens(deps, env, info, terraswap_lp_token)
         }
         ExecuteMsg::EnableClaims {} => handle_enable_claims(deps, info),
-        ExecuteMsg::TransferReturnedAstro { recepient, amount } => {
-            handle_tranfer_returned_astro(deps, info, recepient, amount)
+        ExecuteMsg::TransferReturnedAstro { recipient, amount } => {
+            handle_transfer_returned_astro(deps, info, recipient, amount)
         }
 
         ExecuteMsg::DelegateAstroToAuction { amount } => {
@@ -434,12 +434,12 @@ pub fn handle_update_pool(
 }
 
 /// @dev Admin function to facilitate ASTRO tokens transfer which were returned by the users to forcefully unlock their positions
-/// @param recepient : Addresses to transfer ASTRO tokens to
+/// @param recipient : Addresses to transfer ASTRO tokens to
 /// @param amount : Number of ASTRO tokens to transfer
-pub fn handle_tranfer_returned_astro(
+pub fn handle_transfer_returned_astro(
     deps: DepsMut,
     info: MessageInfo,
-    recepient: String,
+    recipient: String,
     amount: Uint128,
 ) -> StdResult<Response> {
     let config = CONFIG.load(deps.storage)?;
@@ -464,7 +464,7 @@ pub fn handle_tranfer_returned_astro(
             contract_addr: astro_token.to_string(),
             funds: vec![],
             msg: to_binary(&Cw20ExecuteMsg::Transfer {
-                recipient: deps.api.addr_validate(&recepient)?.to_string(),
+                recipient: deps.api.addr_validate(&recipient)?.to_string(),
                 amount,
             })?,
         }
@@ -482,7 +482,7 @@ pub fn handle_tranfer_returned_astro(
         .add_message(send_cw20_msg)
         .add_attributes(vec![
             attr("action", "transfer_returned_astro"),
-            attr("recipient", recepient),
+            attr("recipient", recipient),
             attr("amount", amount),
         ]))
 }
@@ -890,10 +890,9 @@ pub fn handle_delegate_astro_to_auction(
         .unwrap_or_default();
 
     // CHECK :: ASTRO to delegate cannot exceed user's unclaimed ASTRO balance
-    let max_deletatable_astro =
-        total_astro_rewards.checked_sub(user_info.delegated_astro_rewards)?;
-    if amount > max_deletatable_astro {
-        return Err(StdError::generic_err(format!("ASTRO to delegate cannot exceed user's unclaimed ASTRO balance. ASTRO to delegate = {}, Max delegatable ASTRO = {} ",amount, max_deletatable_astro)));
+    let max_delegable_astro = total_astro_rewards.checked_sub(user_info.delegated_astro_rewards)?;
+    if amount > max_delegable_astro {
+        return Err(StdError::generic_err(format!("ASTRO to delegate cannot exceed user's unclaimed ASTRO balance. ASTRO to delegate = {}, Max delegable ASTRO = {} ",amount, max_delegable_astro)));
     }
 
     // UPDATE STATE

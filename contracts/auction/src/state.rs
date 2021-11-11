@@ -29,7 +29,7 @@ pub struct Config {
     pub lp_token_address: Addr,
     ///  Astroport Generator contract with which ASTRO-UST LP Tokens are staked
     pub generator_contract: Addr,
-    /// Total ASTRO token rewards to be used to incentivize boostrap auction participants
+    /// Total ASTRO token rewards to be used to incentivize bootstrap auction participants
     pub astro_rewards: Uint256,
     /// Number of seconds over which ASTRO incentives are vested
     pub astro_vesting_duration: u64,
@@ -46,7 +46,7 @@ pub struct Config {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub struct State {
-    /// Total ASTRO tokens delegated to the contract by lockdrop participants / airdrop recepients
+    /// Total ASTRO tokens delegated to the contract by lockdrop participants / airdrop recipients
     pub total_astro_deposited: Uint256,
     /// Total UST deposited in the contract
     pub total_ust_deposited: Uint256,
@@ -83,7 +83,7 @@ pub struct UserInfo {
     // Total UST deposited by the user
     pub ust_deposited: Uint256,
     // Withdrawal counter to capture if the user already withdrew UST during the "only withdrawals" window
-    pub withdrawl_counter: bool,
+    pub withdrawal_counter: bool,
     // User's LP share balance [Fixed amount, withdrawn amount is added to withdrawn_lp_shares, not subtracted from lp_shares]
     pub lp_shares: Uint256,
     // LP shares withdrawn by the user
@@ -103,7 +103,7 @@ impl Default for UserInfo {
         UserInfo {
             astro_deposited: Uint256::zero(),
             ust_deposited: Uint256::zero(),
-            withdrawl_counter: false,
+            withdrawal_counter: false,
             lp_shares: Uint256::zero(),
             withdrawn_lp_shares: Uint256::zero(),
             total_auction_incentives: Uint256::zero(),

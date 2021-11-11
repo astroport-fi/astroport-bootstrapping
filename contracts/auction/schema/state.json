@@ -47,7 +47,7 @@
       "minimum": 0.0
     },
     "total_astro_deposited": {
-      "description": "Total ASTRO tokens delegated to the contract by lockdrop participants / airdrop recepients",
+      "description": "Total ASTRO tokens delegated to the contract by lockdrop participants / airdrop recipients",
       "allOf": [
         {
           "$ref": "#/definitions/Uint256"

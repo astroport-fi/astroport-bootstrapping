@@ -1,5 +1,5 @@
 import  {Merkle_Tree}  from "./merkle_tree.js";
-import airdropdataTerra from "./airdrop_data/airdrop_recepients.json";
+import airdropdataTerra from "./airdrop_data/airdrop_recipients.json";
 
 const MERKLE_ROOTS = 2;
 
