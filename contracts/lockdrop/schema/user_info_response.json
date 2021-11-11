@@ -3,11 +3,16 @@
   "title": "UserInfoResponse",
   "type": "object",
   "required": [
+    "astro_transferred",
     "delegated_astro_rewards",
     "lockup_infos",
     "total_astro_rewards"
   ],
   "properties": {
+    "astro_transferred": {
+      "description": "ASTRO tokens transferred to user",
+      "type": "boolean"
+    },
     "delegated_astro_rewards": {
       "description": "Total ASTRO tokens user delegated to the LP bootstrap auction pool",
       "allOf": [
@@ -40,11 +45,13 @@
     "LockUpInfoResponse": {
       "type": "object",
       "required": [
-        "astro_transferred",
+        "claimable_generator_astro_debt",
+        "claimable_generator_proxy_debt",
         "duration",
         "generator_astro_debt",
         "generator_proxy_debt",
         "lp_units_locked",
+        "terraswap_lp_token",
         "unlock_timestamp",
         "withdrawal_flag"
       ],
@@ -59,10 +66,6 @@
               "type": "null"
             }
           ]
-        },
-        "astro_transferred": {
-          "description": "ASTRO tokens transferred to user",
-          "type": "boolean"
         },
         "astroport_lp_token": {
           "anyOf": [
@@ -85,13 +88,29 @@
             }
           ]
         },
+        "claimable_generator_astro_debt": {
+          "description": "ASTRO tokens receivable as generator rewards that user can claim",
+          "allOf": [
+            {
+              "$ref": "#/definitions/Uint128"
+            }
+          ]
+        },
+        "claimable_generator_proxy_debt": {
+          "description": "Proxy tokens receivable as generator rewards that user can claim",
+          "allOf": [
+            {
+              "$ref": "#/definitions/Uint128"
+            }
+          ]
+        },
         "duration": {
           "type": "integer",
           "format": "uint64",
           "minimum": 0.0
         },
         "generator_astro_debt": {
-          "description": "Generator ASTRO tokens loockup received as generator rewards",
+          "description": "Generator ASTRO tokens lockup received as generator rewards",
           "allOf": [
             {
               "$ref": "#/definitions/Uint128"
@@ -111,6 +130,14 @@
           "allOf": [
             {
               "$ref": "#/definitions/Uint128"
+            }
+          ]
+        },
+        "terraswap_lp_token": {
+          "description": "Terraswap LP token",
+          "allOf": [
+            {
+              "$ref": "#/definitions/Addr"
             }
           ]
         },

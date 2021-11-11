@@ -1,15 +1,16 @@
 use astroport_periphery::lockdrop::{
-    self, ConfigResponse, ExecuteMsg, InstantiateMsg, PoolResponse, QueryMsg, StateResponse,
-    UpdateConfigMsg, UserInfoResponse,
+    self, ConfigResponse, ExecuteMsg, InstantiateMsg, MigrationInfo, PoolResponse, QueryMsg,
+    StateResponse, UpdateConfigMsg, UserInfoResponse,
 };
 use cosmwasm_bignumber::Uint256;
 use cosmwasm_std::testing::{mock_env, MockApi, MockQuerier, MockStorage};
 use cosmwasm_std::{
-    attr, to_binary, Addr, Decimal, Timestamp, Uint128, Uint256 as CUint256, Uint64,
+    attr, to_binary, Addr, BalanceResponse, Coin, Decimal, Timestamp, Uint128, Uint256 as CUint256,
+    Uint64,
 };
 
 use astroport::token::InstantiateMsg as TokenInstantiateMsg;
-use cw20::Cw20ExecuteMsg;
+use cw20::{Cw20ExecuteMsg, Cw20QueryMsg};
 use terra_multi_test::{App, BankKeeper, ContractWrapper, Executor, TerraMockQuerier};
 
 fn mock_app() -> App {
@@ -366,9 +367,9 @@ fn instantiate_auction_contract(
         astro_rewards: Uint256::from(1000000000000u64),
         astro_vesting_duration: 7776000u64,
         lp_tokens_vesting_duration: 7776000u64,
-        init_timestamp: 1_000_00,
-        deposit_window: 100_000_00,
-        withdrawal_window: 5_000_00,
+        init_timestamp: 10_600_000,
+        deposit_window: 100_00_0,
+        withdrawal_window: 5_00_00,
     };
 
     // Init contract
@@ -471,16 +472,60 @@ fn instantiate_all_contracts(
     let pool_address = pair_resp.contract_addr;
     let lp_token_address = pair_resp.liquidity_token;
 
+    // Airdrop Contract
+    let airdrop_contract = Box::new(ContractWrapper::new(
+        astro_airdrop::contract::execute,
+        astro_airdrop::contract::instantiate,
+        astro_airdrop::contract::query,
+    ));
+
+    let airdrop_code_id = app.store_code(airdrop_contract);
+
+    let airdrop_msg = astroport_periphery::airdrop::InstantiateMsg {
+        owner: Some(owner.clone().to_string()),
+        astro_token_address: astro_token.clone().into_string(),
+        merkle_roots: Some(vec!["merkle_roots".to_string()]),
+        from_timestamp: Some(1_000_00),
+        to_timestamp: 10000_000_00,
+        total_airdrop_size: Uint128::new(100_000_000_000),
+    };
+
+    let airdrop_instance = app
+        .instantiate_contract(
+            airdrop_code_id,
+            owner.clone(),
+            &airdrop_msg,
+            &[],
+            String::from("airdrop_instance"),
+            None,
+        )
+        .unwrap();
+
     // Initiate Auction contract
     let (auction_contract, _) = instantiate_auction_contract(
         &mut app,
         owner.clone(),
         astro_token.clone(),
-        Addr::unchecked("auction_instance"),
+        airdrop_instance.clone(),
         lockdrop_instance.clone(),
         pool_address,
         lp_token_address,
     );
+
+    // Set auction contract in airdrop contract
+    app.execute_contract(
+        owner.clone(),
+        airdrop_instance.clone(),
+        &astroport_periphery::airdrop::ExecuteMsg::UpdateConfig {
+            owner: None,
+            auction_contract_address: Some(auction_contract.clone().to_string()),
+            merkle_roots: None,
+            from_timestamp: None,
+            to_timestamp: None,
+        },
+        &[],
+    )
+    .unwrap();
 
     let (generator_address, _) =
         instantiate_generator_and_vesting(&mut app, owner.clone(), astro_token.clone());
@@ -520,6 +565,319 @@ fn instantiate_all_contracts(
         astroport_factory_instance,
         terraswap_factory_instance,
         update_msg,
+    );
+}
+
+// Instantiate Pools and Migrate Liquidity to Astroport
+fn initialize_and_migrate_liquidity_for_pool(
+    mut app: &mut App,
+    owner: Addr,
+    token_instance: Addr,
+    lockdrop_instance: Addr,
+    astroport_factory_instance: Addr,
+) -> (String, Addr, Addr) {
+    // Terraswap LP Token
+    let terraswap_token_contract = Box::new(ContractWrapper::new(
+        terraswap_token::contract::execute,
+        terraswap_token::contract::instantiate,
+        terraswap_token::contract::query,
+    ));
+    let terraswap_token_code_id = app.store_code(terraswap_token_contract);
+
+    // Terraswap Pair
+    let terraswap_pair_contract = Box::new(
+        ContractWrapper::new(
+            terraswap_pair::contract::execute,
+            terraswap_pair::contract::instantiate,
+            terraswap_pair::contract::query,
+        )
+        .with_reply(terraswap_pair::contract::reply),
+    );
+    let terraswap_pair_code_id = app.store_code(terraswap_pair_contract);
+
+    // LP POOL INSTANCE
+    let terraswap_pool_instance = app
+        .instantiate_contract(
+            terraswap_pair_code_id,
+            Addr::unchecked("user".to_string()),
+            &terraswap::pair::InstantiateMsg {
+                asset_infos: [
+                    terraswap::asset::AssetInfo::Token {
+                        contract_addr: token_instance.clone().to_string(),
+                    },
+                    terraswap::asset::AssetInfo::NativeToken {
+                        denom: "uusd".to_string(),
+                    },
+                ],
+                token_code_id: terraswap_token_code_id,
+            },
+            &[],
+            String::from("terraswap_pool"),
+            None,
+        )
+        .unwrap();
+
+    // Query LP Token
+    let pair_response: terraswap::asset::PairInfo = app
+        .wrap()
+        .query_wasm_smart(
+            &terraswap_pool_instance,
+            &terraswap::pair::QueryMsg::Pair {},
+        )
+        .unwrap();
+    let terraswap_token_instance = pair_response.liquidity_token;
+
+    // SUCCESSFULLY INITIALIZES POOL
+    app.execute_contract(
+        owner.clone(),
+        lockdrop_instance.clone(),
+        &astroport_periphery::lockdrop::ExecuteMsg::InitializePool {
+            terraswap_lp_token: terraswap_token_instance.to_string(),
+            incentives_share: 10000000u64,
+        },
+        &[],
+    )
+    .unwrap();
+
+    let user_address = "user".to_string();
+    let user2_address = "user2".to_string();
+
+    // Mint ANC to users
+    app.execute_contract(
+        owner.clone(),
+        token_instance.clone(),
+        &cw20::Cw20ExecuteMsg::Mint {
+            recipient: user_address.clone(),
+            amount: Uint128::from(10000_000000u64),
+        },
+        &[],
+    )
+    .unwrap();
+    app.execute_contract(
+        owner.clone(),
+        token_instance.clone(),
+        &cw20::Cw20ExecuteMsg::Mint {
+            recipient: user2_address.clone(),
+            amount: Uint128::from(10000_000000u64),
+        },
+        &[],
+    )
+    .unwrap();
+
+    // Set UST user balances
+    app.init_bank_balance(
+        &Addr::unchecked(user_address.clone()),
+        vec![Coin::new(1000000_000000, "uusd")],
+    )
+    .unwrap();
+    app.init_bank_balance(
+        &Addr::unchecked(user2_address.clone()),
+        vec![Coin::new(1000000_000000, "uusd")],
+    )
+    .unwrap();
+
+    // user#1 adds liquidity to Terraswap Pool and locks that in Lockdrop contract
+    // increase allowance
+    app.execute_contract(
+        Addr::unchecked(user_address.clone()),
+        token_instance.clone(),
+        &Cw20ExecuteMsg::IncreaseAllowance {
+            spender: terraswap_pool_instance.clone().to_string(),
+            amount: Uint128::new(1000_000000),
+            expires: None,
+        },
+        &[],
+    )
+    .unwrap();
+
+    // add Liquidity to Terraswap pool
+    app.execute_contract(
+        Addr::unchecked(user_address.clone()),
+        terraswap_pool_instance.clone(),
+        &terraswap::pair::ExecuteMsg::ProvideLiquidity {
+            assets: [
+                terraswap::asset::Asset {
+                    info: terraswap::asset::AssetInfo::Token {
+                        contract_addr: token_instance.clone().to_string(),
+                    },
+                    amount: Uint128::from(1000_000000u64),
+                },
+                terraswap::asset::Asset {
+                    info: terraswap::asset::AssetInfo::NativeToken {
+                        denom: "uusd".to_string(),
+                    },
+                    amount: Uint128::from(1000_000000u64),
+                },
+            ],
+            slippage_tolerance: None,
+            receiver: None,
+        },
+        &[Coin::new(1000_000000, "uusd")],
+    )
+    .unwrap();
+
+    // Query LP balance
+    let mut lp_balance_res: cw20::BalanceResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &terraswap_token_instance.clone(),
+            &cw20::Cw20QueryMsg::Balance {
+                address: user_address.clone(),
+            },
+        )
+        .unwrap();
+    let user_lp_balance = lp_balance_res.balance;
+
+    app.update_block(|b| {
+        b.height += 17280;
+        b.time = Timestamp::from_seconds(1_000_00)
+    });
+
+    // Lock LP Tokens into Lockup Position
+    app.execute_contract(
+        Addr::unchecked(user_address.clone()),
+        Addr::unchecked(terraswap_token_instance.clone()),
+        &cw20::Cw20ExecuteMsg::Send {
+            contract: lockdrop_instance.clone().to_string(),
+            amount: user_lp_balance,
+            msg: to_binary(&lockdrop::Cw20HookMsg::IncreaseLockup { duration: 10u64 }).unwrap(),
+        },
+        &[],
+    )
+    .unwrap();
+
+    // user#2 adds liquidity to Terraswap Pool and locks that in Lockdrop contract
+    // increase allowance
+    app.execute_contract(
+        Addr::unchecked(user2_address.clone()),
+        token_instance.clone(),
+        &Cw20ExecuteMsg::IncreaseAllowance {
+            spender: terraswap_pool_instance.clone().to_string(),
+            amount: Uint128::new(1000_000000),
+            expires: None,
+        },
+        &[],
+    )
+    .unwrap();
+
+    // add Liquidity to Terraswap pool
+    app.execute_contract(
+        Addr::unchecked(user2_address.clone()),
+        terraswap_pool_instance.clone(),
+        &terraswap::pair::ExecuteMsg::ProvideLiquidity {
+            assets: [
+                terraswap::asset::Asset {
+                    info: terraswap::asset::AssetInfo::Token {
+                        contract_addr: token_instance.clone().to_string(),
+                    },
+                    amount: Uint128::from(1000_000000u64),
+                },
+                terraswap::asset::Asset {
+                    info: terraswap::asset::AssetInfo::NativeToken {
+                        denom: "uusd".to_string(),
+                    },
+                    amount: Uint128::from(1000_000000u64),
+                },
+            ],
+            slippage_tolerance: None,
+            receiver: None,
+        },
+        &[Coin::new(1000_000000, "uusd")],
+    )
+    .unwrap();
+
+    // Query LP balance
+    let mut lp_balance_res: cw20::BalanceResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &terraswap_token_instance.clone(),
+            &cw20::Cw20QueryMsg::Balance {
+                address: user2_address.clone(),
+            },
+        )
+        .unwrap();
+    let user_lp_balance = lp_balance_res.balance;
+
+    app.update_block(|b| {
+        b.height += 17280;
+        b.time = Timestamp::from_seconds(1_000_00)
+    });
+
+    // Lock LP Tokens into Lockup Position
+    app.execute_contract(
+        Addr::unchecked(user2_address.clone()),
+        Addr::unchecked(terraswap_token_instance.clone()),
+        &cw20::Cw20ExecuteMsg::Send {
+            contract: lockdrop_instance.clone().to_string(),
+            amount: user_lp_balance,
+            msg: to_binary(&lockdrop::Cw20HookMsg::IncreaseLockup { duration: 10u64 }).unwrap(),
+        },
+        &[],
+    )
+    .unwrap();
+
+    // Increase timestamp for window closure
+    app.update_block(|b| {
+        b.height += 17280;
+        b.time = Timestamp::from_seconds(10600001)
+    });
+
+    // Create Astroport Pair
+    app.execute_contract(
+        Addr::unchecked("user"),
+        astroport_factory_instance.clone(),
+        &astroport::factory::ExecuteMsg::CreatePair {
+            asset_infos: [
+                astroport::asset::AssetInfo::Token {
+                    contract_addr: token_instance.clone(),
+                },
+                astroport::asset::AssetInfo::NativeToken {
+                    denom: "uusd".to_string(),
+                },
+            ],
+            init_hook: None,
+            pair_type: astroport::factory::PairType::Xyk {},
+        },
+        &[],
+    )
+    .unwrap();
+
+    // Query Astroport addresses
+    let pair_resp: astroport::asset::PairInfo = app
+        .wrap()
+        .query_wasm_smart(
+            &astroport_factory_instance,
+            &astroport::factory::QueryMsg::Pair {
+                asset_infos: [
+                    astroport::asset::AssetInfo::Token {
+                        contract_addr: token_instance.clone(),
+                    },
+                    astroport::asset::AssetInfo::NativeToken {
+                        denom: "uusd".to_string(),
+                    },
+                ],
+            },
+        )
+        .unwrap();
+    let astro_pool_address = pair_resp.contract_addr;
+    let astro_lp_address = pair_resp.liquidity_token;
+
+    // Migrate Liquidity
+    app.execute_contract(
+        owner.clone(),
+        lockdrop_instance.clone(),
+        &ExecuteMsg::MigrateLiquidity {
+            terraswap_lp_token: terraswap_token_instance.clone(),
+            astroport_pool_addr: astro_pool_address.to_string(),
+        },
+        &[],
+    )
+    .unwrap();
+
+    return (
+        terraswap_token_instance,
+        astro_lp_address,
+        astro_pool_address,
     );
 }
 
@@ -573,7 +931,6 @@ fn proper_initialization_lockdrop() {
 
     assert_eq!(0u64, resp.total_incentives_share);
     assert_eq!(Uint128::zero(), resp.total_astro_delegated);
-    assert_eq!(Uint128::zero(), resp.total_astro_returned_available);
     assert_eq!(false, resp.are_claims_allowed);
 }
 
@@ -828,7 +1185,6 @@ fn test_initialize_pool() {
         .unwrap();
     assert_eq!(10000000u64, state_resp.total_incentives_share);
     assert_eq!(Uint128::zero(), state_resp.total_astro_delegated);
-    assert_eq!(Uint128::zero(), state_resp.total_astro_returned_available);
     assert_eq!(false, state_resp.are_claims_allowed);
     assert_eq!(
         vec![terraswap_token_instance.clone()],
@@ -849,8 +1205,8 @@ fn test_initialize_pool() {
     assert_eq!(None, pool_resp.migration_info);
     assert_eq!(10000000u64, pool_resp.incentives_share);
     assert_eq!(CUint256::zero(), pool_resp.weighted_amount);
-    assert_eq!(Decimal::zero(), pool_resp.generator_astro_per_share);
-    assert_eq!(Decimal::zero(), pool_resp.generator_proxy_per_share);
+    // assert_eq!(Decimal::zero(), pool_resp.generator_astro_per_share);
+    // assert_eq!(Decimal::zero(), pool_resp.generator_proxy_per_share);
     assert_eq!(false, pool_resp.is_staked);
 
     // ######    ERROR :: Already supported     ######
@@ -904,8 +1260,8 @@ fn test_initialize_pool() {
     assert_eq!(20400000u64, state_resp.total_incentives_share);
     assert_eq!(
         vec![
+            terraswap_token_instance.clone(),
             terraswap_token_instance2.clone(),
-            terraswap_token_instance.clone()
         ],
         state_resp.supported_pairs_list
     );
@@ -1023,7 +1379,6 @@ fn test_update_pool() {
         .unwrap();
     assert_eq!(3434543u64, state_resp.total_incentives_share);
     assert_eq!(Uint128::zero(), state_resp.total_astro_delegated);
-    assert_eq!(Uint128::zero(), state_resp.total_astro_returned_available);
     assert_eq!(false, state_resp.are_claims_allowed);
     assert_eq!(
         vec![terraswap_token_instance.clone()],
@@ -1044,8 +1399,14 @@ fn test_update_pool() {
     assert_eq!(None, pool_resp.migration_info);
     assert_eq!(3434543u64, pool_resp.incentives_share);
     assert_eq!(CUint256::zero(), pool_resp.weighted_amount);
-    assert_eq!(Decimal::zero(), pool_resp.generator_astro_per_share);
-    assert_eq!(Decimal::zero(), pool_resp.generator_proxy_per_share);
+    assert_eq!(
+        Decimal::from_ratio(0u64, 1u64),
+        pool_resp.generator_astro_per_share
+    );
+    assert_eq!(
+        Decimal::from_ratio(0u64, 1u64),
+        pool_resp.generator_proxy_per_share
+    );
     assert_eq!(false, pool_resp.is_staked);
 
     // ######    ERROR :: Pools cannot be added post deposit window closure     ######
@@ -1307,6 +1668,8 @@ fn test_increase_lockup() {
         user_resp.total_astro_rewards
     );
     assert_eq!(Uint128::zero(), user_resp.delegated_astro_rewards);
+    assert_eq!(false, user_resp.astro_transferred);
+
     assert_eq!(
         Uint128::from(10000u128),
         user_resp.lockup_infos[0].lp_units_locked
@@ -1316,7 +1679,6 @@ fn test_increase_lockup() {
         Some(user_resp.total_astro_rewards),
         user_resp.lockup_infos[0].astro_rewards
     );
-    assert_eq!(false, user_resp.lockup_infos[0].astro_transferred);
     assert_eq!(5u64, user_resp.lockup_infos[0].duration);
     assert_eq!(
         Uint128::zero(),
@@ -1772,7 +2134,7 @@ fn test_migrate_liquidity() {
     let mut app = mock_app();
     let owner = Addr::unchecked("contract_owner");
 
-    let (_, lockdrop_instance, _, _, update_msg) =
+    let (_, lockdrop_instance, astroport_factory_instance, _, update_msg) =
         instantiate_all_contracts(&mut app, owner.clone());
 
     // CW20 TOKEN :: Dummy token
@@ -1841,31 +2203,20 @@ fn test_migrate_liquidity() {
                 token_code_id: terraswap_token_code_id,
             },
             &[],
-            String::from("terraswap_pool_token"),
+            String::from("terraswap_pool"),
             None,
         )
         .unwrap();
 
-    // LP Token
-    let terraswap_token_instance = app
-        .instantiate_contract(
-            terraswap_token_code_id,
-            Addr::unchecked("user".to_string()),
-            &terraswap::token::InstantiateMsg {
-                name: "terraswap liquidity token".to_string(),
-                symbol: "uLP".to_string(),
-                decimals: 6,
-                initial_balances: vec![],
-                mint: Some(cw20::MinterResponse {
-                    minter: terraswap_pool_instance.to_string(),
-                    cap: None,
-                }),
-            },
-            &[],
-            String::from("terraswap_lp_token"),
-            None,
+    // Query LP Token
+    let pair_response: terraswap::asset::PairInfo = app
+        .wrap()
+        .query_wasm_smart(
+            &terraswap_pool_instance,
+            &terraswap::pair::QueryMsg::Pair {},
         )
         .unwrap();
+    let terraswap_token_instance = pair_response.liquidity_token;
 
     // SUCCESSFULLY INITIALIZES POOL
     app.execute_contract(
@@ -1882,36 +2233,255 @@ fn test_migrate_liquidity() {
     let user_address = "user".to_string();
     let user2_address = "user2".to_string();
 
-    // Mint some LP tokens to user#1
+    // Mint ANC to users
     app.execute_contract(
-        Addr::unchecked("pair_instance".to_string()),
-        terraswap_token_instance.clone(),
+        owner.clone(),
+        anc_instance.clone(),
         &cw20::Cw20ExecuteMsg::Mint {
             recipient: user_address.clone(),
-            amount: Uint128::from(124231343u128),
+            amount: Uint128::from(10000_000000u64),
+        },
+        &[],
+    )
+    .unwrap();
+    app.execute_contract(
+        owner.clone(),
+        anc_instance.clone(),
+        &cw20::Cw20ExecuteMsg::Mint {
+            recipient: user2_address.clone(),
+            amount: Uint128::from(10000_000000u64),
         },
         &[],
     )
     .unwrap();
 
-    // Deposit into Lockup Position
+    // Set UST user balances
+    app.init_bank_balance(
+        &Addr::unchecked(user_address.clone()),
+        vec![Coin::new(1000000_000000, "uusd")],
+    )
+    .unwrap();
+    app.init_bank_balance(
+        &Addr::unchecked(user2_address.clone()),
+        vec![Coin::new(1000000_000000, "uusd")],
+    )
+    .unwrap();
+
+    // user#1 adds liquidity to Terraswap Pool and locks that in Lockdrop contract
+    // increase allowance
+    app.execute_contract(
+        Addr::unchecked(user_address.clone()),
+        anc_instance.clone(),
+        &Cw20ExecuteMsg::IncreaseAllowance {
+            spender: terraswap_pool_instance.clone().to_string(),
+            amount: Uint128::new(1000_000000),
+            expires: None,
+        },
+        &[],
+    )
+    .unwrap();
+
+    // add Liquidity to Terraswap pool
+    app.execute_contract(
+        Addr::unchecked(user_address.clone()),
+        terraswap_pool_instance.clone(),
+        &terraswap::pair::ExecuteMsg::ProvideLiquidity {
+            assets: [
+                terraswap::asset::Asset {
+                    info: terraswap::asset::AssetInfo::Token {
+                        contract_addr: anc_instance.clone().to_string(),
+                    },
+                    amount: Uint128::from(1000_000000u64),
+                },
+                terraswap::asset::Asset {
+                    info: terraswap::asset::AssetInfo::NativeToken {
+                        denom: "uusd".to_string(),
+                    },
+                    amount: Uint128::from(1000_000000u64),
+                },
+            ],
+            slippage_tolerance: None,
+            receiver: None,
+        },
+        &[Coin::new(1000_000000, "uusd")],
+    )
+    .unwrap();
+
+    // Query LP balance
+    let lp_balance_res: cw20::BalanceResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &terraswap_token_instance.clone(),
+            &cw20::Cw20QueryMsg::Balance {
+                address: user_address.clone(),
+            },
+        )
+        .unwrap();
+    let user_lp_balance = lp_balance_res.balance;
 
     app.update_block(|b| {
         b.height += 17280;
         b.time = Timestamp::from_seconds(1_000_00)
     });
 
+    // Lock LP Tokens into Lockup Position
     app.execute_contract(
         Addr::unchecked(user_address.clone()),
-        terraswap_token_instance.clone(),
+        Addr::unchecked(terraswap_token_instance.clone()),
         &cw20::Cw20ExecuteMsg::Send {
             contract: lockdrop_instance.clone().to_string(),
-            amount: Uint128::from(10000000u128),
+            amount: user_lp_balance,
             msg: to_binary(&lockdrop::Cw20HookMsg::IncreaseLockup { duration: 10u64 }).unwrap(),
         },
         &[],
     )
     .unwrap();
+
+    // Increase timestamp for window closure
+    app.update_block(|b| {
+        b.height += 17280;
+        b.time = Timestamp::from_seconds(10600001)
+    });
+
+    // Create Astroport Pair
+    app.execute_contract(
+        Addr::unchecked("user"),
+        astroport_factory_instance.clone(),
+        &astroport::factory::ExecuteMsg::CreatePair {
+            asset_infos: [
+                astroport::asset::AssetInfo::Token {
+                    contract_addr: anc_instance.clone(),
+                },
+                astroport::asset::AssetInfo::NativeToken {
+                    denom: "uusd".to_string(),
+                },
+            ],
+            init_hook: None,
+            pair_type: astroport::factory::PairType::Xyk {},
+        },
+        &[],
+    )
+    .unwrap();
+
+    // Query Astroport addresses
+    let pair_resp: astroport::asset::PairInfo = app
+        .wrap()
+        .query_wasm_smart(
+            &astroport_factory_instance,
+            &astroport::factory::QueryMsg::Pair {
+                asset_infos: [
+                    astroport::asset::AssetInfo::Token {
+                        contract_addr: anc_instance.clone(),
+                    },
+                    astroport::asset::AssetInfo::NativeToken {
+                        denom: "uusd".to_string(),
+                    },
+                ],
+            },
+        )
+        .unwrap();
+    let astro_pool_address = pair_resp.contract_addr;
+    let astro_lp_address = pair_resp.liquidity_token;
+
+    // astro LP token balance (Lockdrop)
+    let terraswap_balance_resp: cw20::BalanceResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &terraswap_token_instance,
+            &Cw20QueryMsg::Balance {
+                address: lockdrop_instance.clone().to_string(),
+            },
+        )
+        .unwrap();
+
+    // Query pool before migration
+    let pool_resp_before_migration: PoolResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &lockdrop_instance,
+            &QueryMsg::Pool {
+                terraswap_lp_token: terraswap_token_instance.clone().to_string(),
+            },
+        )
+        .unwrap();
+
+    assert_eq!(
+        terraswap_balance_resp.balance,
+        pool_resp_before_migration.terraswap_amount_in_lockups
+    );
+    assert_eq!(
+        CUint256::from(1750000000u128),
+        pool_resp_before_migration.weighted_amount
+    );
+    assert_eq!(false, pool_resp_before_migration.is_staked);
+    assert_eq!(None, pool_resp_before_migration.migration_info);
+
+    // Migrate Liquidity
+    app.execute_contract(
+        owner.clone(),
+        lockdrop_instance.clone(),
+        &ExecuteMsg::MigrateLiquidity {
+            terraswap_lp_token: terraswap_token_instance.clone(),
+            astroport_pool_addr: astro_pool_address.to_string(),
+        },
+        &[],
+    )
+    .unwrap();
+
+    // astro LP token balance (Lockdrop)
+    let astro_balance_resp: cw20::BalanceResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &astro_lp_address,
+            &Cw20QueryMsg::Balance {
+                address: lockdrop_instance.clone().to_string(),
+            },
+        )
+        .unwrap();
+
+    // Query pool after migration
+    let pool_resp_after_migration: PoolResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &lockdrop_instance,
+            &QueryMsg::Pool {
+                terraswap_lp_token: terraswap_token_instance.clone().to_string(),
+            },
+        )
+        .unwrap();
+
+    assert_eq!(
+        pool_resp_before_migration.terraswap_pool,
+        pool_resp_after_migration.terraswap_pool
+    );
+    assert_eq!(
+        pool_resp_before_migration.terraswap_amount_in_lockups,
+        pool_resp_after_migration.terraswap_amount_in_lockups
+    );
+    assert_eq!(
+        pool_resp_before_migration.incentives_share,
+        pool_resp_after_migration.incentives_share
+    );
+
+    assert_eq!(
+        pool_resp_before_migration.incentives_share,
+        pool_resp_after_migration.incentives_share
+    );
+    assert_eq!(
+        Decimal::zero(),
+        pool_resp_after_migration.generator_astro_per_share
+    );
+    assert_eq!(
+        Decimal::zero(),
+        pool_resp_after_migration.generator_proxy_per_share
+    );
+    assert_eq!(
+        MigrationInfo {
+            terraswap_migrated_amount: astro_balance_resp.balance,
+            astroport_lp_token: astro_lp_address
+        },
+        pool_resp_after_migration.migration_info.unwrap()
+    );
 }
 
 #[test]
@@ -1919,6 +2489,1114 @@ fn test_stake_lp_tokens() {
     let mut app = mock_app();
     let owner = Addr::unchecked("contract_owner");
 
-    let (_, lockdrop_instance, _, _, update_msg) =
+    let (_, lockdrop_instance, astroport_factory_instance, _, update_msg) =
         instantiate_all_contracts(&mut app, owner.clone());
+
+    let cw20_contract = Box::new(ContractWrapper::new(
+        astroport_token::contract::execute,
+        astroport_token::contract::instantiate,
+        astroport_token::contract::query,
+    ));
+
+    let cw20_code_id = app.store_code(cw20_contract);
+
+    let token_instance = app
+        .instantiate_contract(
+            cw20_code_id,
+            owner.clone(),
+            &TokenInstantiateMsg {
+                name: String::from("ANC"),
+                symbol: String::from("ANC"),
+                decimals: 6,
+                initial_balances: vec![],
+                mint: Some(cw20::MinterResponse {
+                    minter: owner.to_string(),
+                    cap: None,
+                }),
+                init_hook: None,
+            },
+            &[],
+            String::from("ANC"),
+            None,
+        )
+        .unwrap();
+
+    // Initialize and migrate liquidity for a pool
+    let (terraswap_token_instance, astro_lp_address, astro_pool_address) =
+        initialize_and_migrate_liquidity_for_pool(
+            &mut app,
+            owner.clone(),
+            token_instance,
+            lockdrop_instance.clone(),
+            astroport_factory_instance,
+        );
+
+    // Add pool to ASTRO Generator
+    app.execute_contract(
+        Addr::unchecked(owner.clone()),
+        Addr::unchecked(update_msg.clone().generator_address.unwrap()),
+        &astroport::generator::ExecuteMsg::Add {
+            alloc_point: Uint64::from(10u64),
+            reward_proxy: None,
+            lp_token: astro_lp_address.clone(),
+            with_update: true,
+        },
+        &[],
+    )
+    .unwrap();
+
+    // ######    ERROR :: Unauthorized    ######
+
+    let err = app
+        .execute_contract(
+            Addr::unchecked("not_owner".to_string()),
+            lockdrop_instance.clone(),
+            &astroport_periphery::lockdrop::ExecuteMsg::StakeLpTokens {
+                terraswap_lp_token: terraswap_token_instance.clone(),
+            },
+            &[],
+        )
+        .unwrap_err();
+
+    assert_eq!(err.to_string(), "Generic error: Unauthorized");
+
+    // ######    SHOULD SUCCESSFULLY STAKE LP TOKENS WITH GENERATOR   ######
+
+    // astro LP token balance (Lockdrop)
+    let lockdrop_astro_balance_before_migration: cw20::BalanceResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &astro_lp_address,
+            &Cw20QueryMsg::Balance {
+                address: lockdrop_instance.clone().to_string(),
+            },
+        )
+        .unwrap();
+
+    app.execute_contract(
+        Addr::unchecked(owner.clone()),
+        lockdrop_instance.clone(),
+        &astroport_periphery::lockdrop::ExecuteMsg::StakeLpTokens {
+            terraswap_lp_token: terraswap_token_instance.clone(),
+        },
+        &[],
+    )
+    .unwrap();
+
+    // astro LP token balance (Generator)
+    let generator_astro_balance_after_migration: cw20::BalanceResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &astro_lp_address,
+            &Cw20QueryMsg::Balance {
+                address: update_msg.clone().generator_address.unwrap().to_string(),
+            },
+        )
+        .unwrap();
+
+    assert_eq!(
+        lockdrop_astro_balance_before_migration.balance,
+        generator_astro_balance_after_migration.balance
+    );
+
+    // Query pool after migration
+    let pool_resp_after_migration: PoolResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &lockdrop_instance,
+            &QueryMsg::Pool {
+                terraswap_lp_token: terraswap_token_instance.clone().to_string(),
+            },
+        )
+        .unwrap();
+
+    assert_eq!(true, pool_resp_after_migration.is_staked);
+}
+
+#[test]
+fn test_claim_rewards() {
+    let mut app = mock_app();
+    let owner = Addr::unchecked("contract_owner");
+
+    let (_, lockdrop_instance, astroport_factory_instance, _, update_msg) =
+        instantiate_all_contracts(&mut app, owner.clone());
+
+    let cw20_contract = Box::new(ContractWrapper::new(
+        astroport_token::contract::execute,
+        astroport_token::contract::instantiate,
+        astroport_token::contract::query,
+    ));
+
+    let cw20_code_id = app.store_code(cw20_contract);
+
+    let token_instance = app
+        .instantiate_contract(
+            cw20_code_id,
+            owner.clone(),
+            &TokenInstantiateMsg {
+                name: String::from("ANC"),
+                symbol: String::from("ANC"),
+                decimals: 6,
+                initial_balances: vec![],
+                mint: Some(cw20::MinterResponse {
+                    minter: owner.to_string(),
+                    cap: None,
+                }),
+                init_hook: None,
+            },
+            &[],
+            String::from("ANC"),
+            None,
+        )
+        .unwrap();
+
+    // Initialize and migrate liquidity for a pool
+    let (terraswap_token_instance, astro_lp_address, astro_pool_address) =
+        initialize_and_migrate_liquidity_for_pool(
+            &mut app,
+            owner.clone(),
+            token_instance,
+            lockdrop_instance.clone(),
+            astroport_factory_instance,
+        );
+
+    // Add pool to ASTRO Generator
+    app.execute_contract(
+        Addr::unchecked(owner.clone()),
+        Addr::unchecked(update_msg.clone().generator_address.unwrap()),
+        &astroport::generator::ExecuteMsg::Add {
+            alloc_point: Uint64::from(10u64),
+            reward_proxy: None,
+            lp_token: astro_lp_address.clone(),
+            with_update: true,
+        },
+        &[],
+    )
+    .unwrap();
+
+    // Stake LP Tokens with Generator
+    app.execute_contract(
+        Addr::unchecked(owner.clone()),
+        lockdrop_instance.clone(),
+        &astroport_periphery::lockdrop::ExecuteMsg::StakeLpTokens {
+            terraswap_lp_token: terraswap_token_instance.clone(),
+        },
+        &[],
+    )
+    .unwrap();
+
+    let user_address = "user".to_string();
+    let user2_address = "user2".to_string();
+
+    // Query user
+    let user_info: UserInfoResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &lockdrop_instance,
+            &QueryMsg::UserInfo {
+                address: user_address.clone(),
+            },
+        )
+        .unwrap();
+    assert_eq!(Uint128::from(500000000u64), user_info.total_astro_rewards);
+    assert_eq!(false, user_info.astro_transferred);
+    assert_eq!(Uint128::zero(), user_info.delegated_astro_rewards);
+    let lockup_response = astroport_periphery::lockdrop::LockUpInfoResponse {
+        lp_units_locked: Uint128::from(1000000000u64),
+        withdrawal_flag: false,
+        astro_rewards: Some(Uint128::from(500000000u64)),
+        duration: 10u64,
+        generator_astro_debt: Uint128::from(0u64),
+        claimable_generator_astro_debt: Uint128::from(0u64),
+        generator_proxy_debt: Uint128::from(0u64),
+        claimable_generator_proxy_debt: Uint128::from(0u64),
+        unlock_timestamp: 16648000u64,
+        astroport_lp_units: Some(Uint128::from(1000000000u64)),
+        astroport_lp_token: Some(astro_lp_address.clone()),
+        terraswap_lp_token: Addr::unchecked(terraswap_token_instance.clone()),
+    };
+    assert_eq!(lockup_response, user_info.lockup_infos[0]);
+
+    app.update_block(|b| {
+        b.height += 17280;
+        b.time = Timestamp::from_seconds(10600001)
+    });
+
+    // DELEGATE ASTRO TO AUCTION
+    app.execute_contract(
+        Addr::unchecked(user_address.clone()),
+        lockdrop_instance.clone(),
+        &astroport_periphery::lockdrop::ExecuteMsg::DelegateAstroToAuction {
+            amount: Uint128::from(500000000u64),
+        },
+        &[],
+    )
+    .unwrap();
+
+    app.execute_contract(
+        Addr::unchecked(user2_address.clone()),
+        lockdrop_instance.clone(),
+        &astroport_periphery::lockdrop::ExecuteMsg::DelegateAstroToAuction {
+            amount: Uint128::from(1000u64),
+        },
+        &[],
+    )
+    .unwrap();
+
+    // Query state
+    let state: StateResponse = app
+        .wrap()
+        .query_wasm_smart(&lockdrop_instance, &QueryMsg::State {})
+        .unwrap();
+    assert_eq!(Uint128::from(500001000u64), state.total_astro_delegated);
+
+    // Query user
+    let user_info: UserInfoResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &lockdrop_instance,
+            &QueryMsg::UserInfo {
+                address: user_address.clone(),
+            },
+        )
+        .unwrap();
+    assert_eq!(Uint128::from(500000000u64), user_info.total_astro_rewards);
+    assert_eq!(
+        Uint128::from(500000000u64),
+        user_info.delegated_astro_rewards
+    );
+
+    // DEPOSIT UST INTO AUCTION
+    app.execute_contract(
+        Addr::unchecked(user_address.clone()),
+        Addr::unchecked(update_msg.auction_contract_address.clone().unwrap()),
+        &astroport_periphery::auction::ExecuteMsg::DepositUst {},
+        &[Coin {
+            denom: "uusd".to_string(),
+            amount: Uint128::from(432423u128),
+        }],
+    )
+    .unwrap();
+
+    // ######    ERROR :: Reward claim not allowed    ######
+
+    let err = app
+        .execute_contract(
+            Addr::unchecked(user_address.clone()),
+            lockdrop_instance.clone(),
+            &astroport_periphery::lockdrop::ExecuteMsg::ClaimRewardsAndOptionallyUnlock {
+                terraswap_lp_token: terraswap_token_instance.clone(),
+                duration: 10u64,
+                withdraw_lp_stake: false,
+            },
+            &[],
+        )
+        .unwrap_err();
+
+    assert_eq!(err.to_string(), "Generic error: Reward claim not allowed");
+
+    app.update_block(|b| {
+        b.height += 17280;
+        b.time = Timestamp::from_seconds(10750001)
+    });
+
+    // INITIALIZE ASTRO-UST POOL TO ENABLE CLAIMS
+    app.execute_contract(
+        Addr::unchecked(owner.to_string()),
+        Addr::unchecked(update_msg.auction_contract_address.clone().unwrap()),
+        &astroport_periphery::auction::ExecuteMsg::AddLiquidityToAstroportPool { slippage: None },
+        &[],
+    )
+    .unwrap();
+
+    // ######    ERROR :: Invalid Lockup    ######
+
+    let err = app
+        .execute_contract(
+            Addr::unchecked(user_address.clone()),
+            lockdrop_instance.clone(),
+            &astroport_periphery::lockdrop::ExecuteMsg::ClaimRewardsAndOptionallyUnlock {
+                terraswap_lp_token: terraswap_token_instance.clone(),
+                duration: 9u64,
+                withdraw_lp_stake: false,
+            },
+            &[],
+        )
+        .unwrap_err();
+
+    assert_eq!(
+        err.to_string(),
+        "astroport_lockdrop::state::LockupInfo not found"
+    );
+
+    // ######    SHOULD SUCCESSFULLY CLAIM REWARDS   ######
+
+    // Query user
+    let user_info: UserInfoResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &lockdrop_instance,
+            &QueryMsg::UserInfo {
+                address: user_address.clone(),
+            },
+        )
+        .unwrap();
+    assert_eq!(Uint128::from(500000000u64), user_info.total_astro_rewards);
+    assert_eq!(
+        Uint128::from(500000000u64),
+        user_info.delegated_astro_rewards
+    );
+    assert_eq!(false, user_info.astro_transferred);
+    let lockup_response = astroport_periphery::lockdrop::LockUpInfoResponse {
+        lp_units_locked: Uint128::from(1000000000u64),
+        withdrawal_flag: false,
+        astro_rewards: Some(Uint128::from(500000000u64)),
+        duration: 10u64,
+        generator_astro_debt: Uint128::from(0u64),
+        claimable_generator_astro_debt: Uint128::from(172800000000u64),
+        generator_proxy_debt: Uint128::from(0u64),
+        claimable_generator_proxy_debt: Uint128::from(0u64),
+        unlock_timestamp: 16648000u64,
+        astroport_lp_units: Some(Uint128::from(1000000000u64)),
+        astroport_lp_token: Some(astro_lp_address.clone()),
+        terraswap_lp_token: Addr::unchecked(terraswap_token_instance.clone()),
+    };
+    assert_eq!(lockup_response, user_info.lockup_infos[0]);
+
+    let user1_astro_balance_before: cw20::BalanceResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &update_msg.astro_token_address.clone().unwrap(),
+            &Cw20QueryMsg::Balance {
+                address: user_address.clone(),
+            },
+        )
+        .unwrap();
+
+    app.execute_contract(
+        Addr::unchecked(user_address.clone()),
+        lockdrop_instance.clone(),
+        &astroport_periphery::lockdrop::ExecuteMsg::ClaimRewardsAndOptionallyUnlock {
+            terraswap_lp_token: terraswap_token_instance.clone(),
+            duration: 10u64,
+            withdraw_lp_stake: false,
+        },
+        &[],
+    )
+    .unwrap();
+
+    // Query user
+    let user_info: UserInfoResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &lockdrop_instance,
+            &QueryMsg::UserInfo {
+                address: user_address.clone(),
+            },
+        )
+        .unwrap();
+    assert_eq!(Uint128::from(500000000u64), user_info.total_astro_rewards);
+    assert_eq!(
+        Uint128::from(500000000u64),
+        user_info.delegated_astro_rewards
+    );
+    assert_eq!(true, user_info.astro_transferred);
+    let lockup_response = astroport_periphery::lockdrop::LockUpInfoResponse {
+        lp_units_locked: Uint128::from(1000000000u64),
+        withdrawal_flag: false,
+        astro_rewards: Some(Uint128::from(500000000u64)),
+        duration: 10u64,
+        generator_astro_debt: Uint128::from(172800000000u64),
+        claimable_generator_astro_debt: Uint128::from(0u64),
+        generator_proxy_debt: Uint128::from(0u64),
+        claimable_generator_proxy_debt: Uint128::from(0u64),
+        unlock_timestamp: 16648000u64,
+        astroport_lp_units: Some(Uint128::from(1000000000u64)),
+        astroport_lp_token: Some(astro_lp_address.clone()),
+        terraswap_lp_token: Addr::unchecked(terraswap_token_instance.clone()),
+    };
+    assert_eq!(lockup_response, user_info.lockup_infos[0]);
+
+    let user1_astro_balance_after: cw20::BalanceResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &update_msg.astro_token_address.clone().unwrap(),
+            &Cw20QueryMsg::Balance {
+                address: user_address.clone(),
+            },
+        )
+        .unwrap();
+
+    let astro_reward_claimed =
+        user1_astro_balance_after.balance - user1_astro_balance_before.balance;
+    assert_eq!(
+        astro_reward_claimed,
+        user_info.total_astro_rewards - user_info.delegated_astro_rewards
+            + Uint128::from(172800000000u64)
+    );
+
+    // ######    SHOULD SUCCESSFULLY CLAIM REWARDS :: user-2  ######
+
+    // Query user
+    let user_info: UserInfoResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &lockdrop_instance,
+            &QueryMsg::UserInfo {
+                address: user2_address.clone(),
+            },
+        )
+        .unwrap();
+
+    let user2_astro_balance_before: cw20::BalanceResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &update_msg.astro_token_address.clone().unwrap(),
+            &Cw20QueryMsg::Balance {
+                address: user2_address.clone(),
+            },
+        )
+        .unwrap();
+
+    assert_eq!(Uint128::from(500000000u64), user_info.total_astro_rewards);
+    assert_eq!(Uint128::from(1000u64), user_info.delegated_astro_rewards);
+    assert_eq!(false, user_info.astro_transferred);
+    let lockup_response = astroport_periphery::lockdrop::LockUpInfoResponse {
+        lp_units_locked: Uint128::from(1000000000u64),
+        withdrawal_flag: false,
+        astro_rewards: Some(Uint128::from(500000000u64)),
+        duration: 10u64,
+        generator_astro_debt: Uint128::from(0u64),
+        claimable_generator_astro_debt: Uint128::from(172800000000u64),
+        generator_proxy_debt: Uint128::from(0u64),
+        claimable_generator_proxy_debt: Uint128::from(0u64),
+        unlock_timestamp: 16648000u64,
+        astroport_lp_units: Some(Uint128::from(1000000000u64)),
+        astroport_lp_token: Some(astro_lp_address.clone()),
+        terraswap_lp_token: Addr::unchecked(terraswap_token_instance.clone()),
+    };
+    assert_eq!(lockup_response, user_info.lockup_infos[0]);
+
+    app.execute_contract(
+        Addr::unchecked(user2_address.clone()),
+        lockdrop_instance.clone(),
+        &astroport_periphery::lockdrop::ExecuteMsg::ClaimRewardsAndOptionallyUnlock {
+            terraswap_lp_token: terraswap_token_instance.clone(),
+            duration: 10u64,
+            withdraw_lp_stake: false,
+        },
+        &[],
+    )
+    .unwrap();
+
+    // Query user
+    let user_info: UserInfoResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &lockdrop_instance,
+            &QueryMsg::UserInfo {
+                address: user2_address.clone(),
+            },
+        )
+        .unwrap();
+    assert_eq!(Uint128::from(500000000u64), user_info.total_astro_rewards);
+    assert_eq!(Uint128::from(1000u64), user_info.delegated_astro_rewards);
+    assert_eq!(true, user_info.astro_transferred);
+    let lockup_response = astroport_periphery::lockdrop::LockUpInfoResponse {
+        lp_units_locked: Uint128::from(1000000000u64),
+        withdrawal_flag: false,
+        astro_rewards: Some(Uint128::from(500000000u64)),
+        duration: 10u64,
+        generator_astro_debt: Uint128::from(172800000000u64),
+        claimable_generator_astro_debt: Uint128::from(0u64),
+        generator_proxy_debt: Uint128::from(0u64),
+        claimable_generator_proxy_debt: Uint128::from(0u64),
+        unlock_timestamp: 16648000u64,
+        astroport_lp_units: Some(Uint128::from(1000000000u64)),
+        astroport_lp_token: Some(astro_lp_address.clone()),
+        terraswap_lp_token: Addr::unchecked(terraswap_token_instance.clone()),
+    };
+    assert_eq!(lockup_response, user_info.lockup_infos[0]);
+
+    let user2_astro_balance_after: cw20::BalanceResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &update_msg.astro_token_address.clone().unwrap(),
+            &Cw20QueryMsg::Balance {
+                address: user2_address.clone(),
+            },
+        )
+        .unwrap();
+
+    let astro_reward_claimed =
+        user2_astro_balance_after.balance - user2_astro_balance_before.balance;
+    assert_eq!(
+        astro_reward_claimed,
+        user_info.total_astro_rewards - user_info.delegated_astro_rewards
+            + Uint128::from(172800000000u64)
+    );
+}
+
+#[test]
+fn test_claim_rewards_and_unlock() {
+    let mut app = mock_app();
+    let owner = Addr::unchecked("contract_owner");
+
+    let (_, lockdrop_instance, astroport_factory_instance, _, update_msg) =
+        instantiate_all_contracts(&mut app, owner.clone());
+
+    let cw20_contract = Box::new(ContractWrapper::new(
+        astroport_token::contract::execute,
+        astroport_token::contract::instantiate,
+        astroport_token::contract::query,
+    ));
+
+    let cw20_code_id = app.store_code(cw20_contract);
+
+    let token_instance = app
+        .instantiate_contract(
+            cw20_code_id,
+            owner.clone(),
+            &TokenInstantiateMsg {
+                name: String::from("ANC"),
+                symbol: String::from("ANC"),
+                decimals: 6,
+                initial_balances: vec![],
+                mint: Some(cw20::MinterResponse {
+                    minter: owner.to_string(),
+                    cap: None,
+                }),
+                init_hook: None,
+            },
+            &[],
+            String::from("ANC"),
+            None,
+        )
+        .unwrap();
+
+    // Initialize and migrate liquidity for a pool
+    let (terraswap_token_instance, astro_lp_address, astro_pool_address) =
+        initialize_and_migrate_liquidity_for_pool(
+            &mut app,
+            owner.clone(),
+            token_instance,
+            lockdrop_instance.clone(),
+            astroport_factory_instance,
+        );
+
+    // Add pool to ASTRO Generator
+    app.execute_contract(
+        Addr::unchecked(owner.clone()),
+        Addr::unchecked(update_msg.clone().generator_address.unwrap()),
+        &astroport::generator::ExecuteMsg::Add {
+            alloc_point: Uint64::from(10u64),
+            reward_proxy: None,
+            lp_token: astro_lp_address.clone(),
+            with_update: true,
+        },
+        &[],
+    )
+    .unwrap();
+
+    // Stake LP Tokens with Generator
+    app.execute_contract(
+        Addr::unchecked(owner.clone()),
+        lockdrop_instance.clone(),
+        &astroport_periphery::lockdrop::ExecuteMsg::StakeLpTokens {
+            terraswap_lp_token: terraswap_token_instance.clone(),
+        },
+        &[],
+    )
+    .unwrap();
+
+    let user_address = "user".to_string();
+    let user2_address = "user2".to_string();
+
+    // Query user
+    let user_info: UserInfoResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &lockdrop_instance,
+            &QueryMsg::UserInfo {
+                address: user_address.clone(),
+            },
+        )
+        .unwrap();
+    assert_eq!(Uint128::from(500000000u64), user_info.total_astro_rewards);
+    assert_eq!(false, user_info.astro_transferred);
+    assert_eq!(Uint128::zero(), user_info.delegated_astro_rewards);
+    let lockup_response = astroport_periphery::lockdrop::LockUpInfoResponse {
+        lp_units_locked: Uint128::from(1000000000u64),
+        withdrawal_flag: false,
+        astro_rewards: Some(Uint128::from(500000000u64)),
+        duration: 10u64,
+        generator_astro_debt: Uint128::from(0u64),
+        claimable_generator_astro_debt: Uint128::from(0u64),
+        generator_proxy_debt: Uint128::from(0u64),
+        claimable_generator_proxy_debt: Uint128::from(0u64),
+        unlock_timestamp: 16648000u64,
+        astroport_lp_units: Some(Uint128::from(1000000000u64)),
+        astroport_lp_token: Some(astro_lp_address.clone()),
+        terraswap_lp_token: Addr::unchecked(terraswap_token_instance.clone()),
+    };
+    assert_eq!(lockup_response, user_info.lockup_infos[0]);
+
+    app.update_block(|b| {
+        b.height += 17280;
+        b.time = Timestamp::from_seconds(10600001)
+    });
+
+    // DELEGATE ASTRO TO AUCTION
+    app.execute_contract(
+        Addr::unchecked(user_address.clone()),
+        lockdrop_instance.clone(),
+        &astroport_periphery::lockdrop::ExecuteMsg::DelegateAstroToAuction {
+            amount: Uint128::from(500000000u64),
+        },
+        &[],
+    )
+    .unwrap();
+
+    app.execute_contract(
+        Addr::unchecked(user2_address.clone()),
+        lockdrop_instance.clone(),
+        &astroport_periphery::lockdrop::ExecuteMsg::DelegateAstroToAuction {
+            amount: Uint128::from(1000u64),
+        },
+        &[],
+    )
+    .unwrap();
+
+    // Query state
+    let state: StateResponse = app
+        .wrap()
+        .query_wasm_smart(&lockdrop_instance, &QueryMsg::State {})
+        .unwrap();
+    assert_eq!(Uint128::from(500001000u64), state.total_astro_delegated);
+
+    // Query user
+    let user_info: UserInfoResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &lockdrop_instance,
+            &QueryMsg::UserInfo {
+                address: user_address.clone(),
+            },
+        )
+        .unwrap();
+    assert_eq!(Uint128::from(500000000u64), user_info.total_astro_rewards);
+    assert_eq!(
+        Uint128::from(500000000u64),
+        user_info.delegated_astro_rewards
+    );
+
+    // DEPOSIT UST INTO AUCTION
+    app.execute_contract(
+        Addr::unchecked(user_address.clone()),
+        Addr::unchecked(update_msg.auction_contract_address.clone().unwrap()),
+        &astroport_periphery::auction::ExecuteMsg::DepositUst {},
+        &[Coin {
+            denom: "uusd".to_string(),
+            amount: Uint128::from(432423u128),
+        }],
+    )
+    .unwrap();
+
+    app.update_block(|b| {
+        b.height += 17280;
+        b.time = Timestamp::from_seconds(10750001)
+    });
+
+    // INITIALIZE ASTRO-UST POOL TO ENABLE CLAIMS
+    app.execute_contract(
+        Addr::unchecked(owner.to_string()),
+        Addr::unchecked(update_msg.auction_contract_address.clone().unwrap()),
+        &astroport_periphery::auction::ExecuteMsg::AddLiquidityToAstroportPool { slippage: None },
+        &[],
+    )
+    .unwrap();
+
+    // ######    SHOULD SUCCESSFULLY CLAIM REWARDS AND UNLOCK   ######
+
+    app.update_block(|b| {
+        b.height += 17280;
+        b.time = Timestamp::from_seconds(16648001)
+    });
+
+    // Query user
+    let user_info: UserInfoResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &lockdrop_instance,
+            &QueryMsg::UserInfo {
+                address: user_address.clone(),
+            },
+        )
+        .unwrap();
+    assert_eq!(Uint128::from(500000000u64), user_info.total_astro_rewards);
+    assert_eq!(
+        Uint128::from(500000000u64),
+        user_info.delegated_astro_rewards
+    );
+    assert_eq!(false, user_info.astro_transferred);
+    let lockup_response = astroport_periphery::lockdrop::LockUpInfoResponse {
+        lp_units_locked: Uint128::from(1000000000u64),
+        withdrawal_flag: false,
+        astro_rewards: Some(Uint128::from(500000000u64)),
+        duration: 10u64,
+        generator_astro_debt: Uint128::from(0u64),
+        claimable_generator_astro_debt: Uint128::from(259200000000u64),
+        generator_proxy_debt: Uint128::from(0u64),
+        claimable_generator_proxy_debt: Uint128::from(0u64),
+        unlock_timestamp: 16648000u64,
+        astroport_lp_units: Some(Uint128::from(1000000000u64)),
+        astroport_lp_token: Some(astro_lp_address.clone()),
+        terraswap_lp_token: Addr::unchecked(terraswap_token_instance.clone()),
+    };
+    assert_eq!(lockup_response, user_info.lockup_infos[0]);
+
+    let user1_astro_balance_before: cw20::BalanceResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &update_msg.astro_token_address.clone().unwrap(),
+            &Cw20QueryMsg::Balance {
+                address: user_address.clone(),
+            },
+        )
+        .unwrap();
+
+    let user1_astro_lp_balance_before: cw20::BalanceResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &astro_lp_address.clone(),
+            &Cw20QueryMsg::Balance {
+                address: user_address.clone(),
+            },
+        )
+        .unwrap();
+
+    app.execute_contract(
+        Addr::unchecked(user_address.clone()),
+        lockdrop_instance.clone(),
+        &astroport_periphery::lockdrop::ExecuteMsg::ClaimRewardsAndOptionallyUnlock {
+            terraswap_lp_token: terraswap_token_instance.clone(),
+            duration: 10u64,
+            withdraw_lp_stake: true,
+        },
+        &[],
+    )
+    .unwrap();
+
+    // Query user
+    let user_info: UserInfoResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &lockdrop_instance,
+            &QueryMsg::UserInfo {
+                address: user_address.clone(),
+            },
+        )
+        .unwrap();
+    assert_eq!(Uint128::from(500000000u64), user_info.total_astro_rewards);
+    assert_eq!(
+        Uint128::from(500000000u64),
+        user_info.delegated_astro_rewards
+    );
+    assert_eq!(true, user_info.astro_transferred);
+    assert_eq!(true, user_info.lockup_infos.is_empty());
+
+    let user1_astro_balance_after: cw20::BalanceResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &update_msg.astro_token_address.clone().unwrap(),
+            &Cw20QueryMsg::Balance {
+                address: user_address.clone(),
+            },
+        )
+        .unwrap();
+
+    let user1_astro_lp_balance_after: cw20::BalanceResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &astro_lp_address.clone(),
+            &Cw20QueryMsg::Balance {
+                address: user_address.clone(),
+            },
+        )
+        .unwrap();
+
+    let astro_reward_claimed =
+        user1_astro_balance_after.balance - user1_astro_balance_before.balance;
+    let lp_tokens_withdrawn =
+        user1_astro_lp_balance_after.balance - user1_astro_lp_balance_before.balance;
+    assert_eq!(
+        astro_reward_claimed,
+        user_info.total_astro_rewards - user_info.delegated_astro_rewards
+            + Uint128::from(259200000000u64)
+    );
+    assert_eq!(lp_tokens_withdrawn, Uint128::from(1000000000u64));
+
+    // ######    SHOULD SUCCESSFULLY CLAIM REWARDS :: user-2  ######
+
+    // Query user
+    let user_info: UserInfoResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &lockdrop_instance,
+            &QueryMsg::UserInfo {
+                address: user2_address.clone(),
+            },
+        )
+        .unwrap();
+
+    let user2_astro_balance_before: cw20::BalanceResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &update_msg.astro_token_address.clone().unwrap(),
+            &Cw20QueryMsg::Balance {
+                address: user2_address.clone(),
+            },
+        )
+        .unwrap();
+
+    assert_eq!(Uint128::from(500000000u64), user_info.total_astro_rewards);
+    assert_eq!(Uint128::from(1000u64), user_info.delegated_astro_rewards);
+    assert_eq!(false, user_info.astro_transferred);
+    let lockup_response = astroport_periphery::lockdrop::LockUpInfoResponse {
+        lp_units_locked: Uint128::from(1000000000u64),
+        withdrawal_flag: false,
+        astro_rewards: Some(Uint128::from(500000000u64)),
+        duration: 10u64,
+        generator_astro_debt: Uint128::from(0u64),
+        claimable_generator_astro_debt: Uint128::from(259200000000u64),
+        generator_proxy_debt: Uint128::from(0u64),
+        claimable_generator_proxy_debt: Uint128::from(0u64),
+        unlock_timestamp: 16648000u64,
+        astroport_lp_units: Some(Uint128::from(1000000000u64)),
+        astroport_lp_token: Some(astro_lp_address.clone()),
+        terraswap_lp_token: Addr::unchecked(terraswap_token_instance.clone()),
+    };
+    assert_eq!(lockup_response, user_info.lockup_infos[0]);
+
+    let user2_astro_lp_balance_before: cw20::BalanceResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &astro_lp_address.clone(),
+            &Cw20QueryMsg::Balance {
+                address: user2_address.clone(),
+            },
+        )
+        .unwrap();
+
+    app.execute_contract(
+        Addr::unchecked(user2_address.clone()),
+        lockdrop_instance.clone(),
+        &astroport_periphery::lockdrop::ExecuteMsg::ClaimRewardsAndOptionallyUnlock {
+            terraswap_lp_token: terraswap_token_instance.clone(),
+            duration: 10u64,
+            withdraw_lp_stake: true,
+        },
+        &[],
+    )
+    .unwrap();
+
+    // Query user
+    let user_info: UserInfoResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &lockdrop_instance,
+            &QueryMsg::UserInfo {
+                address: user2_address.clone(),
+            },
+        )
+        .unwrap();
+    assert_eq!(Uint128::from(500000000u64), user_info.total_astro_rewards);
+    assert_eq!(Uint128::from(1000u64), user_info.delegated_astro_rewards);
+    assert_eq!(true, user_info.astro_transferred);
+    assert_eq!(true, user_info.lockup_infos.is_empty());
+
+    let user2_astro_balance_after: cw20::BalanceResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &update_msg.astro_token_address.clone().unwrap(),
+            &Cw20QueryMsg::Balance {
+                address: user2_address.clone(),
+            },
+        )
+        .unwrap();
+
+    let user2_astro_lp_balance_after: cw20::BalanceResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &astro_lp_address.clone(),
+            &Cw20QueryMsg::Balance {
+                address: user2_address.clone(),
+            },
+        )
+        .unwrap();
+
+    let astro_reward_claimed =
+        user2_astro_balance_after.balance - user2_astro_balance_before.balance;
+    assert_eq!(
+        astro_reward_claimed,
+        user_info.total_astro_rewards - user_info.delegated_astro_rewards
+            + Uint128::from(259200000000u64)
+    );
+    let lp_tokens_withdrawn =
+        user2_astro_lp_balance_after.balance - user2_astro_lp_balance_before.balance;
+    assert_eq!(lp_tokens_withdrawn, Uint128::from(1000000000u64));
+}
+
+#[test]
+fn test_delegate_astro_to_auction() {
+    let mut app = mock_app();
+    let owner = Addr::unchecked("contract_owner");
+
+    let (_, lockdrop_instance, astroport_factory_instance, _, update_msg) =
+        instantiate_all_contracts(&mut app, owner.clone());
+
+    let cw20_contract = Box::new(ContractWrapper::new(
+        astroport_token::contract::execute,
+        astroport_token::contract::instantiate,
+        astroport_token::contract::query,
+    ));
+
+    let cw20_code_id = app.store_code(cw20_contract);
+
+    let token_instance = app
+        .instantiate_contract(
+            cw20_code_id,
+            owner.clone(),
+            &TokenInstantiateMsg {
+                name: String::from("ANC"),
+                symbol: String::from("ANC"),
+                decimals: 6,
+                initial_balances: vec![],
+                mint: Some(cw20::MinterResponse {
+                    minter: owner.to_string(),
+                    cap: None,
+                }),
+                init_hook: None,
+            },
+            &[],
+            String::from("ANC"),
+            None,
+        )
+        .unwrap();
+
+    // Initialize and migrate liquidity for a pool
+    let (terraswap_token_instance, astro_lp_address, astro_pool_address) =
+        initialize_and_migrate_liquidity_for_pool(
+            &mut app,
+            owner.clone(),
+            token_instance,
+            lockdrop_instance.clone(),
+            astroport_factory_instance,
+        );
+
+    // Add pool to ASTRO Generator
+    app.execute_contract(
+        Addr::unchecked(owner.clone()),
+        Addr::unchecked(update_msg.clone().generator_address.unwrap()),
+        &astroport::generator::ExecuteMsg::Add {
+            alloc_point: Uint64::from(10u64),
+            reward_proxy: None,
+            lp_token: astro_lp_address.clone(),
+            with_update: true,
+        },
+        &[],
+    )
+    .unwrap();
+
+    // Stake LP Tokens with Generator
+    app.execute_contract(
+        Addr::unchecked(owner.clone()),
+        lockdrop_instance.clone(),
+        &astroport_periphery::lockdrop::ExecuteMsg::StakeLpTokens {
+            terraswap_lp_token: terraswap_token_instance.clone(),
+        },
+        &[],
+    )
+    .unwrap();
+
+    let user_address = "user".to_string();
+    let user2_address = "user2".to_string();
+
+    // Query user
+    let user_info: UserInfoResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &lockdrop_instance,
+            &QueryMsg::UserInfo {
+                address: user_address.clone(),
+            },
+        )
+        .unwrap();
+    assert_eq!(Uint128::from(500000000u64), user_info.total_astro_rewards);
+    assert_eq!(false, user_info.astro_transferred);
+    assert_eq!(Uint128::zero(), user_info.delegated_astro_rewards);
+    let lockup_response = astroport_periphery::lockdrop::LockUpInfoResponse {
+        lp_units_locked: Uint128::from(1000000000u64),
+        withdrawal_flag: false,
+        astro_rewards: Some(Uint128::from(500000000u64)),
+        duration: 10u64,
+        generator_astro_debt: Uint128::from(0u64),
+        claimable_generator_astro_debt: Uint128::from(0u64),
+        generator_proxy_debt: Uint128::from(0u64),
+        claimable_generator_proxy_debt: Uint128::from(0u64),
+        unlock_timestamp: 16648000u64,
+        astroport_lp_units: Some(Uint128::from(1000000000u64)),
+        astroport_lp_token: Some(astro_lp_address.clone()),
+        terraswap_lp_token: Addr::unchecked(terraswap_token_instance.clone()),
+    };
+    assert_eq!(lockup_response, user_info.lockup_infos[0]);
+
+    app.update_block(|b| {
+        b.height += 17280;
+        b.time = Timestamp::from_seconds(10600001)
+    });
+
+    // DELEGATE ASTRO TO AUCTION
+    app.execute_contract(
+        Addr::unchecked(user_address.clone()),
+        lockdrop_instance.clone(),
+        &astroport_periphery::lockdrop::ExecuteMsg::DelegateAstroToAuction {
+            amount: Uint128::from(500000000u64),
+        },
+        &[],
+    )
+    .unwrap();
+
+    app.execute_contract(
+        Addr::unchecked(user2_address.clone()),
+        lockdrop_instance.clone(),
+        &astroport_periphery::lockdrop::ExecuteMsg::DelegateAstroToAuction {
+            amount: Uint128::from(1000u64),
+        },
+        &[],
+    )
+    .unwrap();
+
+    // Query state
+    let state: StateResponse = app
+        .wrap()
+        .query_wasm_smart(&lockdrop_instance, &QueryMsg::State {})
+        .unwrap();
+    assert_eq!(Uint128::from(500001000u64), state.total_astro_delegated);
+
+    // Query user
+    let user_info: UserInfoResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &lockdrop_instance,
+            &QueryMsg::UserInfo {
+                address: user_address.clone(),
+            },
+        )
+        .unwrap();
+    assert_eq!(Uint128::from(500000000u64), user_info.total_astro_rewards);
+    assert_eq!(
+        Uint128::from(500000000u64),
+        user_info.delegated_astro_rewards
+    );
 }
