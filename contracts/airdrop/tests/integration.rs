@@ -1081,7 +1081,6 @@ fn test_withdraw_airdrop_rewards() {
 #[test]
 fn test_delegate_astro_to_bootstrap_auction() {
     use astroport::asset::AssetInfo;
-    use cosmwasm_std::testing::MOCK_CONTRACT_ADDR;
 
     let mut app = mock_app();
     let (airdrop_instance, astro_instance, init_msg, token_code_id) = init_contracts(&mut app);
@@ -1091,10 +1090,10 @@ fn test_delegate_astro_to_bootstrap_auction() {
     // mint ASTRO for to Airdrop Contract
     mint_some_astro(
         &mut app,
-        Addr::unchecked(init_msg.owner.clone().unwrap()),
+        owner.clone(),
         astro_instance.clone(),
         Uint128::new(100_000_000_000),
-        airdrop_instance.clone().to_string(),
+        airdrop_instance.to_string(),
     );
 
     let pair_contract = Box::new(ContractWrapper::new(
@@ -1143,7 +1142,7 @@ fn test_delegate_astro_to_bootstrap_auction() {
         airdrop_contract_address: airdrop_instance.clone().to_string(),
         lockdrop_contract_address: "lockdrop_contract_address".to_string(),
         astro_ust_pair_address: pair_instance.to_string(),
-        generator_contract_address: MOCK_CONTRACT_ADDR.to_string(),
+        generator_contract_address: None,
         lp_tokens_vesting_duration: 2592000u64,
         init_timestamp: 100000u64,
         deposit_window: 2592000u64,
@@ -1173,13 +1172,8 @@ fn test_delegate_astro_to_bootstrap_auction() {
     };
 
     // Update Config :: should be a success
-    app.execute_contract(
-        Addr::unchecked(init_msg.owner.clone().unwrap()),
-        airdrop_instance.clone(),
-        &update_msg,
-        &[],
-    )
-    .unwrap();
+    app.execute_contract(owner.clone(), airdrop_instance.clone(), &update_msg, &[])
+        .unwrap();
 
     let resp: ConfigResponse = app
         .wrap()
@@ -1248,7 +1242,10 @@ fn test_delegate_astro_to_bootstrap_auction() {
             &[],
         )
         .unwrap_err();
-    assert_eq!(claim_f.to_string(), "Generic error: Total amount being delegated for boostrap auction cannot exceed your claimable airdrop balance");
+    assert_eq!(
+        claim_f.to_string(),
+        "Generic error: Total amount being delegated for boostrap auction cannot exceed your claimable airdrop balance"
+    );
 
     // **** Should successfully delegate ASTRO ****
 

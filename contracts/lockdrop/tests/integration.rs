@@ -1,9 +1,7 @@
-use astroport::generator;
 use astroport_periphery::lockdrop::{
     self, ConfigResponse, ExecuteMsg, InstantiateMsg, PoolResponse, QueryMsg, StateResponse,
     UpdateConfigMsg, UserInfoResponse,
 };
-use cosmwasm_bignumber::Uint256;
 use cosmwasm_std::testing::{mock_env, MockApi, MockQuerier, MockStorage};
 use cosmwasm_std::{
     attr, to_binary, Addr, Decimal, Timestamp, Uint128, Uint256 as CUint256, Uint64,
@@ -346,7 +344,6 @@ fn instantiate_auction_contract(
     airdrop_instance: Addr,
     lockdrop_instance: Addr,
     pair_instance: Addr,
-    lp_token_instance: Addr,
     generator_instance: Addr,
 ) -> (Addr, astroport_periphery::auction::InstantiateMsg) {
     let auction_contract = Box::new(ContractWrapper::new(
@@ -363,11 +360,11 @@ fn instantiate_auction_contract(
         airdrop_contract_address: airdrop_instance.to_string(),
         lockdrop_contract_address: lockdrop_instance.to_string(),
         astro_ust_pair_address: pair_instance.to_string(),
-        generator_contract_address: generator_instance.to_string(),
+        generator_contract_address: Some(generator_instance.to_string()),
         lp_tokens_vesting_duration: 7776000u64,
-        init_timestamp: 1_000_00,
-        deposit_window: 100_000_00,
-        withdrawal_window: 5_000_00,
+        init_timestamp: 100_000,
+        deposit_window: 10_000_000,
+        withdrawal_window: 500_000,
     };
 
     // Init contract
@@ -396,9 +393,9 @@ fn instantiate_lockdrop_contract(app: &mut App, owner: Addr) -> (Addr, Instantia
 
     let lockdrop_instantiate_msg = InstantiateMsg {
         owner: Some(owner.clone().to_string()),
-        init_timestamp: 1_000_00,
-        deposit_window: 100_000_00,
-        withdrawal_window: 5_000_00,
+        init_timestamp: 100_000,
+        deposit_window: 10_000_000,
+        withdrawal_window: 500_000,
         min_lock_duration: 1u64,
         max_lock_duration: 52u64,
         weekly_multiplier: 1u64,
@@ -468,7 +465,6 @@ fn instantiate_all_contracts(
         )
         .unwrap();
     let pool_address = pair_resp.contract_addr;
-    let lp_token_address = pair_resp.liquidity_token;
 
     let (generator_address, _) =
         instantiate_generator_and_vesting(&mut app, owner.clone(), astro_token.clone());
@@ -481,7 +477,6 @@ fn instantiate_all_contracts(
         Addr::unchecked("auction_instance"),
         lockdrop_instance.clone(),
         pool_address,
-        lp_token_address,
         generator_address.clone(),
     );
 
@@ -618,7 +613,6 @@ fn test_update_config() {
         )
         .unwrap();
     let pool_address = pair_resp.contract_addr;
-    let lp_token_address = pair_resp.liquidity_token;
 
     let (generator_address, _) =
         instantiate_generator_and_vesting(&mut app, owner.clone(), astro_token.clone());
@@ -631,7 +625,6 @@ fn test_update_config() {
         Addr::unchecked("auction_instance"),
         lockdrop_instance.clone(),
         pool_address,
-        lp_token_address,
         generator_address.clone(),
     );
 
@@ -1773,8 +1766,7 @@ fn test_migrate_liquidity() {
     let mut app = mock_app();
     let owner = Addr::unchecked("contract_owner");
 
-    let (_, lockdrop_instance, _, _, update_msg) =
-        instantiate_all_contracts(&mut app, owner.clone());
+    let (_, lockdrop_instance, _, _, _) = instantiate_all_contracts(&mut app, owner.clone());
 
     // CW20 TOKEN :: Dummy token
     let cw20_contract = Box::new(ContractWrapper::new(
@@ -1881,11 +1873,11 @@ fn test_migrate_liquidity() {
     .unwrap();
 
     let user_address = "user".to_string();
-    let user2_address = "user2".to_string();
+    let _user2_address = "user2".to_string();
 
     // Mint some LP tokens to user#1
     app.execute_contract(
-        Addr::unchecked("pair_instance".to_string()),
+        terraswap_pool_instance,
         terraswap_token_instance.clone(),
         &cw20::Cw20ExecuteMsg::Mint {
             recipient: user_address.clone(),
@@ -1920,6 +1912,6 @@ fn test_stake_lp_tokens() {
     let mut app = mock_app();
     let owner = Addr::unchecked("contract_owner");
 
-    let (_, lockdrop_instance, _, _, update_msg) =
+    let (_, _lockdrop_instance, _, _, _update_msg) =
         instantiate_all_contracts(&mut app, owner.clone());
 }

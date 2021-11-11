@@ -27,7 +27,7 @@ pub struct Config {
     ///  ASTRO-UST LP Token address
     pub astro_ust_lp_token_address: Addr,
     ///  Astroport Generator contract with which ASTRO-UST LP Tokens are staked
-    pub generator_contract: Addr,
+    pub generator_contract: Option<Addr>,
     /// Total ASTRO token rewards to be used to incentivize boostrap auction participants
     pub astro_incentive_amount: Option<Uint128>,
     ///  Number of seconds over which LP Tokens are vested
@@ -55,8 +55,6 @@ pub struct State {
     pub pool_init_timestamp: u64,
     /// Ratio of ASTRO rewards accured to weighted_amount. Used to calculate ASTRO incentives accured by each user
     pub generator_astro_per_share: Decimal,
-    /// Ratio of ASSET rewards accured to weighted. Used to calculate ASSET incentives accured by each user
-    pub generator_proxy_per_share: Decimal,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema, Default)]
@@ -68,15 +66,13 @@ pub struct UserInfo {
     // Withdrawal counter to capture if the user already withdrew UST during the "only withdrawals" window
     pub ust_withdrawn: bool,
     // User's LP share balance
-    pub lp_shares: Uint128,
+    pub lp_shares: Option<Uint128>,
     // LP shares withdrawn by the user
     pub claimed_lp_shares: Uint128,
     // User's ASTRO rewards for participating in the auction
-    pub auction_incentive_amount: Uint128,
+    pub auction_incentive_amount: Option<Uint128>,
     // ASTRO tokens were transferred to user
     pub astro_incentive_transfered: bool,
     // ASTRO staking incentives (LP token staking) withdrawn by the user
     pub generator_astro_debt: Uint128,
-    // ASSET staking incentives (LP token staking) withdrawn by the user
-    pub generator_proxy_debt: Uint128,
 }

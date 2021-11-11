@@ -47,7 +47,6 @@ dependencies = [
  "cosmwasm-storage",
  "cw-storage-plus 0.8.1",
  "cw20",
- "cw20-base",
  "schemars",
  "serde",
  "terra-multi-test",

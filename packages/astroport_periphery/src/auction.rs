@@ -10,7 +10,7 @@ pub struct InstantiateMsg {
     pub airdrop_contract_address: String,
     pub lockdrop_contract_address: String,
     pub astro_ust_pair_address: String,
-    pub generator_contract_address: String,
+    pub generator_contract_address: Option<String>,
     pub lp_tokens_vesting_duration: u64,
     pub init_timestamp: u64,
     pub deposit_window: u64,
@@ -51,7 +51,6 @@ pub enum Cw20HookMsg {
 pub enum CallbackMsg {
     UpdateStateOnRewardClaim {
         prev_astro_balance: Uint128,
-        prev_proxy_reward_balance: Option<Uint128>,
     },
     UpdateStateOnLiquidityAdditionToPool {
         prev_lp_balance: Uint128,
@@ -90,7 +89,7 @@ pub struct ConfigResponse {
     pub lockdrop_contract_address: Addr,
     pub astro_ust_pool_address: Addr,
     pub astro_ust_lp_token_address: Addr,
-    pub generator_contract: Addr,
+    pub generator_contract: Option<Addr>,
     pub astro_incentive_amount: Option<Uint128>,
     pub lp_tokens_vesting_duration: u64,
     pub init_timestamp: u64,
@@ -106,7 +105,6 @@ pub struct StateResponse {
     pub lp_shares_minted: Option<Uint128>,
     pub pool_init_timestamp: u64,
     pub generator_astro_per_share: Decimal,
-    pub generator_proxy_per_share: Decimal,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -114,11 +112,10 @@ pub struct UserInfoResponse {
     pub astro_delegated: Uint128,
     pub ust_delegated: Uint128,
     pub ust_withdrawn: bool,
-    pub lp_shares: Uint128,
+    pub lp_shares: Option<Uint128>,
     pub claimed_lp_shares: Uint128,
-    pub withdrawable_lp_shares: Uint128,
-    pub auction_incentive_amount: Uint128,
+    pub withdrawable_lp_shares: Option<Uint128>,
+    pub auction_incentive_amount: Option<Uint128>,
     pub astro_incentive_transfered: bool,
     pub generator_astro_debt: Uint128,
-    pub generator_proxy_debt: Uint128,
 }
