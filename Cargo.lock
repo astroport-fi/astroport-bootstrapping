@@ -98,6 +98,7 @@ dependencies = [
 name = "astroport-lockdrop"
 version = "1.0.0"
 dependencies = [
+ "astro-airdrop",
  "astro-auction",
  "astroport",
  "astroport-factory",

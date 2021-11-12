@@ -117,5 +117,6 @@ pub struct UserInfoResponse {
     pub withdrawable_lp_shares: Option<Uint128>,
     pub auction_incentive_amount: Option<Uint128>,
     pub astro_incentive_transfered: bool,
+    pub claimable_generator_astro: Uint128,
     pub generator_astro_debt: Uint128,
 }

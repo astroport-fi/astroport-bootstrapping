@@ -49,8 +49,6 @@ pub struct State {
     pub total_incentives_share: u64,
     /// ASTRO Tokens delegated to the bootstrap auction contract
     pub total_astro_delegated: Uint128,
-    /// ASTRO returned to forcefully unlock Lockup positions
-    pub total_astro_returned_available: Uint128,
     /// Boolean value indicating if the user can withdraw their ASTRO rewards or not
     pub are_claims_allowed: bool,
 }
@@ -74,20 +72,23 @@ pub struct PoolInfo {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema, Default)]
 pub struct UserInfo {
+    /// Total ASTRO tokens user received as rewards for participation in the lockdrop
+    pub total_astro_rewards: Uint128,
     /// Total ASTRO tokens user delegated to the LP bootstrap auction pool
     pub delegated_astro_rewards: Uint128,
+    /// ASTRO tokens transferred to user
+    pub astro_transferred: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct LockupInfo {
     /// Terraswap LP units locked by the user
     pub lp_units_locked: Uint128,
+    pub astroport_lp_transferred: Option<Uint128>,
     /// Boolean value indicating if the user's has withdrawn funds post the only 1 withdrawal limit cutoff
     pub withdrawal_flag: bool,
     /// ASTRO tokens received as rewards for participation in the lockdrop
     pub astro_rewards: Option<Uint128>,
-    /// ASTRO tokens transferred to user
-    pub astro_transferred: bool,
     /// Generator ASTRO tokens loockup received as generator rewards
     pub generator_astro_debt: Uint128,
     /// Generator Proxy tokens lockup received as generator rewards

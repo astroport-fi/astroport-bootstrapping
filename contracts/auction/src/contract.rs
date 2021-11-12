@@ -748,7 +748,6 @@ pub fn callback_withdraw_user_rewards_and_optionally_lp(
 
         let total_user_astro_rewards = state.generator_astro_per_share * astroport_lp_amount;
         let pending_astro_rewards = total_user_astro_rewards - user_info.generator_astro_debt;
-        user_info.generator_astro_debt = total_user_astro_rewards;
 
         cosmos_msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr: rwi.base_reward_token.to_string(),
@@ -784,15 +783,10 @@ pub fn callback_withdraw_user_rewards_and_optionally_lp(
         }));
         attributes.push(attr("lp_withdrawn", withdrawn_lp_shares));
         user_info.claimed_lp_shares += withdrawn_lp_shares;
-
-        if user_lp_shares == user_info.claimed_lp_shares {
-            USERS.remove(deps.storage, &user_address);
-        } else {
-            USERS.save(deps.storage, &user_address, &user_info)?;
-        };
-    } else {
-        USERS.save(deps.storage, &user_address, &user_info)?;
     }
+    user_info.generator_astro_debt =
+        state.generator_astro_per_share * (user_lp_shares - user_info.claimed_lp_shares);
+    USERS.save(deps.storage, &user_address, &user_info)?;
 
     Ok(Response::new()
         .add_messages(cosmos_msgs)
@@ -970,20 +964,50 @@ fn query_state(deps: Deps) -> StdResult<StateResponse> {
 /// @dev Returns details around user's ASTRO Airdrop claim
 fn query_user_info(deps: Deps, env: Env, user_address: String) -> StdResult<UserInfoResponse> {
     let config = CONFIG.load(deps.storage)?;
-    let state = STATE.load(deps.storage)?;
+    let mut state = STATE.load(deps.storage)?;
     let user_address = deps.api.addr_validate(&user_address)?;
     let mut user_info = USERS
         .may_load(deps.storage, &user_address)?
         .unwrap_or_default();
+
+    let mut claimable_generator_astro = Uint128::zero();
     if let Some(lp_balance) = state.lp_shares_minted {
         if user_info.auction_incentive_amount.is_none() {
             update_user_incentives_and_lp_share(&config, &state, lp_balance, &mut user_info)?;
         }
+        let astroport_lp_amount = user_info.lp_shares.unwrap() - user_info.claimed_lp_shares;
+        if state.is_lp_staked && !astroport_lp_amount.is_zero() {
+            let generator = config
+                .generator_contract
+                .clone()
+                .expect("Generator should be set at this moment!");
+
+            let lp_balance: Uint128 = deps.querier.query_wasm_smart(
+                &generator,
+                &GenQueryMsg::Deposit {
+                    lp_token: config.astro_ust_lp_token_address.clone(),
+                    user: env.contract.address.clone(),
+                },
+            )?;
+
+            // QUERY :: Check if there are any pending staking rewards
+            let pending_rewards: PendingTokenResponse = deps.querier.query_wasm_smart(
+                &generator,
+                &GenQueryMsg::PendingToken {
+                    lp_token: config.astro_ust_lp_token_address.clone(),
+                    user: env.contract.address.clone(),
+                },
+            )?;
+
+            state.generator_astro_per_share = state.generator_astro_per_share
+                + Decimal::from_ratio(pending_rewards.pending, lp_balance);
+
+            claimable_generator_astro = state.generator_astro_per_share * astroport_lp_amount
+                - user_info.generator_astro_debt;
+        }
     }
     let withdrawable_lp_shares =
         calculate_withdrawable_lp_shares(env.block.time.seconds(), &config, &state, &user_info)?;
-
-    // TODO: query pending generator rewards
 
     Ok(UserInfoResponse {
         astro_delegated: user_info.astro_delegated,
@@ -995,5 +1019,6 @@ fn query_user_info(deps: Deps, env: Env, user_address: String) -> StdResult<User
         auction_incentive_amount: user_info.auction_incentive_amount,
         astro_incentive_transfered: user_info.astro_incentive_transfered,
         generator_astro_debt: user_info.generator_astro_debt,
+        claimable_generator_astro,
     })
 }
