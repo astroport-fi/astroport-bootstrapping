@@ -25,8 +25,6 @@ use cw20::{BalanceResponse, Cw20ExecuteMsg, Cw20QueryMsg, Cw20ReceiveMsg};
 
 const UUSD_DENOM: &str = "uusd";
 
-// TODO: there will be orphan generator ASTROs and proxy rewards because of rounding
-
 //----------------------------------------------------------------------------------------
 // Entry points
 //----------------------------------------------------------------------------------------

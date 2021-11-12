@@ -224,6 +224,10 @@ pub struct UserInfoResponse {
     pub astro_transferred: bool,
     /// Lockup positions
     pub lockup_infos: Vec<LockUpInfoResponse>,
+    /// ASTRO tokens receivable as generator rewards that user can claim
+    pub claimable_generator_astro_debt: Uint128,
+    /// Proxy tokens receivable as generator rewards that user can claim
+    pub claimable_generator_proxy_debt: Uint128,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
