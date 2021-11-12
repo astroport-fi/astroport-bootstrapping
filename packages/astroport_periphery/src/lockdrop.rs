@@ -224,6 +224,10 @@ pub struct UserInfoResponse {
     pub astro_transferred: bool,
     /// Lockup positions
     pub lockup_infos: Vec<LockUpInfoResponse>,
+    /// ASTRO tokens receivable as generator rewards that user can claim
+    pub claimable_generator_astro_debt: Uint128,
+    /// Proxy tokens receivable as generator rewards that user can claim
+    pub claimable_generator_proxy_debt: Uint128,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -250,5 +254,5 @@ pub struct LockUpInfoResponse {
     /// User's Astroport LP units, calculated as lp_units_locked (terraswap) / total LP units locked (terraswap) * Astroport LP units minted post migration
     pub astroport_lp_units: Option<Uint128>,
     pub astroport_lp_token: Option<Addr>,
-    pub terraswap_lp_token: Addr,
+    pub astroport_lp_transferred: Option<Uint128>,
 }

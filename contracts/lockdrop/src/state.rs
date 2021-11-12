@@ -84,6 +84,7 @@ pub struct UserInfo {
 pub struct LockupInfo {
     /// Terraswap LP units locked by the user
     pub lp_units_locked: Uint128,
+    pub astroport_lp_transferred: Option<Uint128>,
     /// Boolean value indicating if the user's has withdrawn funds post the only 1 withdrawal limit cutoff
     pub withdrawal_flag: bool,
     /// ASTRO tokens received as rewards for participation in the lockdrop

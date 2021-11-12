@@ -2,7 +2,7 @@ use astroport_periphery::airdrop::{
     ClaimResponse, ConfigResponse, ExecuteMsg, InstantiateMsg, QueryMsg, StateResponse,
     UserInfoResponse,
 };
-use astroport_periphery::auction::Cw20HookMsg::DepositAstroTokens;
+use astroport_periphery::auction::Cw20HookMsg::DelegateAstroTokens;
 use astroport_periphery::helpers::{build_send_cw20_token_msg, build_transfer_cw20_token_msg};
 use cosmwasm_std::{
     attr, entry_point, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdError,
@@ -300,8 +300,8 @@ pub fn handle_delegate_astro_to_bootstrap_auction(
     }
 
     // COSMOS MSG :: DELEGATE ASTRO TOKENS TO LP BOOTSTRAP AUCTION CONTRACT
-    let msg = to_binary(&DepositAstroTokens {
-        user_address: info.sender.clone(),
+    let msg = to_binary(&DelegateAstroTokens {
+        user_address: info.sender.to_string(),
     })?;
 
     let delegate_msg = build_send_cw20_token_msg(

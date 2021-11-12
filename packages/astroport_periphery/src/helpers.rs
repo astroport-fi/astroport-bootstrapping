@@ -1,8 +1,7 @@
-use crate::tax::deduct_tax;
 use cosmwasm_bignumber::Uint256;
 use cosmwasm_std::{
-    to_binary, Addr, Api, BankMsg, Binary, Coin, CosmosMsg, Deps, QuerierWrapper, QueryRequest,
-    StdResult, Uint128, WasmMsg, WasmQuery,
+    to_binary, Addr, Api, Binary, Coin, CosmosMsg, QuerierWrapper, QueryRequest, StdResult,
+    Uint128, WasmMsg, WasmQuery,
 };
 use cw20::{BalanceResponse, Cw20ExecuteMsg, Cw20QueryMsg};
 
@@ -44,28 +43,6 @@ pub fn build_send_cw20_token_msg(
             msg: msg_,
         })?,
         funds: vec![],
-    }))
-}
-
-/// @dev Helper function which returns a cosmos wasm msg to send native tokens to recepient
-/// @param recipient : Contract Address to be transferred native tokens to
-/// @param denom : Native token to transfer
-/// @param amount : Number of tokens to transfer
-pub fn build_send_native_asset_msg(
-    deps: Deps,
-    recipient: Addr,
-    denom: &str,
-    amount: Uint256,
-) -> StdResult<CosmosMsg> {
-    Ok(CosmosMsg::Bank(BankMsg::Send {
-        to_address: recipient.into(),
-        amount: vec![deduct_tax(
-            deps,
-            Coin {
-                denom: denom.to_string(),
-                amount: amount.into(),
-            },
-        )?],
     }))
 }
 

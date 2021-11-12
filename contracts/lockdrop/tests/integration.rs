@@ -2,11 +2,9 @@ use astroport_periphery::lockdrop::{
     self, ConfigResponse, ExecuteMsg, InstantiateMsg, MigrationInfo, PoolResponse, QueryMsg,
     StateResponse, UpdateConfigMsg, UserInfoResponse,
 };
-use cosmwasm_bignumber::Uint256;
 use cosmwasm_std::testing::{mock_env, MockApi, MockQuerier, MockStorage};
 use cosmwasm_std::{
-    attr, to_binary, Addr, BalanceResponse, Coin, Decimal, Timestamp, Uint128, Uint256 as CUint256,
-    Uint64,
+    attr, to_binary, Addr, Coin, Decimal, Timestamp, Uint128, Uint256 as CUint256, Uint64,
 };
 
 use astroport::token::InstantiateMsg as TokenInstantiateMsg;
@@ -346,7 +344,7 @@ fn instantiate_auction_contract(
     airdrop_instance: Addr,
     lockdrop_instance: Addr,
     pair_instance: Addr,
-    lp_token_instance: Addr,
+    generator_instance: Addr,
 ) -> (Addr, astroport_periphery::auction::InstantiateMsg) {
     let auction_contract = Box::new(ContractWrapper::new(
         astro_auction::contract::execute,
@@ -357,15 +355,12 @@ fn instantiate_auction_contract(
     let auction_code_id = app.store_code(auction_contract);
 
     let auction_instantiate_msg = astroport_periphery::auction::InstantiateMsg {
-        owner: owner.clone().to_string(),
+        owner: Some(owner.to_string()),
         astro_token_address: astro_token_instance.clone().into_string(),
         airdrop_contract_address: airdrop_instance.to_string(),
         lockdrop_contract_address: lockdrop_instance.to_string(),
-        astroport_lp_pool: Some(pair_instance.to_string()),
-        lp_token_address: Some(lp_token_instance.to_string()),
-        generator_contract: None,
-        astro_rewards: Uint256::from(1000000000000u64),
-        astro_vesting_duration: 7776000u64,
+        astro_ust_pair_address: pair_instance.to_string(),
+        generator_contract_address: Some(generator_instance.to_string()),
         lp_tokens_vesting_duration: 7776000u64,
         init_timestamp: 10_600_000,
         deposit_window: 100_00_0,
@@ -398,9 +393,9 @@ fn instantiate_lockdrop_contract(app: &mut App, owner: Addr) -> (Addr, Instantia
 
     let lockdrop_instantiate_msg = InstantiateMsg {
         owner: Some(owner.clone().to_string()),
-        init_timestamp: 1_000_00,
-        deposit_window: 100_000_00,
-        withdrawal_window: 5_000_00,
+        init_timestamp: 100_000,
+        deposit_window: 10_000_000,
+        withdrawal_window: 500_000,
         min_lock_duration: 1u64,
         max_lock_duration: 52u64,
         weekly_multiplier: 1u64,
@@ -470,7 +465,9 @@ fn instantiate_all_contracts(
         )
         .unwrap();
     let pool_address = pair_resp.contract_addr;
-    let lp_token_address = pair_resp.liquidity_token;
+
+    let (generator_address, _) =
+        instantiate_generator_and_vesting(&mut app, owner.clone(), astro_token.clone());
 
     // Airdrop Contract
     let airdrop_contract = Box::new(ContractWrapper::new(
@@ -509,7 +506,7 @@ fn instantiate_all_contracts(
         airdrop_instance.clone(),
         lockdrop_instance.clone(),
         pool_address,
-        lp_token_address,
+        generator_address.clone(),
     );
 
     // Set auction contract in airdrop contract
@@ -526,9 +523,6 @@ fn instantiate_all_contracts(
         &[],
     )
     .unwrap();
-
-    let (generator_address, _) =
-        instantiate_generator_and_vesting(&mut app, owner.clone(), astro_token.clone());
 
     let update_msg = UpdateConfigMsg {
         owner: None,
@@ -570,7 +564,7 @@ fn instantiate_all_contracts(
 
 // Instantiate Pools and Migrate Liquidity to Astroport
 fn initialize_and_migrate_liquidity_for_pool(
-    mut app: &mut App,
+    app: &mut App,
     owner: Addr,
     token_instance: Addr,
     lockdrop_instance: Addr,
@@ -717,7 +711,7 @@ fn initialize_and_migrate_liquidity_for_pool(
     .unwrap();
 
     // Query LP balance
-    let mut lp_balance_res: cw20::BalanceResponse = app
+    let lp_balance_res: cw20::BalanceResponse = app
         .wrap()
         .query_wasm_smart(
             &terraswap_token_instance.clone(),
@@ -787,7 +781,7 @@ fn initialize_and_migrate_liquidity_for_pool(
     .unwrap();
 
     // Query LP balance
-    let mut lp_balance_res: cw20::BalanceResponse = app
+    let lp_balance_res: cw20::BalanceResponse = app
         .wrap()
         .query_wasm_smart(
             &terraswap_token_instance.clone(),
@@ -975,7 +969,9 @@ fn test_update_config() {
         )
         .unwrap();
     let pool_address = pair_resp.contract_addr;
-    let lp_token_address = pair_resp.liquidity_token;
+
+    let (generator_address, _) =
+        instantiate_generator_and_vesting(&mut app, owner.clone(), astro_token.clone());
 
     // Initiate Auction contract
     let (auction_contract, _) = instantiate_auction_contract(
@@ -985,11 +981,8 @@ fn test_update_config() {
         Addr::unchecked("auction_instance"),
         lockdrop_instance.clone(),
         pool_address,
-        lp_token_address,
+        generator_address.clone(),
     );
-
-    let (generator_address, _) =
-        instantiate_generator_and_vesting(&mut app, owner.clone(), astro_token.clone());
 
     let update_msg = UpdateConfigMsg {
         owner: Some("new_owner".to_string()),
@@ -2134,7 +2127,7 @@ fn test_migrate_liquidity() {
     let mut app = mock_app();
     let owner = Addr::unchecked("contract_owner");
 
-    let (_, lockdrop_instance, astroport_factory_instance, _, update_msg) =
+    let (_, lockdrop_instance, astroport_factory_instance, _, _) =
         instantiate_all_contracts(&mut app, owner.clone());
 
     // CW20 TOKEN :: Dummy token
@@ -2522,14 +2515,13 @@ fn test_stake_lp_tokens() {
         .unwrap();
 
     // Initialize and migrate liquidity for a pool
-    let (terraswap_token_instance, astro_lp_address, astro_pool_address) =
-        initialize_and_migrate_liquidity_for_pool(
-            &mut app,
-            owner.clone(),
-            token_instance,
-            lockdrop_instance.clone(),
-            astroport_factory_instance,
-        );
+    let (terraswap_token_instance, astro_lp_address, _) = initialize_and_migrate_liquidity_for_pool(
+        &mut app,
+        owner.clone(),
+        token_instance,
+        lockdrop_instance.clone(),
+        astroport_factory_instance,
+    );
 
     // Add pool to ASTRO Generator
     app.execute_contract(
@@ -2651,14 +2643,13 @@ fn test_claim_rewards() {
         .unwrap();
 
     // Initialize and migrate liquidity for a pool
-    let (terraswap_token_instance, astro_lp_address, astro_pool_address) =
-        initialize_and_migrate_liquidity_for_pool(
-            &mut app,
-            owner.clone(),
-            token_instance,
-            lockdrop_instance.clone(),
-            astroport_factory_instance,
-        );
+    let (terraswap_token_instance, astro_lp_address, _) = initialize_and_migrate_liquidity_for_pool(
+        &mut app,
+        owner.clone(),
+        token_instance,
+        lockdrop_instance.clone(),
+        astroport_factory_instance,
+    );
 
     // Add pool to ASTRO Generator
     app.execute_contract(
@@ -2714,6 +2705,7 @@ fn test_claim_rewards() {
         astroport_lp_units: Some(Uint128::from(1000000000u64)),
         astroport_lp_token: Some(astro_lp_address.clone()),
         terraswap_lp_token: Addr::unchecked(terraswap_token_instance.clone()),
+        astroport_lp_transferred: None,
     };
     assert_eq!(lockup_response, user_info.lockup_infos[0]);
 
@@ -2804,7 +2796,7 @@ fn test_claim_rewards() {
     app.execute_contract(
         Addr::unchecked(owner.to_string()),
         Addr::unchecked(update_msg.auction_contract_address.clone().unwrap()),
-        &astroport_periphery::auction::ExecuteMsg::AddLiquidityToAstroportPool { slippage: None },
+        &astroport_periphery::auction::ExecuteMsg::InitPool { slippage: None },
         &[],
     )
     .unwrap();
@@ -2860,6 +2852,7 @@ fn test_claim_rewards() {
         astroport_lp_units: Some(Uint128::from(1000000000u64)),
         astroport_lp_token: Some(astro_lp_address.clone()),
         terraswap_lp_token: Addr::unchecked(terraswap_token_instance.clone()),
+        astroport_lp_transferred: None,
     };
     assert_eq!(lockup_response, user_info.lockup_infos[0]);
 
@@ -2914,6 +2907,7 @@ fn test_claim_rewards() {
         astroport_lp_units: Some(Uint128::from(1000000000u64)),
         astroport_lp_token: Some(astro_lp_address.clone()),
         terraswap_lp_token: Addr::unchecked(terraswap_token_instance.clone()),
+        astroport_lp_transferred: None,
     };
     assert_eq!(lockup_response, user_info.lockup_infos[0]);
 
@@ -2974,6 +2968,7 @@ fn test_claim_rewards() {
         astroport_lp_units: Some(Uint128::from(1000000000u64)),
         astroport_lp_token: Some(astro_lp_address.clone()),
         terraswap_lp_token: Addr::unchecked(terraswap_token_instance.clone()),
+        astroport_lp_transferred: None,
     };
     assert_eq!(lockup_response, user_info.lockup_infos[0]);
 
@@ -3015,6 +3010,7 @@ fn test_claim_rewards() {
         astroport_lp_units: Some(Uint128::from(1000000000u64)),
         astroport_lp_token: Some(astro_lp_address.clone()),
         terraswap_lp_token: Addr::unchecked(terraswap_token_instance.clone()),
+        astroport_lp_transferred: None,
     };
     assert_eq!(lockup_response, user_info.lockup_infos[0]);
 
@@ -3075,14 +3071,13 @@ fn test_claim_rewards_and_unlock() {
         .unwrap();
 
     // Initialize and migrate liquidity for a pool
-    let (terraswap_token_instance, astro_lp_address, astro_pool_address) =
-        initialize_and_migrate_liquidity_for_pool(
-            &mut app,
-            owner.clone(),
-            token_instance,
-            lockdrop_instance.clone(),
-            astroport_factory_instance,
-        );
+    let (terraswap_token_instance, astro_lp_address, _) = initialize_and_migrate_liquidity_for_pool(
+        &mut app,
+        owner.clone(),
+        token_instance,
+        lockdrop_instance.clone(),
+        astroport_factory_instance,
+    );
 
     // Add pool to ASTRO Generator
     app.execute_contract(
@@ -3138,6 +3133,7 @@ fn test_claim_rewards_and_unlock() {
         astroport_lp_units: Some(Uint128::from(1000000000u64)),
         astroport_lp_token: Some(astro_lp_address.clone()),
         terraswap_lp_token: Addr::unchecked(terraswap_token_instance.clone()),
+        astroport_lp_transferred: None,
     };
     assert_eq!(lockup_response, user_info.lockup_infos[0]);
 
@@ -3211,7 +3207,7 @@ fn test_claim_rewards_and_unlock() {
     app.execute_contract(
         Addr::unchecked(owner.to_string()),
         Addr::unchecked(update_msg.auction_contract_address.clone().unwrap()),
-        &astroport_periphery::auction::ExecuteMsg::AddLiquidityToAstroportPool { slippage: None },
+        &astroport_periphery::auction::ExecuteMsg::InitPool { slippage: None },
         &[],
     )
     .unwrap();
@@ -3252,6 +3248,7 @@ fn test_claim_rewards_and_unlock() {
         astroport_lp_units: Some(Uint128::from(1000000000u64)),
         astroport_lp_token: Some(astro_lp_address.clone()),
         terraswap_lp_token: Addr::unchecked(terraswap_token_instance.clone()),
+        astroport_lp_transferred: None,
     };
     assert_eq!(lockup_response, user_info.lockup_infos[0]);
 
@@ -3303,7 +3300,6 @@ fn test_claim_rewards_and_unlock() {
         user_info.delegated_astro_rewards
     );
     assert_eq!(true, user_info.astro_transferred);
-    assert_eq!(true, user_info.lockup_infos.is_empty());
 
     let user1_astro_balance_after: cw20::BalanceResponse = app
         .wrap()
@@ -3375,6 +3371,7 @@ fn test_claim_rewards_and_unlock() {
         astroport_lp_units: Some(Uint128::from(1000000000u64)),
         astroport_lp_token: Some(astro_lp_address.clone()),
         terraswap_lp_token: Addr::unchecked(terraswap_token_instance.clone()),
+        astroport_lp_transferred: None,
     };
     assert_eq!(lockup_response, user_info.lockup_infos[0]);
 
@@ -3413,7 +3410,6 @@ fn test_claim_rewards_and_unlock() {
     assert_eq!(Uint128::from(500000000u64), user_info.total_astro_rewards);
     assert_eq!(Uint128::from(1000u64), user_info.delegated_astro_rewards);
     assert_eq!(true, user_info.astro_transferred);
-    assert_eq!(true, user_info.lockup_infos.is_empty());
 
     let user2_astro_balance_after: cw20::BalanceResponse = app
         .wrap()
@@ -3485,14 +3481,13 @@ fn test_delegate_astro_to_auction() {
         .unwrap();
 
     // Initialize and migrate liquidity for a pool
-    let (terraswap_token_instance, astro_lp_address, astro_pool_address) =
-        initialize_and_migrate_liquidity_for_pool(
-            &mut app,
-            owner.clone(),
-            token_instance,
-            lockdrop_instance.clone(),
-            astroport_factory_instance,
-        );
+    let (terraswap_token_instance, astro_lp_address, _) = initialize_and_migrate_liquidity_for_pool(
+        &mut app,
+        owner.clone(),
+        token_instance,
+        lockdrop_instance.clone(),
+        astroport_factory_instance,
+    );
 
     // Add pool to ASTRO Generator
     app.execute_contract(
@@ -3548,6 +3543,7 @@ fn test_delegate_astro_to_auction() {
         astroport_lp_units: Some(Uint128::from(1000000000u64)),
         astroport_lp_token: Some(astro_lp_address.clone()),
         terraswap_lp_token: Addr::unchecked(terraswap_token_instance.clone()),
+        astroport_lp_transferred: None,
     };
     assert_eq!(lockup_response, user_info.lockup_infos[0]);
 
