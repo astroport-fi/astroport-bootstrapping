@@ -28,7 +28,7 @@ pub struct Config {
     pub astro_ust_lp_token_address: Addr,
     ///  Astroport Generator contract with which ASTRO-UST LP Tokens are staked
     pub generator_contract: Option<Addr>,
-    /// Total ASTRO token rewards to be used to incentivize boostrap auction participants
+    /// Total ASTRO token rewards to be used to incentivize bootstrap auction participants
     pub astro_incentive_amount: Option<Uint128>,
     ///  Number of seconds over which LP Tokens are vested
     pub lp_tokens_vesting_duration: u64,
@@ -43,7 +43,7 @@ pub struct Config {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema, Default)]
 #[serde(rename_all = "snake_case")]
 pub struct State {
-    /// Total ASTRO tokens delegated to the contract by lockdrop participants / airdrop recepients
+    /// Total ASTRO tokens delegated to the contract by lockdrop participants / airdrop recipients
     pub total_astro_delegated: Uint128,
     /// Total UST delegated to the contract
     pub total_ust_delegated: Uint128,

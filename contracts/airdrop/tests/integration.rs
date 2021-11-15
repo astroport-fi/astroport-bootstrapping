@@ -1230,7 +1230,7 @@ fn test_delegate_astro_to_bootstrap_auction() {
         attr("airdrop", "250000000")
     );
 
-    // **** "Total amount being delegated for boostrap auction cannot exceed your claimable airdrop balance" Error should be returned ****
+    // **** "Total amount being delegated for bootstrap auction cannot exceed your claimable airdrop balance" Error should be returned ****
 
     let claim_f = app
         .execute_contract(
@@ -1244,7 +1244,7 @@ fn test_delegate_astro_to_bootstrap_auction() {
         .unwrap_err();
     assert_eq!(
         claim_f.to_string(),
-        "Generic error: Total amount being delegated for boostrap auction cannot exceed your claimable airdrop balance"
+        "Generic error: Total amount being delegated for bootstrap auction cannot exceed your claimable airdrop balance"
     );
 
     // **** Should successfully delegate ASTRO ****

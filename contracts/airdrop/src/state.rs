@@ -20,11 +20,11 @@ pub struct Config {
     pub astro_token_address: Addr,
     /// Merkle roots used to verify is a terra user is eligible for the airdrop
     pub merkle_roots: Vec<String>,
-    /// Timestamp since which ASTRO airdrops can be delegated to boostrap auction contract
+    /// Timestamp since which ASTRO airdrops can be delegated to bootstrap auction contract
     pub from_timestamp: u64,
     /// Timestamp to which ASTRO airdrops can be claimed
     pub to_timestamp: u64,
-    /// Boostrap auction contract address
+    /// bootstrap auction contract address
     pub auction_contract_address: Option<Addr>,
     /// Boolean value indicating if the users can withdraw their ASTRO airdrop tokens or not
     /// This value is updated in the same Tx in which Liquidity is added to the LP Pool
@@ -36,7 +36,7 @@ pub struct Config {
 pub struct State {
     /// Total ASTRO issuance used as airdrop incentives
     pub total_airdrop_size: Uint128,
-    /// Total ASTRO tokens that have been delegated to the boostrap auction pool
+    /// Total ASTRO tokens that have been delegated to the bootstrap auction pool
     pub total_delegated_amount: Uint128,
     /// Total ASTRO tokens that are yet to be claimed by the users
     pub unclaimed_tokens: Uint128,

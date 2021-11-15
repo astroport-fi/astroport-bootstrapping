@@ -4,43 +4,30 @@
   "type": "object",
   "required": [
     "airdrop_contract_address",
-    "astro_rewards",
     "astro_token_address",
-    "astro_vesting_duration",
+    "astro_ust_pair_address",
     "deposit_window",
     "init_timestamp",
     "lockdrop_contract_address",
     "lp_tokens_vesting_duration",
-    "owner",
     "withdrawal_window"
   ],
   "properties": {
     "airdrop_contract_address": {
       "type": "string"
     },
-    "astro_rewards": {
-      "$ref": "#/definitions/Uint256"
-    },
     "astro_token_address": {
       "type": "string"
     },
-    "astro_vesting_duration": {
-      "type": "integer",
-      "format": "uint64",
-      "minimum": 0.0
-    },
-    "astroport_lp_pool": {
-      "type": [
-        "string",
-        "null"
-      ]
+    "astro_ust_pair_address": {
+      "type": "string"
     },
     "deposit_window": {
       "type": "integer",
       "format": "uint64",
       "minimum": 0.0
     },
-    "generator_contract": {
+    "generator_contract_address": {
       "type": [
         "string",
         "null"
@@ -54,29 +41,21 @@
     "lockdrop_contract_address": {
       "type": "string"
     },
-    "lp_token_address": {
-      "type": [
-        "string",
-        "null"
-      ]
-    },
     "lp_tokens_vesting_duration": {
       "type": "integer",
       "format": "uint64",
       "minimum": 0.0
     },
     "owner": {
-      "type": "string"
+      "type": [
+        "string",
+        "null"
+      ]
     },
     "withdrawal_window": {
       "type": "integer",
       "format": "uint64",
       "minimum": 0.0
-    }
-  },
-  "definitions": {
-    "Uint256": {
-      "type": "string"
     }
   }
 }

@@ -3,29 +3,7 @@
   "title": "UpdateConfigMsg",
   "type": "object",
   "properties": {
-    "astro_rewards": {
-      "anyOf": [
-        {
-          "$ref": "#/definitions/Uint256"
-        },
-        {
-          "type": "null"
-        }
-      ]
-    },
-    "astroport_lp_pool": {
-      "type": [
-        "string",
-        "null"
-      ]
-    },
     "generator_contract": {
-      "type": [
-        "string",
-        "null"
-      ]
-    },
-    "lp_token_address": {
       "type": [
         "string",
         "null"
@@ -36,11 +14,6 @@
         "string",
         "null"
       ]
-    }
-  },
-  "definitions": {
-    "Uint256": {
-      "type": "string"
     }
   }
 }
