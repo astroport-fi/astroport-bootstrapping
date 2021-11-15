@@ -35,6 +35,16 @@
         }
       ]
     },
+    "astroport_lp_transferred": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Uint128"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "astroport_lp_units": {
       "description": "User's Astroport LP units, calculated as lp_units_locked (terraswap) / total LP units locked (terraswap) * Astroport LP units minted post migration",
       "anyOf": [

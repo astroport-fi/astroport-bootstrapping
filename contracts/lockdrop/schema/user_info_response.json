@@ -4,6 +4,8 @@
   "type": "object",
   "required": [
     "astro_transferred",
+    "claimable_generator_astro_debt",
+    "claimable_generator_proxy_debt",
     "delegated_astro_rewards",
     "lockup_infos",
     "total_astro_rewards"
@@ -12,6 +14,22 @@
     "astro_transferred": {
       "description": "ASTRO tokens transferred to user",
       "type": "boolean"
+    },
+    "claimable_generator_astro_debt": {
+      "description": "ASTRO tokens receivable as generator rewards that user can claim",
+      "allOf": [
+        {
+          "$ref": "#/definitions/Uint128"
+        }
+      ]
+    },
+    "claimable_generator_proxy_debt": {
+      "description": "Proxy tokens receivable as generator rewards that user can claim",
+      "allOf": [
+        {
+          "$ref": "#/definitions/Uint128"
+        }
+      ]
     },
     "delegated_astro_rewards": {
       "description": "Total ASTRO tokens user delegated to the LP bootstrap auction pool",
@@ -71,6 +89,16 @@
           "anyOf": [
             {
               "$ref": "#/definitions/Addr"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "astroport_lp_transferred": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Uint128"
             },
             {
               "type": "null"

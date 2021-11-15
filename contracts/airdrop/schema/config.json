@@ -24,7 +24,7 @@
       ]
     },
     "auction_contract_address": {
-      "description": "Boostrap auction contract address",
+      "description": "bootstrap auction contract address",
       "anyOf": [
         {
           "$ref": "#/definitions/Addr"
@@ -35,7 +35,7 @@
       ]
     },
     "from_timestamp": {
-      "description": "Timestamp since which ASTRO airdrops can be delegated to boostrap auction contract",
+      "description": "Timestamp since which ASTRO airdrops can be delegated to bootstrap auction contract",
       "type": "integer",
       "format": "uint64",
       "minimum": 0.0

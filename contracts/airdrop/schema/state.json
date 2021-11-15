@@ -17,7 +17,7 @@
       ]
     },
     "total_delegated_amount": {
-      "description": "Total ASTRO tokens that have been delegated to the boostrap auction pool",
+      "description": "Total ASTRO tokens that have been delegated to the bootstrap auction pool",
       "allOf": [
         {
           "$ref": "#/definitions/Uint128"
