@@ -488,7 +488,7 @@ fn instantiate_generator_and_vesting(
     (generator_instance, vesting_instance)
 }
 
-// Mints some ASTRO to "to" recepient
+// Mints some ASTRO to "to" recipient
 fn mint_some_astro(
     app: &mut App,
     owner: Addr,
@@ -750,7 +750,7 @@ fn test_delegate_astro_tokens_from_airdrop() {
         contract: auction_instance.clone().to_string(),
         amount: Uint128::new(100000000),
         msg: to_binary(&Cw20HookMsg::DelegateAstroTokens {
-            user_address: "airdrop_recepient".to_string(),
+            user_address: "airdrop_recipient".to_string(),
         })
         .unwrap(),
     };
@@ -775,7 +775,7 @@ fn test_delegate_astro_tokens_from_airdrop() {
                 contract: auction_instance.clone().to_string(),
                 amount: Uint128::new(0),
                 msg: to_binary(&Cw20HookMsg::DelegateAstroTokens {
-                    user_address: "airdrop_recepient".to_string(),
+                    user_address: "airdrop_recipient".to_string(),
                 })
                 .unwrap(),
             },
@@ -828,7 +828,7 @@ fn test_delegate_astro_tokens_from_airdrop() {
         .query_wasm_smart(
             &auction_instance,
             &QueryMsg::UserInfo {
-                address: "airdrop_recepient".to_string(),
+                address: "airdrop_recipient".to_string(),
             },
         )
         .unwrap();
@@ -865,7 +865,7 @@ fn test_delegate_astro_tokens_from_airdrop() {
         .query_wasm_smart(
             &auction_instance,
             &QueryMsg::UserInfo {
-                address: "airdrop_recepient".to_string(),
+                address: "airdrop_recipient".to_string(),
             },
         )
         .unwrap();

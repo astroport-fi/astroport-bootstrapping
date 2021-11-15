@@ -99,7 +99,7 @@ pub fn receive_cw20(
     let config = CONFIG.load(deps.storage)?;
 
     if info.sender != config.astro_token_address {
-        return Err(StdError::generic_err("Only astro tokens is acceptable!"));
+        return Err(StdError::generic_err("Only astro tokens are received!"));
     }
 
     // CHECK ::: Amount needs to be valid
@@ -232,7 +232,7 @@ pub fn handle_delegate_astro_tokens(
 
     let user_address = deps.api.addr_validate(&user_address)?;
 
-    // CHECK :: Lockdrop deposit window open
+    // CHECK :: Auction deposit window open
     if !is_deposit_open(env.block.time.seconds(), &config) {
         return Err(StdError::generic_err("Deposit window closed"));
     }
@@ -265,7 +265,7 @@ pub fn handle_deposit_ust(
 ) -> Result<Response, StdError> {
     let config = CONFIG.load(deps.storage)?;
 
-    // CHECK :: Lockdrop deposit window open
+    // CHECK :: Auction deposit window open
     if !is_deposit_open(env.block.time.seconds(), &config) {
         return Err(StdError::generic_err("Deposit window closed"));
     }
@@ -419,6 +419,7 @@ pub fn handle_init_pool(
         return Err(StdError::generic_err("Unauthorized"));
     }
 
+    // CHECK :: Can be executed once
     if state.lp_shares_minted.is_some() {
         return Err(StdError::generic_err("Liquidity already added"));
     }

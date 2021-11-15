@@ -830,12 +830,12 @@ pub fn handle_delegate_astro_to_auction(
     }
 
     // CHECK :: ASTRO to delegate cannot exceed user's unclaimed ASTRO balance
-    let max_deletatable_astro = user_info
+    let max_delegable_astro = user_info
         .total_astro_rewards
         .checked_sub(user_info.delegated_astro_rewards)?;
 
-    if amount > max_deletatable_astro {
-        return Err(StdError::generic_err(format!("ASTRO to delegate cannot exceed user's unclaimed ASTRO balance. ASTRO to delegate = {}, Max delegatable ASTRO = {}. ",amount, max_deletatable_astro)));
+    if amount > max_delegable_astro {
+        return Err(StdError::generic_err(format!("ASTRO to delegate cannot exceed user's unclaimed ASTRO balance. ASTRO to delegate = {}, Max delegable ASTRO = {}. ",amount, max_delegable_astro)));
     }
 
     // UPDATE STATE

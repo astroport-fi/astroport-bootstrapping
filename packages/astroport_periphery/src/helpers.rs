@@ -5,7 +5,7 @@ use cosmwasm_std::{
 };
 use cw20::{BalanceResponse, Cw20ExecuteMsg, Cw20QueryMsg};
 
-/// @dev Helper function which returns a cosmos wasm msg to transfer cw20 tokens to a recepient address
+/// @dev Helper function which returns a cosmos wasm msg to transfer cw20 tokens to a recipient address
 /// @param recipient : Address to be transferred cw20 tokens to
 /// @param token_contract_address : Contract address of the cw20 token to transfer
 /// @param amount : Number of tokens to transfer
@@ -28,7 +28,7 @@ pub fn build_transfer_cw20_token_msg(
 /// @param recipient_contract_addr : Contract Address to be transferred cw20 tokens to
 /// @param token_contract_address : Contract address of the cw20 token to transfer
 /// @param amount : Number of tokens to transfer
-/// @param msg_ : ExecuteMsg coded into binary which needs to be handled by the recepient contract
+/// @param msg_ : ExecuteMsg coded into binary which needs to be handled by the recipient contract
 pub fn build_send_cw20_token_msg(
     recipient_contract_addr: String,
     token_contract_address: String,
