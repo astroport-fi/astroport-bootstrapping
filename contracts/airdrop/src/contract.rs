@@ -98,8 +98,8 @@ pub fn execute(
         }
         ExecuteMsg::EnableClaims {} => handle_enable_claims(deps, info),
         ExecuteMsg::WithdrawAirdropReward {} => handle_withdraw_airdrop_rewards(deps, env, info),
-        ExecuteMsg::TransferUnclaimedTokens { recepient, amount } => {
-            handle_transfer_unclaimed_tokens(deps, env, info, recepient, amount)
+        ExecuteMsg::TransferUnclaimedTokens { recipient, amount } => {
+            handle_transfer_unclaimed_tokens(deps, env, info, recipient, amount)
         }
     }
 }
@@ -157,6 +157,12 @@ pub fn handle_update_config(
     }
 
     if let Some(from_timestamp) = from_timestamp {
+        if config.to_timestamp <= from_timestamp {
+            return Err(StdError::generic_err(
+                "Invalid airdrop claim window closure timestamp",
+            ));
+        }
+
         config.from_timestamp = from_timestamp
     }
 
@@ -348,7 +354,7 @@ pub fn handle_withdraw_airdrop_rewards(
 
     // CHECK :: HAS USER ALREADY WITHDRAWN THEIR REWARDS ?
     if user_info.tokens_withdrawn {
-        return Err(StdError::generic_err("Already claimed"));
+        return Err(StdError::generic_err("Tokens have already been withdrawn"));
     }
 
     // TRANSFER ASTRO IF CLAIMS ARE ALLOWED (i.e LP bootstrap auction has concluded)
@@ -377,8 +383,8 @@ pub fn handle_withdraw_airdrop_rewards(
         ]))
 }
 
-/// @dev Admin function to transfer ASTRO Tokens to the recepient address
-/// @param recepient Recepient receiving the ASTRO tokens
+/// @dev Admin function to transfer ASTRO Tokens to the recipient address
+/// @param recipient Recipient receiving the ASTRO tokens
 /// @param amount Amount of ASTRO to be transferred
 pub fn handle_transfer_unclaimed_tokens(
     deps: DepsMut,

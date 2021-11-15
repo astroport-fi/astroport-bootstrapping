@@ -270,7 +270,7 @@ fn test_transfer_unclaimed_tokens() {
             Addr::unchecked("wrong_owner"),
             airdrop_instance.clone(),
             &ExecuteMsg::TransferUnclaimedTokens {
-                recepient: "recepient".to_string(),
+                recipient: "recipient".to_string(),
                 amount: Uint128::from(1000000 as u64),
             },
             &[],
@@ -291,7 +291,7 @@ fn test_transfer_unclaimed_tokens() {
             Addr::unchecked(init_msg.owner.clone().unwrap()),
             airdrop_instance.clone(),
             &ExecuteMsg::TransferUnclaimedTokens {
-                recepient: "recepient".to_string(),
+                recipient: "recipient".to_string(),
                 amount: Uint128::from(1000000 as u64),
             },
             &[],
@@ -315,7 +315,7 @@ fn test_transfer_unclaimed_tokens() {
             Addr::unchecked(init_msg.owner.clone().unwrap()),
             airdrop_instance.clone(),
             &ExecuteMsg::TransferUnclaimedTokens {
-                recepient: "recepient".to_string(),
+                recipient: "recipient".to_string(),
                 amount: Uint128::from(100_000_000_0000 as u64),
             },
             &[],
@@ -332,7 +332,7 @@ fn test_transfer_unclaimed_tokens() {
         Addr::unchecked(init_msg.owner.clone().unwrap()),
         airdrop_instance.clone(),
         &ExecuteMsg::TransferUnclaimedTokens {
-            recepient: "recepient".to_string(),
+            recipient: "recipient".to_string(),
             amount: Uint128::from(100_000_00 as u64),
         },
         &[],
