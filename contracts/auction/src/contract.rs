@@ -165,6 +165,7 @@ pub fn handle_update_config(
     new_config: UpdateConfigMsg,
 ) -> StdResult<Response> {
     let mut config = CONFIG.load(deps.storage)?;
+    let state = STATE.load(deps.storage)?;
     let mut attributes = vec![attr("action", "update_config")];
 
     // CHECK :: ONLY OWNER CAN CALL THIS FUNCTION
@@ -179,6 +180,11 @@ pub fn handle_update_config(
     }
 
     if let Some(astro_ust_pair_address) = new_config.astro_ust_pair_address {
+        if state.lp_shares_minted.is_some() {
+            return Err(StdError::generic_err(
+                "Assets had already been provided to previous pool!",
+            ));
+        }
         let astro_ust_pair_addr = deps.api.addr_validate(&astro_ust_pair_address)?;
 
         let pair_info: PairInfo = deps
