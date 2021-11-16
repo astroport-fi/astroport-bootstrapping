@@ -1,5 +1,5 @@
 [package]
-name = "astro-auction"
+name = "astroport-auction"
 version = "1.0.0"
 authors = ["_astromartian"]
 edition = "2018"
@@ -42,5 +42,5 @@ astroport-pair = {git = "https://github.com/astroport-fi/astroport.git", branch 
 astroport-token = {git = "https://github.com/astroport-fi/astroport.git", branch = "master", package = "astroport-token"}
 astroport-vesting = {git = "https://github.com/astroport-fi/astroport.git", branch = "master", package = "astroport-vesting"}
 astroport-generator = {git = "https://github.com/astroport-fi/astroport.git", branch = "master", package = "astroport-generator"}
-astro-airdrop =  { path = "../airdrop" }
+astroport-airdrop =  { path = "../airdrop" }
 astroport-lockdrop =  { path = "../lockdrop" }

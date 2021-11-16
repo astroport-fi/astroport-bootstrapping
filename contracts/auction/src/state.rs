@@ -1,3 +1,4 @@
+use astroport_periphery::auction::PoolInfo;
 use cosmwasm_std::{Addr, Decimal, Uint128};
 use cw_storage_plus::{Item, Map};
 use schemars::JsonSchema;
@@ -22,10 +23,8 @@ pub struct Config {
     pub airdrop_contract_address: Addr,
     /// Lockdrop Contract address
     pub lockdrop_contract_address: Addr,
-    ///  ASTRO-UST LP Pool address
-    pub astro_ust_pool_address: Addr,
-    ///  ASTRO-UST LP Token address
-    pub astro_ust_lp_token_address: Addr,
+    /// ASTRO-UST Pool info
+    pub pool_info: Option<PoolInfo>,
     ///  Astroport Generator contract with which ASTRO-UST LP Tokens are staked
     pub generator_contract: Option<Addr>,
     /// Total ASTRO token rewards to be used to incentivize bootstrap auction participants

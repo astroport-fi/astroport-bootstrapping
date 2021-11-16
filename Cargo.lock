@@ -9,11 +9,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "61604a8f862e1d5c3229fdd78f8b02c68dcf73a4c4b05fd636d12240aaa242c1"
 
 [[package]]
-name = "astro-airdrop"
+name = "astroport"
+version = "2.4.0"
+source = "git+https://github.com/astroport-fi/astroport.git?branch=master#c13babefd606ad505701857467d4c8c6e03598ef"
+dependencies = [
+ "cosmwasm-std",
+ "cw20",
+ "schemars",
+ "serde",
+ "terra-cosmwasm",
+ "uint",
+]
+
+[[package]]
+name = "astroport-airdrop"
 version = "1.0.0"
 dependencies = [
- "astro-auction",
  "astroport",
+ "astroport-auction",
  "astroport-pair",
  "astroport-periphery",
  "astroport-token",
@@ -30,11 +43,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "astro-auction"
+name = "astroport-auction"
 version = "1.0.0"
 dependencies = [
- "astro-airdrop",
  "astroport",
+ "astroport-airdrop",
  "astroport-generator",
  "astroport-lockdrop",
  "astroport-pair",
@@ -50,19 +63,6 @@ dependencies = [
  "schemars",
  "serde",
  "terra-multi-test",
-]
-
-[[package]]
-name = "astroport"
-version = "2.4.0"
-source = "git+https://github.com/astroport-fi/astroport.git?branch=master#c13babefd606ad505701857467d4c8c6e03598ef"
-dependencies = [
- "cosmwasm-std",
- "cw20",
- "schemars",
- "serde",
- "terra-cosmwasm",
- "uint",
 ]
 
 [[package]]
@@ -98,9 +98,9 @@ dependencies = [
 name = "astroport-lockdrop"
 version = "1.0.0"
 dependencies = [
- "astro-airdrop",
- "astro-auction",
  "astroport",
+ "astroport-airdrop",
+ "astroport-auction",
  "astroport-factory",
  "astroport-generator",
  "astroport-pair",

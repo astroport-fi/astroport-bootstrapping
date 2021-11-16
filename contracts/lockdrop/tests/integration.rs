@@ -1,6 +1,9 @@
-use astroport_periphery::lockdrop::{
-    self, ConfigResponse, ExecuteMsg, InstantiateMsg, MigrationInfo, PoolResponse, QueryMsg,
-    StateResponse, UpdateConfigMsg, UserInfoResponse,
+use astroport_periphery::{
+    auction::{ExecuteMsg as AuctionExecuteMsg, UpdateConfigMsg as AuctionUpdateConfigMsg},
+    lockdrop::{
+        self, ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, MigrationInfo, PoolResponse,
+        QueryMsg, StateResponse, UpdateConfigMsg, UserInfoResponse,
+    },
 };
 use cosmwasm_std::testing::{mock_env, MockApi, MockQuerier, MockStorage};
 use cosmwasm_std::{
@@ -347,9 +350,9 @@ fn instantiate_auction_contract(
     generator_instance: Addr,
 ) -> (Addr, astroport_periphery::auction::InstantiateMsg) {
     let auction_contract = Box::new(ContractWrapper::new(
-        astro_auction::contract::execute,
-        astro_auction::contract::instantiate,
-        astro_auction::contract::query,
+        astroport_auction::contract::execute,
+        astroport_auction::contract::instantiate,
+        astroport_auction::contract::query,
     ));
 
     let auction_code_id = app.store_code(auction_contract);
@@ -359,8 +362,6 @@ fn instantiate_auction_contract(
         astro_token_address: astro_token_instance.clone().into_string(),
         airdrop_contract_address: airdrop_instance.to_string(),
         lockdrop_contract_address: lockdrop_instance.to_string(),
-        astro_ust_pair_address: pair_instance.to_string(),
-        generator_contract_address: Some(generator_instance.to_string()),
         lp_tokens_vesting_duration: 7776000u64,
         init_timestamp: 10_600_000,
         deposit_window: 100_00_0,
@@ -378,6 +379,20 @@ fn instantiate_auction_contract(
             None,
         )
         .unwrap();
+
+    app.execute_contract(
+        owner.clone(),
+        auction_instance.clone(),
+        &AuctionExecuteMsg::UpdateConfig {
+            new_config: AuctionUpdateConfigMsg {
+                astro_ust_pair_address: Some(pair_instance.to_string()),
+                owner: None,
+                generator_contract: Some(generator_instance.to_string()),
+            },
+        },
+        &[],
+    )
+    .unwrap();
     (auction_instance, auction_instantiate_msg)
 }
 
@@ -471,9 +486,9 @@ fn instantiate_all_contracts(
 
     // Airdrop Contract
     let airdrop_contract = Box::new(ContractWrapper::new(
-        astro_airdrop::contract::execute,
-        astro_airdrop::contract::instantiate,
-        astro_airdrop::contract::query,
+        astroport_airdrop::contract::execute,
+        astroport_airdrop::contract::instantiate,
+        astroport_airdrop::contract::query,
     ));
 
     let airdrop_code_id = app.store_code(airdrop_contract);
@@ -529,7 +544,6 @@ fn instantiate_all_contracts(
         astro_token_address: Some(astro_token.to_string()),
         auction_contract_address: Some(auction_contract.to_string()),
         generator_address: Some(generator_address.to_string()),
-        lockdrop_incentives: Some(Uint128::from(1000000000u64)),
     };
     app.execute_contract(
         owner.clone(),
@@ -548,6 +562,18 @@ fn instantiate_all_contracts(
         lockdrop_instance.clone(),
         &ExecuteMsg::UpdateConfig {
             new_config: update_msg.clone(),
+        },
+        &[],
+    )
+    .unwrap();
+
+    app.execute_contract(
+        owner.clone(),
+        astro_token.clone(),
+        &Cw20ExecuteMsg::Send {
+            amount: Uint128::from(1000000000u64),
+            contract: lockdrop_instance.to_string(),
+            msg: to_binary(&Cw20HookMsg::IncreaseAstroIncentives {}).unwrap(),
         },
         &[],
     )
@@ -989,7 +1015,6 @@ fn test_update_config() {
         astro_token_address: Some(astro_token.to_string()),
         auction_contract_address: Some(auction_contract.to_string()),
         generator_address: Some(generator_address.to_string()),
-        lockdrop_incentives: Some(Uint128::from(1000000000u64)),
     };
 
     // ######    ERROR :: Unauthorized     ######
@@ -1005,32 +1030,7 @@ fn test_update_config() {
         .unwrap_err();
     assert_eq!(err.to_string(), "Generic error: Unauthorized");
 
-    // ######    ERROR :: No allowance for this account     ######
-    let err = app
-        .execute_contract(
-            owner.clone(),
-            lockdrop_instance.clone(),
-            &ExecuteMsg::UpdateConfig {
-                new_config: update_msg.clone(),
-            },
-            &[],
-        )
-        .unwrap_err();
-    assert_eq!(err.to_string(), "No allowance for this account");
-
     // ######    SUCCESS :: Should have successfully updated   ######
-
-    app.execute_contract(
-        owner.clone(),
-        astro_token.clone(),
-        &Cw20ExecuteMsg::IncreaseAllowance {
-            spender: lockdrop_instance.clone().to_string(),
-            amount: Uint128::new(1000000000u128),
-            expires: None,
-        },
-        &[],
-    )
-    .unwrap();
 
     app.execute_contract(
         owner.clone(),
@@ -1041,6 +1041,19 @@ fn test_update_config() {
         &[],
     )
     .unwrap();
+
+    app.execute_contract(
+        owner.clone(),
+        astro_token.clone(),
+        &Cw20ExecuteMsg::Send {
+            amount: Uint128::from(1000000000u64),
+            contract: lockdrop_instance.to_string(),
+            msg: to_binary(&Cw20HookMsg::IncreaseAstroIncentives {}).unwrap(),
+        },
+        &[],
+    )
+    .unwrap();
+
     let resp: ConfigResponse = app
         .wrap()
         .query_wasm_smart(&lockdrop_instance, &QueryMsg::Config {})
@@ -1060,31 +1073,14 @@ fn test_update_config() {
         resp.generator.unwrap()
     );
     assert_eq!(
-        update_msg.clone().lockdrop_incentives.unwrap(),
+        Uint128::from(1000000000u64),
         resp.lockdrop_incentives.unwrap()
     );
-
-    // ######    ERROR :: ASTRO is already being distributed     ######
 
     app.update_block(|b| {
         b.height += 17280;
         b.time = Timestamp::from_seconds(10600001)
     });
-
-    let err = app
-        .execute_contract(
-            Addr::unchecked("new_owner".to_string()),
-            lockdrop_instance.clone(),
-            &ExecuteMsg::UpdateConfig {
-                new_config: update_msg.clone(),
-            },
-            &[],
-        )
-        .unwrap_err();
-    assert_eq!(
-        err.to_string(),
-        "Generic error: ASTRO is already being distributed"
-    );
 
     // ######    ERROR :: ASTRO tokens are live. Configuration cannot be updated now     ######
     app.execute_contract(
@@ -1429,8 +1425,7 @@ fn test_increase_lockup() {
     let mut app = mock_app();
     let owner = Addr::unchecked("contract_owner");
 
-    let (_, lockdrop_instance, _, _, update_msg) =
-        instantiate_all_contracts(&mut app, owner.clone());
+    let (_, lockdrop_instance, _, _, _) = instantiate_all_contracts(&mut app, owner.clone());
 
     // Terraswap LP Token
     let terraswap_token_contract = Box::new(ContractWrapper::new(
@@ -1656,10 +1651,7 @@ fn test_increase_lockup() {
             },
         )
         .unwrap();
-    assert_eq!(
-        update_msg.lockdrop_incentives.unwrap(),
-        user_resp.total_astro_rewards
-    );
+    assert_eq!(Uint128::from(1000000000u64), user_resp.total_astro_rewards);
     assert_eq!(Uint128::zero(), user_resp.delegated_astro_rewards);
     assert_eq!(false, user_resp.astro_transferred);
 

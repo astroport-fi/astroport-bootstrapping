@@ -1,7 +1,6 @@
 {
-  "astrotokenAddress": "terra1ntwxrg374cazaquyrz9jnscq02yl8evsj0jx8e",
-  "generator_contract": "terra1ymekq0sglcvlnp0u5fvrtugqd04qru33vpd50d",
-  "airdropAddress": "terra1pu3ajuesdwwxsh2k20mk3ujhdqfpfy0ps59n5u",
-  "lockdropAddress": "terra1wdn2l6f9wyw0lux64sa2k94qw0ldxclc4err9d",
-  "auctionAddress": "terra19z8az0uwlems4k6de04uc8wx8cze0mwsn5pgj9"
+  "astrotokenAddress": "terra1kmgk72wetuz6gxwatks5r6al048tn6rlxy3t68",
+  "airdropAddress": "terra13p3z5n40kqvj982wj9uueqkruetf6z27uh4h5l",
+  "lockdropAddress": "terra12n3hey0s85gk7qs2cx3a6tflarj4c776vqmuya",
+  "auctionAddress": "terra1xhrfnxa5kua8z4rt0aahlw6yppu3ay70n3strl"
 }

@@ -1,5 +1,5 @@
 [package]
-name = "astro-airdrop"
+name = "astroport-airdrop"
 version = "1.0.0"
 authors = ["_astromartian"]
 edition = "2018"
@@ -40,5 +40,5 @@ cosmwasm-schema = { version = "0.16.0" }
 terra-multi-test = {git = "https://github.com/astroport-fi/terra-plus.git"}
 astroport-token = {git = "https://github.com/astroport-fi/astroport.git", branch = "master", package = "astroport-token"}
 astroport = {git = "https://github.com/astroport-fi/astroport.git", branch = "master"}
-astro-auction = {path = "../auction"}
+astroport-auction = {path = "../auction"}
 astroport-pair = {git = "https://github.com/astroport-fi/astroport.git", branch = "master", package = "astroport-pair"}

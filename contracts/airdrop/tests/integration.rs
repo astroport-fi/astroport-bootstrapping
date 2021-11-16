@@ -1,6 +1,9 @@
-use astroport_periphery::airdrop::{
-    ClaimResponse, ConfigResponse, ExecuteMsg, InstantiateMsg, QueryMsg, StateResponse,
-    UserInfoResponse,
+use astroport_periphery::{
+    airdrop::{
+        ClaimResponse, ConfigResponse, ExecuteMsg, InstantiateMsg, QueryMsg, StateResponse,
+        UserInfoResponse,
+    },
+    auction::{ExecuteMsg as AuctionExecuteMsg, UpdateConfigMsg},
 };
 use cosmwasm_std::testing::{mock_env, MockApi, MockQuerier, MockStorage};
 use cosmwasm_std::{attr, Addr, Timestamp, Uint128};
@@ -53,9 +56,9 @@ fn init_contracts(app: &mut App) -> (Addr, Addr, InstantiateMsg, u64) {
 
     // Instantiate Airdrop Contract
     let airdrop_contract = Box::new(ContractWrapper::new(
-        astro_airdrop::contract::execute,
-        astro_airdrop::contract::instantiate,
-        astro_airdrop::contract::query,
+        astroport_airdrop::contract::execute,
+        astroport_airdrop::contract::instantiate,
+        astroport_airdrop::contract::query,
     ));
 
     let airdrop_code_id = app.store_code(airdrop_contract);
@@ -1131,9 +1134,9 @@ fn test_delegate_astro_to_bootstrap_auction() {
 
     // Initialize Bootstrap Auction contract
     let auction_contract = Box::new(ContractWrapper::new(
-        astro_auction::contract::execute,
-        astro_auction::contract::instantiate,
-        astro_auction::contract::query,
+        astroport_auction::contract::execute,
+        astroport_auction::contract::instantiate,
+        astroport_auction::contract::query,
     ));
     let auction_contract_code_id = app.store_code(auction_contract);
     let auction_init_msg = astroport_periphery::auction::InstantiateMsg {
@@ -1141,8 +1144,6 @@ fn test_delegate_astro_to_bootstrap_auction() {
         astro_token_address: astro_instance.clone().to_string(),
         airdrop_contract_address: airdrop_instance.clone().to_string(),
         lockdrop_contract_address: "lockdrop_contract_address".to_string(),
-        astro_ust_pair_address: pair_instance.to_string(),
-        generator_contract_address: None,
         lp_tokens_vesting_duration: 2592000u64,
         init_timestamp: 100000u64,
         deposit_window: 2592000u64,
@@ -1159,6 +1160,20 @@ fn test_delegate_astro_to_bootstrap_auction() {
             None,
         )
         .unwrap();
+
+    app.execute_contract(
+        owner.clone(),
+        auction_contract_instance.clone(),
+        &AuctionExecuteMsg::UpdateConfig {
+            new_config: UpdateConfigMsg {
+                astro_ust_pair_address: Some(pair_instance.to_string()),
+                owner: None,
+                generator_contract: None,
+            },
+        },
+        &[],
+    )
+    .unwrap();
 
     let merkle_roots =
         vec!["cdcdfad1c342f5f55a2639dcae7321a64cd000807fa24c2c4ddaa944fd52d34e".to_string()];
