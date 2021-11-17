@@ -256,8 +256,15 @@ pub fn handle_update_config(
     };
 
     if let Some(auction) = new_config.auction_contract_address {
-        config.auction_contract = Some(deps.api.addr_validate(&auction)?);
-        attributes.push(attr("new_auction_contract", auction))
+        match config.auction_contract {
+            Some(_) => {
+                return Err(StdError::generic_err("Auction contract already set."));
+            }
+            None => {
+                config.auction_contract = Some(deps.api.addr_validate(&auction)?);
+                attributes.push(attr("auction_contract", auction))
+            }
+        }
     };
 
     if let Some(generator) = new_config.generator_address {
