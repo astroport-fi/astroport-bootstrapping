@@ -5,7 +5,6 @@
   "required": [
     "airdrop_contract_address",
     "astro_token_address",
-    "astro_ust_pair_address",
     "deposit_window",
     "init_timestamp",
     "lockdrop_contract_address",
@@ -19,19 +18,10 @@
     "astro_token_address": {
       "type": "string"
     },
-    "astro_ust_pair_address": {
-      "type": "string"
-    },
     "deposit_window": {
       "type": "integer",
       "format": "uint64",
       "minimum": 0.0
-    },
-    "generator_contract_address": {
-      "type": [
-        "string",
-        "null"
-      ]
     },
     "init_timestamp": {
       "type": "integer",
