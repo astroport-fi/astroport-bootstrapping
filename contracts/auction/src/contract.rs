@@ -376,13 +376,13 @@ pub fn handle_withdraw_ust(
             attr("action", "Auction::ExecuteMsg::WithdrawUst"),
             attr("user", user_address.to_string()),
             attr("ust_withdrawn", amount),
-            attr("ust_comission", transfer_ust.compute_tax(&deps.querier)?),
+            attr("ust_commission", transfer_ust.compute_tax(&deps.querier)?),
         ])
         .add_message(transfer_ust.into_msg(&deps.querier, user_address)?))
 }
 
 ///  @dev Helper function to calculate maximum % of their total UST deposited that can be withdrawn
-/// Returns % UST that can be withdrawn and 'more_withdrawals_allowed' boolean which indicates whether more withdrawls by the user
+/// Returns % UST that can be withdrawn and 'more_withdrawals_allowed' boolean which indicates whether more withdrawals by the user
 /// will be allowed or not
 fn allowed_withdrawal_percent(current_timestamp: u64, config: &Config) -> Decimal {
     let withdrawal_cutoff_init_point = config.init_timestamp + config.deposit_window;
@@ -763,7 +763,7 @@ pub fn callback_withdraw_user_rewards_and_optionally_lp(
 
         let astroport_lp_amount = user_lp_shares - user_info.claimed_lp_shares;
 
-        if !user_info.astro_incentive_transfered {
+        if !user_info.astro_incentive_transferred {
             cosmos_msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
                 contract_addr: config.astro_token_address.to_string(),
                 funds: vec![],
@@ -772,7 +772,7 @@ pub fn callback_withdraw_user_rewards_and_optionally_lp(
                     amount: user_auction_incentive_amount,
                 })?,
             }));
-            user_info.astro_incentive_transfered = true;
+            user_info.astro_incentive_transferred = true;
             attributes.push(attr("auction_astro_reward", user_auction_incentive_amount));
         }
 
@@ -1083,7 +1083,7 @@ fn query_user_info(deps: Deps, env: Env, user_address: String) -> StdResult<User
             claimed_lp_shares: user_info.claimed_lp_shares,
             withdrawable_lp_shares,
             auction_incentive_amount: user_info.auction_incentive_amount,
-            astro_incentive_transfered: user_info.astro_incentive_transfered,
+            astro_incentive_transferred: user_info.astro_incentive_transferred,
             generator_astro_debt: user_info.generator_astro_debt,
             claimable_generator_astro,
         })

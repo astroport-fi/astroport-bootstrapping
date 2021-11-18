@@ -52,7 +52,7 @@ pub struct State {
     pub lp_shares_minted: Option<Uint128>,
     /// Timestamp at which liquidity was added to the ASTRO-UST LP Pool
     pub pool_init_timestamp: u64,
-    /// Ratio of ASTRO rewards accured to weighted_amount. Used to calculate ASTRO incentives accured by each user
+    /// Ratio of ASTRO rewards accrued to weighted_amount. Used to calculate ASTRO incentives accrued by each user
     pub generator_astro_per_share: Decimal,
 }
 
@@ -71,7 +71,7 @@ pub struct UserInfo {
     // User's ASTRO rewards for participating in the auction
     pub auction_incentive_amount: Option<Uint128>,
     // ASTRO tokens were transferred to user
-    pub astro_incentive_transfered: bool,
+    pub astro_incentive_transferred: bool,
     // ASTRO staking incentives (LP token staking) withdrawn by the user
     pub generator_astro_debt: Uint128,
 }

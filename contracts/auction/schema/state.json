@@ -11,7 +11,7 @@
   ],
   "properties": {
     "generator_astro_per_share": {
-      "description": "Ratio of ASTRO rewards accured to weighted_amount. Used to calculate ASTRO incentives accured by each user",
+      "description": "Ratio of ASTRO rewards accrued to weighted_amount. Used to calculate ASTRO incentives accrued by each user",
       "allOf": [
         {
           "$ref": "#/definitions/Decimal"

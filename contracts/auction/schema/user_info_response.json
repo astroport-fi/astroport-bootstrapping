@@ -4,7 +4,7 @@
   "type": "object",
   "required": [
     "astro_delegated",
-    "astro_incentive_transfered",
+    "astro_incentive_transferred",
     "claimable_generator_astro",
     "claimed_lp_shares",
     "generator_astro_debt",
@@ -15,7 +15,7 @@
     "astro_delegated": {
       "$ref": "#/definitions/Uint128"
     },
-    "astro_incentive_transfered": {
+    "astro_incentive_transferred": {
       "type": "boolean"
     },
     "auction_incentive_amount": {

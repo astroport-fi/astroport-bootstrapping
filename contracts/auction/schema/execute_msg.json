@@ -253,6 +253,12 @@
     "UpdateConfigMsg": {
       "type": "object",
       "properties": {
+        "astro_ust_pair_address": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "generator_contract": {
           "type": [
             "string",
