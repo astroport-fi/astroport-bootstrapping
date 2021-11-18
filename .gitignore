@@ -1,5 +1,7 @@
 target
+/artifacts/*.wasm
 /scripts/node_modules
+/scripts/.env
 test
 .idea
 .gitconfig

@@ -60,9 +60,9 @@ fn instantiate_auction_contract(
     pair_instance: Addr,
 ) -> (Addr, InstantiateMsg) {
     let auction_contract = Box::new(ContractWrapper::new(
-        astro_auction::contract::execute,
-        astro_auction::contract::instantiate,
-        astro_auction::contract::query,
+        astroport_auction::contract::execute,
+        astroport_auction::contract::instantiate,
+        astroport_auction::contract::query,
     ));
 
     let auction_code_id = app.store_code(auction_contract);
@@ -72,8 +72,6 @@ fn instantiate_auction_contract(
         astro_token_address: astro_token_instance.clone().into_string(),
         airdrop_contract_address: airdrop_instance.to_string(),
         lockdrop_contract_address: lockdrop_instance.to_string(),
-        astro_ust_pair_address: pair_instance.to_string(),
-        generator_contract_address: None,
         lp_tokens_vesting_duration: 7776000u64,
         init_timestamp: 1_000_00,
         deposit_window: 100_000_00,
@@ -91,6 +89,20 @@ fn instantiate_auction_contract(
             None,
         )
         .unwrap();
+
+    app.execute_contract(
+        owner.clone(),
+        auction_instance.clone(),
+        &ExecuteMsg::UpdateConfig {
+            new_config: UpdateConfigMsg {
+                astro_ust_pair_address: Some(pair_instance.to_string()),
+                owner: None,
+                generator_contract: None,
+            },
+        },
+        &[],
+    )
+    .unwrap();
     (auction_instance, auction_instantiate_msg)
 }
 
@@ -167,7 +179,6 @@ fn init_all_contracts(app: &mut App) -> (Addr, Addr, Addr, Addr, Addr, Addr, Ins
                 auction_contract_address: Some(auction_instance.to_string()),
                 generator_address: None,
                 astro_token_address: None,
-                lockdrop_incentives: None,
             },
         },
         &[],
@@ -244,9 +255,9 @@ fn instantiate_airdrop_lockdrop_contracts(
     astro_token_instance: Addr,
 ) -> (Addr, Addr) {
     let airdrop_contract = Box::new(ContractWrapper::new(
-        astro_airdrop::contract::execute,
-        astro_airdrop::contract::instantiate,
-        astro_airdrop::contract::query,
+        astroport_airdrop::contract::execute,
+        astroport_airdrop::contract::instantiate,
+        astroport_airdrop::contract::query,
     ));
 
     let lockdrop_contract = Box::new(ContractWrapper::new(
@@ -326,7 +337,7 @@ fn instantiate_airdrop_lockdrop_contracts(
     .unwrap();
 
     app.execute_contract(
-        owner,
+        owner.clone(),
         lockdrop_instance.clone(),
         &astroport_periphery::lockdrop::ExecuteMsg::UpdateConfig {
             new_config: astroport_periphery::lockdrop::UpdateConfigMsg {
@@ -334,8 +345,19 @@ fn instantiate_airdrop_lockdrop_contracts(
                 astro_token_address: Some(astro_token_instance.clone().into_string()),
                 auction_contract_address: None,
                 generator_address: None,
-                lockdrop_incentives: Some(Uint128::from(100_000_00u64)),
             },
+        },
+        &[],
+    )
+    .unwrap();
+
+    app.execute_contract(
+        owner.clone(),
+        astro_token_instance,
+        &Cw20ExecuteMsg::Send {
+            amount: Uint128::from(100_000_00u64),
+            contract: lockdrop_instance.to_string(),
+            msg: to_binary(&Cw20HookMsg::IncreaseAstroIncentives {}).unwrap(),
         },
         &[],
     )
@@ -1060,6 +1082,7 @@ fn test_update_config() {
 
     let update_msg = UpdateConfigMsg {
         owner: Some("new_owner".to_string()),
+        astro_ust_pair_address: None,
         generator_contract: Some("generator_contract".to_string()),
     };
 
@@ -1769,6 +1792,7 @@ fn test_stake_lp_tokens() {
 
     let update_msg = UpdateConfigMsg {
         owner: None,
+        astro_ust_pair_address: None,
         generator_contract: Some(generator_instance.to_string()),
     };
 
@@ -1991,6 +2015,7 @@ fn test_claim_rewards() {
 
     let update_msg = UpdateConfigMsg {
         owner: None,
+        astro_ust_pair_address: None,
         generator_contract: Some(generator_instance.to_string()),
     };
 
@@ -2062,7 +2087,10 @@ fn test_claim_rewards() {
             &[],
         )
         .unwrap_err();
-    assert_eq!(err.to_string(), "astro_auction::state::UserInfo not found");
+    assert_eq!(
+        err.to_string(),
+        "astroport_auction::state::UserInfo not found"
+    );
 
     // ######    Sucess :: Initialize ASTRO-UST Pool   ######
 
@@ -2306,6 +2334,7 @@ fn test_withdraw_unlocked_lp_shares() {
 
     let update_msg = UpdateConfigMsg {
         owner: None,
+        astro_ust_pair_address: None,
         generator_contract: Some(generator_instance.to_string()),
     };
 
@@ -2350,7 +2379,10 @@ fn test_withdraw_unlocked_lp_shares() {
             &[],
         )
         .unwrap_err();
-    assert_eq!(err.to_string(), "astro_auction::state::UserInfo not found");
+    assert_eq!(
+        err.to_string(),
+        "astroport_auction::state::UserInfo not found"
+    );
 
     // ######    Sucess :: Initialize ASTRO-UST Pool   ######
 

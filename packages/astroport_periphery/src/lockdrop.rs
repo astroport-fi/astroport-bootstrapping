@@ -35,8 +35,6 @@ pub struct UpdateConfigMsg {
     pub auction_contract_address: Option<String>,
     /// Generator (Staking for dual rewards) contract address
     pub generator_address: Option<String>,
-    /// Total ASTRO lockdrop incentives to be distributed among the users
-    pub lockdrop_incentives: Option<Uint128>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -97,7 +95,10 @@ pub enum ExecuteMsg {
 #[serde(rename_all = "snake_case")]
 pub enum Cw20HookMsg {
     /// Open a new user position or add to an existing position (Cw20ReceiveMsg)
-    IncreaseLockup { duration: u64 },
+    IncreaseLockup {
+        duration: u64,
+    },
+    IncreaseAstroIncentives {},
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

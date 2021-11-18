@@ -9,8 +9,6 @@ pub struct InstantiateMsg {
     pub astro_token_address: String,
     pub airdrop_contract_address: String,
     pub lockdrop_contract_address: String,
-    pub astro_ust_pair_address: String,
-    pub generator_contract_address: Option<String>,
     pub lp_tokens_vesting_duration: u64,
     pub init_timestamp: u64,
     pub deposit_window: u64,
@@ -20,7 +18,17 @@ pub struct InstantiateMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct UpdateConfigMsg {
     pub owner: Option<String>,
+    pub astro_ust_pair_address: Option<String>,
     pub generator_contract: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub struct PoolInfo {
+    ///  ASTRO-UST LP Pool address
+    pub astro_ust_pool_address: Addr,
+    ///  ASTRO-UST LP Token address
+    pub astro_ust_lp_token_address: Addr,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -87,8 +95,7 @@ pub struct ConfigResponse {
     pub astro_token_address: Addr,
     pub airdrop_contract_address: Addr,
     pub lockdrop_contract_address: Addr,
-    pub astro_ust_pool_address: Addr,
-    pub astro_ust_lp_token_address: Addr,
+    pub pool_info: Option<PoolInfo>,
     pub generator_contract: Option<Addr>,
     pub astro_incentive_amount: Option<Uint128>,
     pub lp_tokens_vesting_duration: u64,

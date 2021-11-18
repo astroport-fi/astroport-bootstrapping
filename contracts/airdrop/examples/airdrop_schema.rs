@@ -3,7 +3,7 @@ use std::fs::create_dir_all;
 
 use cosmwasm_schema::{export_schema, remove_schemas, schema_for};
 
-use astro_airdrop::state::{Config, State};
+use astroport_airdrop::state::{Config, State};
 use astroport_periphery::airdrop::{
     ClaimResponse, ConfigResponse, ExecuteMsg, InstantiateMsg, QueryMsg, SignatureResponse,
     StateResponse, UserInfoResponse,

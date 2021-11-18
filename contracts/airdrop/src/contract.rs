@@ -130,6 +130,7 @@ pub fn handle_update_config(
     to_timestamp: Option<u64>,
 ) -> StdResult<Response> {
     let mut config = CONFIG.load(deps.storage)?;
+    let mut attributes = vec![attr("action", "Airdrop::ExecuteMsg::UpdateConfig")];
 
     // CHECK :: ONLY OWNER CAN CALL THIS FUNCTION
     if info.sender != config.owner {
@@ -138,6 +139,7 @@ pub fn handle_update_config(
 
     if let Some(owner) = owner {
         config.owner = deps.api.addr_validate(&owner)?;
+        attributes.push(attr("new_owner", owner.as_str()))
     }
 
     if let Some(auction_contract_address) = auction_contract_address {
@@ -148,6 +150,7 @@ pub fn handle_update_config(
             None => {
                 config.auction_contract_address =
                     Some(deps.api.addr_validate(&auction_contract_address)?);
+                attributes.push(attr("auction_contract", auction_contract_address))
             }
         }
     }
@@ -163,7 +166,8 @@ pub fn handle_update_config(
             ));
         }
 
-        config.from_timestamp = from_timestamp
+        config.from_timestamp = from_timestamp;
+        attributes.push(attr("new_from_timestamp", from_timestamp.to_string()))
     }
 
     if let Some(to_timestamp) = to_timestamp {
@@ -173,11 +177,12 @@ pub fn handle_update_config(
             ));
         }
 
-        config.to_timestamp = to_timestamp
+        config.to_timestamp = to_timestamp;
+        attributes.push(attr("new_to_timestamp", to_timestamp.to_string()))
     }
 
     CONFIG.save(deps.storage, &config)?;
-    Ok(Response::new().add_attribute("action", "Airdrop::ExecuteMsg::UpdateConfig"))
+    Ok(Response::new().add_attributes(attributes))
 }
 
 /// @dev Function to enable ASTRO Claims by users. Called along-with Bootstrap Auction contract's LP Pool provide liquidity tx

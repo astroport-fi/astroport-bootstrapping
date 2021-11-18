@@ -1,4 +1,4 @@
-use std::{cmp::Ordering, convert::TryInto};
+use std::convert::TryInto;
 
 use cosmwasm_std::{
     attr, entry_point, from_binary, to_binary, Addr, Binary, Coin, CosmosMsg, Decimal, Decimal256,
@@ -83,9 +83,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
     match msg {
         ExecuteMsg::Receive(msg) => receive_cw20(deps, env, info, msg),
 
-        ExecuteMsg::UpdateConfig { new_config } => {
-            handle_update_config(deps, env, info, new_config)
-        }
+        ExecuteMsg::UpdateConfig { new_config } => handle_update_config(deps, info, new_config),
         ExecuteMsg::InitializePool {
             terraswap_lp_token,
             incentives_share,
@@ -141,6 +139,9 @@ pub fn receive_cw20(
     match from_binary(&cw20_msg.msg)? {
         Cw20HookMsg::IncreaseLockup { duration } => {
             handle_increase_lockup(deps, env, info, user_address, duration, amount)
+        }
+        Cw20HookMsg::IncreaseAstroIncentives {} => {
+            handle_increasing_astro_incentives(deps, env, info, amount)
         }
     }
 }
@@ -225,13 +226,11 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
 /// @param new_config : Same as UpdateConfigMsg struct
 pub fn handle_update_config(
     deps: DepsMut,
-    env: Env,
     info: MessageInfo,
     new_config: UpdateConfigMsg,
 ) -> StdResult<Response> {
     let mut config = CONFIG.load(deps.storage)?;
     let state = STATE.load(deps.storage)?;
-    let mut messages: Vec<WasmMsg> = vec![];
     let mut attributes = vec![attr("action", "update_config")];
 
     // CHECK :: Only owner can call this function
@@ -248,66 +247,68 @@ pub fn handle_update_config(
 
     if let Some(owner) = new_config.owner {
         config.owner = deps.api.addr_validate(&owner)?;
+        attributes.push(attr("new_owner", owner.as_str()))
     };
 
     if let Some(astro_addr) = new_config.astro_token_address {
         config.astro_token = Some(deps.api.addr_validate(&astro_addr)?);
+        attributes.push(attr("new_astro_token", astro_addr))
     };
 
     if let Some(auction) = new_config.auction_contract_address {
-        config.auction_contract = Some(deps.api.addr_validate(&auction)?);
+        match config.auction_contract {
+            Some(_) => {
+                return Err(StdError::generic_err("Auction contract already set."));
+            }
+            None => {
+                config.auction_contract = Some(deps.api.addr_validate(&auction)?);
+                attributes.push(attr("auction_contract", auction))
+            }
+        }
     };
 
     if let Some(generator) = new_config.generator_address {
         config.generator = Some(deps.api.addr_validate(&generator)?);
-    }
-
-    if let Some(new_incentives) = new_config.lockdrop_incentives {
-        if let Some(astro_addr) = &config.astro_token {
-            if env.block.time.seconds()
-                >= config.init_timestamp + config.deposit_window + config.withdrawal_window
-            {
-                return Err(StdError::generic_err("ASTRO is already being distributed"));
-            };
-            let prev_incentives = config.lockdrop_incentives.unwrap_or_default();
-            match prev_incentives.cmp(&new_incentives) {
-                Ordering::Equal => {}
-                Ordering::Greater => {
-                    let amount = prev_incentives - new_incentives;
-                    messages.push(WasmMsg::Execute {
-                        contract_addr: astro_addr.to_string(),
-                        funds: vec![],
-                        msg: to_binary(&Cw20ExecuteMsg::Transfer {
-                            recipient: info.sender.to_string(),
-                            amount,
-                        })?,
-                    });
-                    attributes.push(attr("incentives_returned", amount));
-                }
-                Ordering::Less => {
-                    let amount = new_incentives - prev_incentives;
-                    messages.push(WasmMsg::Execute {
-                        contract_addr: astro_addr.to_string(),
-                        funds: vec![],
-                        msg: to_binary(&Cw20ExecuteMsg::TransferFrom {
-                            owner: info.sender.to_string(),
-                            recipient: env.contract.address.to_string(),
-                            amount,
-                        })?,
-                    });
-                    attributes.push(attr("incentives_received", amount));
-                }
-            };
-            config.lockdrop_incentives = Some(new_incentives);
-        } else {
-            return Err(StdError::generic_err("Astro contract wasn't specified!"));
-        }
+        attributes.push(attr("new_generator", generator))
     }
 
     CONFIG.save(deps.storage, &config)?;
+    Ok(Response::new().add_attributes(attributes))
+}
+
+pub fn handle_increasing_astro_incentives(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    amount: Uint128,
+) -> Result<Response, StdError> {
+    let mut config = CONFIG.load(deps.storage)?;
+
+    if &info.sender
+        != config
+            .astro_token
+            .as_ref()
+            .ok_or_else(|| StdError::generic_err("Astro token should be set!"))?
+    {
+        return Err(StdError::generic_err("Only astro tokens are received!"));
+    }
+
+    if env.block.time.seconds()
+        >= config.init_timestamp + config.deposit_window + config.withdrawal_window
+    {
+        return Err(StdError::generic_err("ASTRO is already being distributed"));
+    };
+
+    // Anyone can increase astro incentives
+
+    config.lockdrop_incentives = config
+        .lockdrop_incentives
+        .map_or(Some(amount), |v| Some(v + amount));
+
+    CONFIG.save(deps.storage, &config)?;
     Ok(Response::new()
-        .add_attributes(attributes)
-        .add_messages(messages))
+        .add_attribute("action", "astro_incentives_increased")
+        .add_attribute("amount", amount))
 }
 
 /// @dev Admin function to initialize new LP Pool
