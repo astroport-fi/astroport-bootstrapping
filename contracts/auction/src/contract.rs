@@ -207,6 +207,7 @@ pub fn handle_update_config(
     Ok(Response::new().add_attributes(attributes))
 }
 
+/// @dev Facilitates increasing ASTRO incentives which are to be distributed for partcipating in the auction
 pub fn handle_increasing_astro_incentives(
     deps: DepsMut,
     amount: Uint128,
@@ -840,7 +841,7 @@ pub fn callback_withdraw_user_rewards_and_optionally_lp(
 // Handle::Callback functions
 //----------------------------------------------------------------------------------------
 
-// CALLBACK :: CALLED AFTER ASTRO, UST LIQUIDITY IS ADDED TO THE LP POOL
+/// @dev Callback function to update state after liquidity is added to the ASTRO-UST Pool
 pub fn update_state_on_liquidity_addition_to_pool(
     deps: DepsMut,
     env: Env,
@@ -897,7 +898,8 @@ pub fn update_state_on_liquidity_addition_to_pool(
     }
 }
 
-// @dev CallbackMsg :: Facilitates state update and ASTRO rewards transfer to users post ASTRO incentives claim from the generator contract
+/// @dev Callback function to update state after ASTRO rewards are claimed from the astroport generator       
+/// @params prev_astro_balance : Number of ASTRO tokens available with the contract before the claim
 pub fn update_state_on_reward_claim(
     deps: DepsMut,
     env: Env,

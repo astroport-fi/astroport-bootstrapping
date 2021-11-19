@@ -24,7 +24,7 @@
       ]
     },
     "auction_contract_address": {
-      "description": "bootstrap auction contract address",
+      "description": "Bootstrap auction contract address",
       "anyOf": [
         {
           "$ref": "#/definitions/Addr"

@@ -458,17 +458,6 @@
             "null"
           ]
         },
-        "lockdrop_incentives": {
-          "description": "Total ASTRO lockdrop incentives to be distributed among the users",
-          "anyOf": [
-            {
-              "$ref": "#/definitions/Uint128"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
         "owner": {
           "description": "Account which can update config",
           "type": [

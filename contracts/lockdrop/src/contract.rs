@@ -276,6 +276,8 @@ pub fn handle_update_config(
     Ok(Response::new().add_attributes(attributes))
 }
 
+/// @dev Facilitates increaseing ASTRO incentives that are to be distributed as Lockdrop participation reward
+/// @params amount : Number of ASTRO tokens which are to be added to current incentives
 pub fn handle_increasing_astro_incentives(
     deps: DepsMut,
     env: Env,
