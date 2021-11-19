@@ -24,6 +24,18 @@
         }
       },
       "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "increase_astro_incentives"
+      ],
+      "properties": {
+        "increase_astro_incentives": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
     }
   ]
 }
