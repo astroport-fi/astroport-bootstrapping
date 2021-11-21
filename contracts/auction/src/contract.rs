@@ -732,6 +732,10 @@ fn update_user_incentives_and_lp_share(
     Ok(())
 }
 
+//----------------------------------------------------------------------------------------
+// Handle::Callback functions
+//----------------------------------------------------------------------------------------
+
 /// @dev CALLBACK Function to withdraw user rewards and LP Tokens if available
 /// @param user_address : User address who is withdrawing
 /// @param withdraw_lp_shares : Optional amount to withdraw lp tokens
@@ -836,10 +840,6 @@ pub fn callback_withdraw_user_rewards_and_optionally_lp(
         .add_messages(cosmos_msgs)
         .add_attributes(attributes))
 }
-
-//----------------------------------------------------------------------------------------
-// Handle::Callback functions
-//----------------------------------------------------------------------------------------
 
 /// @dev Callback function to update state after liquidity is added to the ASTRO-UST Pool
 pub fn update_state_on_liquidity_addition_to_pool(
