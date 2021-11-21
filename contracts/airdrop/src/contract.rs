@@ -160,25 +160,19 @@ pub fn handle_update_config(
     }
 
     if let Some(from_timestamp) = from_timestamp {
-        if config.to_timestamp <= from_timestamp {
-            return Err(StdError::generic_err(
-                "Invalid airdrop claim window closure timestamp",
-            ));
-        }
-
         config.from_timestamp = from_timestamp;
         attributes.push(attr("new_from_timestamp", from_timestamp.to_string()))
     }
 
     if let Some(to_timestamp) = to_timestamp {
-        if to_timestamp <= config.from_timestamp {
-            return Err(StdError::generic_err(
-                "Invalid airdrop claim window closure timestamp",
-            ));
-        }
-
         config.to_timestamp = to_timestamp;
         attributes.push(attr("new_to_timestamp", to_timestamp.to_string()))
+    }
+
+    if config.to_timestamp <= config.from_timestamp {
+        return Err(StdError::generic_err(
+            "Invalid airdrop claim window",
+        ));
     }
 
     CONFIG.save(deps.storage, &config)?;
