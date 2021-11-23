@@ -67,8 +67,8 @@ fn init_contracts(app: &mut App) -> (Addr, Addr, InstantiateMsg, u64) {
         owner: Some(owner.clone().to_string()),
         astro_token_address: astro_token_instance.clone().into_string(),
         merkle_roots: Some(vec!["merkle_roots".to_string()]),
-        from_timestamp: Some(1_000_00),
-        to_timestamp: 100_000_00,
+        from_timestamp: Some(1571897419),
+        to_timestamp: 1581797419,
         total_airdrop_size: Uint128::new(100_000_000_000),
     };
 
@@ -204,8 +204,8 @@ fn update_config() {
     let new_owner = String::from("new_owner");
     let auction_contract_address = String::from("auction_contract_address");
     let merkle_roots = vec!["new_merkle_roots".to_string()];
-    let from_timestamp = 2_000_00;
-    let to_timestamp = 200_000_00;
+    let from_timestamp = 1571997419;
+    let to_timestamp = 1591797419;
 
     let update_msg = ExecuteMsg::UpdateConfig {
         owner: Some(new_owner.clone()),
@@ -285,7 +285,7 @@ fn test_transfer_unclaimed_tokens() {
     // claim period is not over
     app.update_block(|b| {
         b.height += 17280;
-        b.time = Timestamp::from_seconds(1_000_00)
+        b.time = Timestamp::from_seconds(1571897419)
     });
 
     // Can only be called after the claim period is over
@@ -309,7 +309,7 @@ fn test_transfer_unclaimed_tokens() {
     // claim period is over
     app.update_block(|b| {
         b.height += 17280;
-        b.time = Timestamp::from_seconds(1_000_00_00)
+        b.time = Timestamp::from_seconds(1581797419)
     });
 
     // Amount needs to be less than unclaimed_tokens balance
@@ -416,7 +416,7 @@ fn test_claim_by_terra_user() {
     // Claim period has not started yet
     app.update_block(|b| {
         b.height += 17280;
-        b.time = Timestamp::from_seconds(1_000)
+        b.time = Timestamp::from_seconds(1571798419)
     });
 
     let mut claim_msg = ExecuteMsg::Claim {
@@ -462,7 +462,7 @@ fn test_claim_by_terra_user() {
     // Update Block to test successful claim
     app.update_block(|b| {
         b.height += 17280;
-        b.time = Timestamp::from_seconds(1_000_05)
+        b.time = Timestamp::from_seconds(1571897424)
     });
 
     // **** "Incorrect Merkle Root Index" Error should be returned ****
@@ -788,7 +788,7 @@ fn test_claim_by_terra_user() {
     // Claim period has concluded
     app.update_block(|b| {
         b.height += 17280;
-        b.time = Timestamp::from_seconds(1_000_000_000)
+        b.time = Timestamp::from_seconds(2571797419)
     });
 
     // **** "Claim period has concluded" Error should be returned ****
@@ -933,7 +933,7 @@ fn test_withdraw_airdrop_rewards() {
     // Update Block to test successful claim
     app.update_block(|b| {
         b.height += 17280;
-        b.time = Timestamp::from_seconds(1_000_05)
+        b.time = Timestamp::from_seconds(1571897424)
     });
 
     // ################################
@@ -1145,7 +1145,7 @@ fn test_delegate_astro_to_bootstrap_auction() {
         airdrop_contract_address: airdrop_instance.clone().to_string(),
         lockdrop_contract_address: "lockdrop_contract_address".to_string(),
         lp_tokens_vesting_duration: 2592000u64,
-        init_timestamp: 100000u64,
+        init_timestamp: 1571897419u64,
         deposit_window: 2592000u64,
         withdrawal_window: 1592000u64,
     };
@@ -1204,7 +1204,7 @@ fn test_delegate_astro_to_bootstrap_auction() {
     // Update Block to test successful claim
     app.update_block(|b| {
         b.height += 17280;
-        b.time = Timestamp::from_seconds(1_000_05)
+        b.time = Timestamp::from_seconds(1571897424)
     });
 
     // ################################

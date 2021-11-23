@@ -383,8 +383,6 @@ pub fn handle_withdraw_ust(
 }
 
 ///  @dev Helper function to calculate maximum % of their total UST deposited that can be withdrawn
-/// Returns % UST that can be withdrawn and 'more_withdrawals_allowed' boolean which indicates whether more withdrawals by the user
-/// will be allowed or not
 fn allowed_withdrawal_percent(current_timestamp: u64, config: &Config) -> Decimal {
     let withdrawal_cutoff_init_point = config.init_timestamp + config.deposit_window;
 
