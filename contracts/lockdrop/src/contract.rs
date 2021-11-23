@@ -515,7 +515,7 @@ pub fn handle_migrate_liquidity(
 
     let mut assets = vec![];
 
-    for asset_info in terraswap_lp_info.asset_infos {
+    for asset_info in terraswap_lp_info.asset_infos.iter() {
         assets.push(terraswap::asset::Asset {
             amount: match &asset_info {
                 terraswap::asset::AssetInfo::NativeToken { denom } => {
@@ -533,7 +533,7 @@ pub fn handle_migrate_liquidity(
                     )?
                 }
             },
-            info: asset_info,
+            info: asset_info.to_owned(),
         })
     }
 
@@ -1310,8 +1310,8 @@ pub fn callback_deposit_liquidity_in_astroport(
     let mut assets = vec![];
     let mut coins = vec![];
 
-    for prev_asset in prev_assets {
-        match prev_asset.info {
+    for prev_asset in prev_assets.iter() {
+        match prev_asset.info.clone() {
             terraswap::asset::AssetInfo::NativeToken { denom } => {
                 let mut new_asset = astroport::asset::Asset {
                     info: astroport::asset::AssetInfo::NativeToken {
