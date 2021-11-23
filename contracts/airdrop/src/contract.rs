@@ -81,6 +81,7 @@ pub fn execute(
             to_timestamp,
         } => handle_update_config(
             deps,
+            env,
             info,
             owner,
             auction_contract_address,
@@ -122,6 +123,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 /// @param new_config : Same as InstantiateMsg struct
 pub fn handle_update_config(
     deps: DepsMut,
+    env: Env,
     info: MessageInfo,
     owner: Option<String>,
     auction_contract_address: Option<String>,
@@ -160,19 +162,27 @@ pub fn handle_update_config(
     }
 
     if let Some(from_timestamp) = from_timestamp {
+        if env.block.time.seconds() >= config.from_timestamp {
+            return Err(StdError::generic_err(
+                "from_timestamp can't be changed after window starts",
+            ));
+        }
         config.from_timestamp = from_timestamp;
         attributes.push(attr("new_from_timestamp", from_timestamp.to_string()))
     }
 
     if let Some(to_timestamp) = to_timestamp {
+        if env.block.time.seconds() >= config.from_timestamp && to_timestamp < config.to_timestamp {
+            return Err(StdError::generic_err(
+                "When window starts to_timestamp can only be increased",
+            ));
+        }
         config.to_timestamp = to_timestamp;
         attributes.push(attr("new_to_timestamp", to_timestamp.to_string()))
     }
 
     if config.to_timestamp <= config.from_timestamp {
-        return Err(StdError::generic_err(
-            "Invalid airdrop claim window",
-        ));
+        return Err(StdError::generic_err("Invalid airdrop claim window"));
     }
 
     CONFIG.save(deps.storage, &config)?;
