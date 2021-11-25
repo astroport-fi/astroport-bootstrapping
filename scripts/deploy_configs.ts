@@ -1,12 +1,14 @@
 export const bombay_testnet: Config = {
 
+    // timestamp 1638133200 is 29 Nov 2021
+
     airdrop_InitMsg: {
         "config": {
             "owner": undefined,
             "astro_token_address": "",
             "merkle_roots": [],
-            "from_timestamp": undefined,
-            "to_timestamp": 0,
+            "from_timestamp": 1638133200,
+            "to_timestamp": 1638133200 + 7 * 24 * 60 * 60,
             "total_airdrop_size": "0",
         }
     },
@@ -14,13 +16,13 @@ export const bombay_testnet: Config = {
     lockdrop_InitMsg: {
         "config": {
             "owner": undefined,
-            "init_timestamp": 0,
-            "deposit_window": 86400,
-            "withdrawal_window": 86400,
-            "min_lock_duration": 1,
+            "init_timestamp": 1638133200,
+            "deposit_window": 5 * 24 * 60 * 60,
+            "withdrawal_window": 2 * 24 * 60 * 60,
+            "min_lock_duration": 2,
             "max_lock_duration": 52,
-            "weekly_multiplier": 1,
-            "weekly_divider": 12,
+            "weekly_multiplier": 3,
+            "weekly_divider": 51,
         }
     },
 
@@ -30,10 +32,10 @@ export const bombay_testnet: Config = {
             "astro_token_address": "",
             "airdrop_contract_address": "",
             "lockdrop_contract_address": "",
-            "lp_tokens_vesting_duration": 86400,
-            "init_timestamp": 0,
-            "deposit_window": 86400,
-            "withdrawal_window": 86400,
+            "lp_tokens_vesting_duration": 3 * 30 * 24 * 60 * 60,
+            "init_timestamp": 1638133200 + 7 * 24 * 60 * 60,
+            "deposit_window": 5 * 24 * 60 * 60,
+            "withdrawal_window": 2 * 24 * 60 * 60,
         }
     }
 }

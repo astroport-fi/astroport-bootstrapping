@@ -1,8 +1,16 @@
 {
-  "astrotokenAddress": "terra1kmgk72wetuz6gxwatks5r6al048tn6rlxy3t68",
-  "airdropAddress": "terra13p3z5n40kqvj982wj9uueqkruetf6z27uh4h5l",
-  "lockdropAddress": "terra1w025z6yxp6p0q0yu0k98nsh6cxdpk25y9xnend",
-  "auctionAddress": "terra1xhrfnxa5kua8z4rt0aahlw6yppu3ay70n3strl",
-  "ust_pair_address": "terra1y0g7hj0g7ygmq5dg9544cdkh5pdvaza8e2cg8g",
-  "generator_contract": "terra1sat6slc7ecwtgwequz46j8cmqt0fxl40gynnlp"
+  "astrotokenAddress": "terra1vvrvqupxs92ennv9cxzlwp6w63707uveachdrq",
+  "astro_ust_pair_address": "terra1wd7wxlzfpwj764z7u8dm5wpuv2vhlmz4wtnj6u",
+  "generator_contract": "terra19ha4hajrfa2gtmww6d4a89nuxdzxy06346qx7q",
+  "airdropAddress": "terra1lms30y80xl872wl2f3ywltnmf4wyt4sphlewn3",
+  "lockdropAddress": "terra1ngh9kapg9nahfecm8jhr66hteh4u7cuhyczpvs",
+  "auctionAddress": "terra1kejujlvdc022hp5vzz4nlpu5rqtcs7l0jrae3w",
+  "auction_set_in_airdrop": true,
+  "auction_set_in_lockdrop": true,
+  "astro_ust_pair_set_in_auction": true,
+  "generator_set_to_lockdrop_and_auction": true,
+  "terraswap_anc_ust_pair": "terra1havtdh6raw80pgp56wzu3wswx4y28wr97dt8eg",
+  "terraswap_psi_ust_pair": "terra13wesva39whtfyp5w9qaggaaj6m28mu0hhu7lzl",
+  "terraswap_anc_ust_pair_initialized_in_lockdrop": true,
+  "terraswap_psi_ust_pair_initialized_in_lockdrop": true
 }

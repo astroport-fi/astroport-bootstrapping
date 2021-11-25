@@ -1,5 +1,7 @@
 target
 /artifacts/*.wasm
+/artifacts/checksums_intermediate.txt
+/artifacts/checksums.txt
 /scripts/node_modules
 /scripts/.env
 test
