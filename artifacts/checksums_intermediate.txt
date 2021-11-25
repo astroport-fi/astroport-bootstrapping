@@ -1,3 +1,0 @@
-8bde6eb4d0db689f06945500fcd806c13c11aa3a9f87ae9378e8484b111e91ba  target/wasm32-unknown-unknown/release/astroport_airdrop.wasm
-22d05c0f05c29fec6f1de31df6ab395528921a8b94553052a1b34cb1e1de2520  target/wasm32-unknown-unknown/release/astroport_auction.wasm
-533cfb405d3c8fabf7f2eb63abbd2db034db2e2973a431e0bccbcdd81afd0e42  target/wasm32-unknown-unknown/release/astroport_lockdrop.wasm
