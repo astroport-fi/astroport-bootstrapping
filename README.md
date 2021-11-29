@@ -51,6 +51,10 @@ docker run --rm -v "$(pwd)":/code \
   cosmwasm/rust-optimizer:0.11.3
 ```
 
+## Bug Bounty
+
+The contracts in this repo are included in a [bug bounty program](https://www.immunefi.com/bounty/astroport).
+
 ## License
 
-TBD
+[GNU General Public License v3.0](https://github.com/astroport-fi/astroport-periphery/blob/main/LICENSE)
