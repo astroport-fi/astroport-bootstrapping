@@ -529,7 +529,8 @@ fn build_provide_liquidity_to_lp_pool_msg(
         msg: to_binary(&astroport::pair::ExecuteMsg::ProvideLiquidity {
             assets: [ust, astro],
             slippage_tolerance,
-            auto_stack: None,
+            auto_stake: None,
+            receiver: None,
         })?,
     }))
 }
@@ -578,12 +579,13 @@ pub fn handle_stake_lp_tokens(
             lp_shares_minted,
         )?));
         response.messages.push(SubMsg::new(WasmMsg::Execute {
-            contract_addr: generator.to_string(),
-            msg: to_binary(&astroport::generator::ExecuteMsg::Deposit {
-                lp_token: astro_ust_lp_token_address,
+            contract_addr: astro_ust_lp_token_address.to_string(),
+            funds: vec![],
+            msg: to_binary(&Cw20ExecuteMsg::Send {
+                contract: generator.to_string(),
+                msg: to_binary(&astroport::generator::Cw20HookMsg::Deposit {})?,
                 amount: lp_shares_minted,
             })?,
-            funds: vec![],
         }));
 
         state.is_lp_staked = true;

@@ -614,10 +614,11 @@ pub fn handle_stake_lp_tokens(
     }));
 
     cosmos_msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
-        contract_addr: generator.to_string(),
+        contract_addr: astroport_lp_token.to_string(),
         funds: vec![],
-        msg: to_binary(&astroport::generator::ExecuteMsg::Deposit {
-            lp_token: astroport_lp_token.clone(),
+        msg: to_binary(&Cw20ExecuteMsg::Send {
+            contract: generator.to_string(),
+            msg: to_binary(&astroport::generator::Cw20HookMsg::Deposit {})?,
             amount,
         })?,
     }));
@@ -1370,7 +1371,8 @@ pub fn callback_deposit_liquidity_in_astroport(
         msg: to_binary(&astroport::pair::ExecuteMsg::ProvideLiquidity {
             assets: assets.clone().try_into().unwrap(),
             slippage_tolerance: None,
-            auto_stack: None,
+            auto_stake: None,
+            receiver: None,
         })?,
     }));
 
