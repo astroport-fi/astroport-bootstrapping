@@ -22,7 +22,7 @@ use crate::state::{
 };
 use cw20::{BalanceResponse, Cw20ExecuteMsg, Cw20QueryMsg, Cw20ReceiveMsg};
 
-const SECONDS_PER_WEEK: u64 = 3600;
+const SECONDS_PER_WEEK: u64 = 86400 * 7; // 3600;
 
 //----------------------------------------------------------------------------------------
 // Entry Points

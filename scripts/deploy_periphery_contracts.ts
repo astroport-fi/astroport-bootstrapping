@@ -19,14 +19,14 @@ import { join } from "path";
 
 let MULTI_SIG_TO_USE = "";
 
-const LOCKDROP_INCENTIVES = 75_000_00_000000; // 7.5 Million = 7.5%
-const AIRDROP_INCENTIVES = 25_000_00_000000; // 2.5 Million = 2.5%
-const AUCTION_INCENTIVES = 10_000_00_000000; // 1.0 Million = 1%
+const LOCKDROP_INCENTIVES = 75_000_000_000000; // 7.5 Million = 7.5%
+const AIRDROP_INCENTIVES = 25_000_000_000000; // 2.5 Million = 2.5%
+const AUCTION_INCENTIVES = 10_000_000_000000; // 1.0 Million = 1%
 // LOCKDROP INCENTIVES
-const LUNA_UST_ASTRO_INCENTIVES = 21_750_000_000000;
 const LUNA_BLUNA_ASTRO_INCENTIVES = 17_250_000_000000;
+const LUNA_UST_ASTRO_INCENTIVES = 21_750_000_000000;
 const ANC_UST_ASTRO_INCENTIVES = 14_250_000_000000;
-const MIR_UST_ASTRO_INCENTIVES = 6_250_000_000000;
+const MIR_UST_ASTRO_INCENTIVES = 6_750_000_000000;
 const ORION_UST_ASTRO_INCENTIVES = 1_500_000_000000;
 const STT_UST_ASTRO_INCENTIVES = 3_750_000_000000;
 const VKR_UST_ASTRO_INCENTIVES = 2_250_000_000000;
@@ -69,8 +69,8 @@ async function main() {
   if (terra.config.chainID == "bombay-12") {
     const LOCKDROP_INIT_TIMESTAMP =
       parseInt((Date.now() / 1000).toFixed(0)) + 180;
-    const LOCKDROP_DEPOSIT_WINDOW = 3600 * 0.25;
-    const LOCKDROP_WITHDRAWAL_WINDOW = 3600 * 0.1;
+    const LOCKDROP_DEPOSIT_WINDOW = 3600 * 9;
+    const LOCKDROP_WITHDRAWAL_WINDOW = 3600 * 3;
 
     // LOCKDROP :: CONFIG
     CONFIGURATION.lockdrop_InitMsg.config.init_timestamp =
@@ -132,8 +132,6 @@ async function main() {
     CONFIGURATION.airdrop_InitMsg.config.merkle_roots = await getMerkleRoots();
     CONFIGURATION.airdrop_InitMsg.config.astro_token_address =
       network.astrotokenAddress;
-    CONFIGURATION.airdrop_InitMsg.config.total_airdrop_size =
-      String(AIRDROP_INCENTIVES);
     // deploy airdrop contract
     network.airdrop_Address = await deployContract(
       terra,
@@ -267,8 +265,8 @@ async function main() {
       writeArtifact(network, terra.config.chainID);
     }
 
-    // ASTRO::TRANSFER : Transfer ASTRO to Airdrop if bombay-12
-    // ASTRO::TRANSFER : Transfer ASTRO to Airdrop if bombay-12
+    // ASTRO::Send::Airdrop::IncreaseAstroIncentives:: Transfer ASTRO to Airdrop if bombay-12
+    // ASTRO::Send::Airdrop::IncreaseAstroIncentives:: Transfer ASTRO to Airdrop if bombay-12
     if (!network.airdrop_astro_token_transferred) {
       // transfer ASTRO Tx
       let tx = await executeContract(
@@ -276,9 +274,12 @@ async function main() {
         wallet,
         network.astrotokenAddress,
         {
-          transfer: {
-            recipient: network.airdrop_Address,
+          send: {
+            contract: network.airdrop_Address,
             amount: String(AIRDROP_INCENTIVES),
+            msg: Buffer.from(
+              JSON.stringify({ increase_astro_incentives: {} })
+            ).toString("base64"),
           },
         },
         [],

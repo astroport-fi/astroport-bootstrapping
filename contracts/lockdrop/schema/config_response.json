@@ -5,7 +5,9 @@
   "required": [
     "deposit_window",
     "init_timestamp",
+    "lockdrop_incentives",
     "max_lock_duration",
+    "max_positions_per_user",
     "min_lock_duration",
     "owner",
     "weekly_divider",
@@ -60,12 +62,9 @@
     },
     "lockdrop_incentives": {
       "description": "Total ASTRO lockdrop incentives to be distributed among the users",
-      "anyOf": [
+      "allOf": [
         {
           "$ref": "#/definitions/Uint128"
-        },
-        {
-          "type": "null"
         }
       ]
     },
@@ -73,6 +72,12 @@
       "description": "Max. no. of weeks allowed for lockup",
       "type": "integer",
       "format": "uint64",
+      "minimum": 0.0
+    },
+    "max_positions_per_user": {
+      "description": "Max lockup positions a user can have",
+      "type": "integer",
+      "format": "uint32",
       "minimum": 0.0
     },
     "min_lock_duration": {

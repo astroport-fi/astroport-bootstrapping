@@ -44,3 +44,5 @@ async function main() {
 }
 
 main().catch(console.log);
+
+// {"lock_up_info":{"user_address":"terra1yskm9s4r0h0egg3lxe5wmmppr9s6lfau4j8yhc","terraswap_lp_token":"terra18y7dnplnh8kncxmkuhnr3mdjc8wny0zrxreynv","duration":3}}

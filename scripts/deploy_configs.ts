@@ -14,6 +14,7 @@ export const mainnet: Config = {
       max_lock_duration: 52,
       weekly_multiplier: 3,
       weekly_divider: 51,
+      max_positions_per_user: 14,
     },
   },
 
@@ -24,7 +25,6 @@ export const mainnet: Config = {
       merkle_roots: [],
       from_timestamp: 1638133200,
       to_timestamp: 1638133200 + 7 * 24 * 60 * 60,
-      total_airdrop_size: "0",
     },
   },
 
@@ -67,6 +67,7 @@ export const bombay_testnet: Config = {
       max_lock_duration: 52,
       weekly_multiplier: 3,
       weekly_divider: 51,
+      max_positions_per_user: 44,
     },
   },
 
@@ -90,7 +91,6 @@ export const bombay_testnet: Config = {
       merkle_roots: [],
       from_timestamp: 0,
       to_timestamp: 0 + 0,
-      total_airdrop_size: "0",
     },
   },
 
@@ -128,6 +128,7 @@ interface LockdropInitMsg {
     max_lock_duration: number;
     weekly_multiplier: number;
     weekly_divider: number;
+    max_positions_per_user: number;
   };
 }
 
@@ -138,7 +139,6 @@ interface AirdropInitMsg {
     merkle_roots?: string[];
     from_timestamp?: number;
     to_timestamp: number;
-    total_airdrop_size: string;
   };
 }
 

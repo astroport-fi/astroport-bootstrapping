@@ -82,45 +82,47 @@ async function main() {
   //   );
   // }
 
-  // // ASTROPORT :: CREATE PAIR :: LUNA/BLUNA
-  // // ASTROPORT :: CREATE PAIR :: LUNA/BLUNA
-  // // ASTROPORT :: CREATE PAIR :: LUNA/BLUNA
-  // // ASTROPORT :: CREATE PAIR :: LUNA/BLUNA
-  // if (!network.bluna_luna_astroport_pool) {
-  //   console.log(
-  //     `${terra.config.chainID} :: Creating LUNA/BLUNA pool on Astroport`
-  //   );
-  //   // create pair tx
-  //   let tx = await executeContract(
-  //     terra,
-  //     wallet,
-  //     network.astroport_factory_address,
-  //     {
-  //       create_pair: {
-  //         pair_type: { stable: {} },
-  //         asset_infos: [
-  //           { token: { contract_addr: network.bluna_token_address } },
-  //           { native_token: { denom: "uluna" } },
-  //         ],
-  //         init_params: null,
-  //       },
-  //     },
-  //     [],
-  //     "Astroport :: Initializing LUNA/BLUNA Pool"
-  //   );
-  //   let tx_resp = extract_astroport_pool_info(tx);
-  //   network.bluna_luna_astroport_pool = tx_resp.pool_address;
-  //   network.bluna_luna_astroport_lp_token_address = tx_resp.lp_token_address;
-  //   writeArtifact(network, terra.config.chainID);
-  //   console.log(
-  //     `LUNA/BLUNA pool on Astroport successfully initialized ${tx.txhash}:: ${terra.config.chainID}\n`
-  //   );
-  //   await delay(300);
-  // } else {
-  //   console.log(
-  //     `LUNA/BLUNA pool on already exists on Astroport :: ${terra.config.chainID}`
-  //   );
-  // }
+  // ASTROPORT :: CREATE PAIR :: LUNA/BLUNA
+  // ASTROPORT :: CREATE PAIR :: LUNA/BLUNA
+  // ASTROPORT :: CREATE PAIR :: LUNA/BLUNA
+  // ASTROPORT :: CREATE PAIR :: LUNA/BLUNA
+  if (!network.bluna_luna_astroport_pool) {
+    console.log(
+      `${terra.config.chainID} :: Creating LUNA/BLUNA pool on Astroport`
+    );
+    // create pair tx
+    let tx = await executeContract(
+      terra,
+      wallet,
+      network.astroport_factory_address,
+      {
+        create_pair: {
+          pair_type: { stable: {} },
+          asset_infos: [
+            { token: { contract_addr: network.bluna_token_address } },
+            { native_token: { denom: "uluna" } },
+          ],
+          init_params: Buffer.from(JSON.stringify({ amp: 100 })).toString(
+            "base64"
+          ),
+        },
+      },
+      [],
+      "Astroport :: Initializing LUNA/BLUNA Pool"
+    );
+    let tx_resp = extract_astroport_pool_info(tx);
+    network.bluna_luna_astroport_pool = tx_resp.pool_address;
+    network.bluna_luna_astroport_lp_token_address = tx_resp.lp_token_address;
+    writeArtifact(network, terra.config.chainID);
+    console.log(
+      `LUNA/BLUNA pool on Astroport successfully initialized ${tx.txhash}:: ${terra.config.chainID}\n`
+    );
+    await delay(300);
+  } else {
+    console.log(
+      `LUNA/BLUNA pool on already exists on Astroport :: ${terra.config.chainID}`
+    );
+  }
 
   // ASTROPORT :: CREATE PAIR :: ANC/UST
   // ASTROPORT :: CREATE PAIR :: ANC/UST

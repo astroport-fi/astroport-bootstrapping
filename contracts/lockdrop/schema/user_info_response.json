@@ -8,6 +8,7 @@
     "claimable_generator_proxy_debt",
     "delegated_astro_rewards",
     "lockup_infos",
+    "lockup_positions_index",
     "total_astro_rewards"
   ],
   "properties": {
@@ -46,6 +47,12 @@
         "$ref": "#/definitions/LockUpInfoResponse"
       }
     },
+    "lockup_positions_index": {
+      "description": "Number of lockup positions the user is having",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0.0
+    },
     "total_astro_rewards": {
       "description": "Total ASTRO tokens user received as rewards for participation in the lockdrop",
       "allOf": [
@@ -63,6 +70,7 @@
     "LockUpInfoResponse": {
       "type": "object",
       "required": [
+        "astro_rewards",
         "claimable_generator_astro_debt",
         "claimable_generator_proxy_debt",
         "duration",
@@ -76,12 +84,9 @@
       "properties": {
         "astro_rewards": {
           "description": "ASTRO tokens received as rewards for participation in the lockdrop",
-          "anyOf": [
+          "allOf": [
             {
               "$ref": "#/definitions/Uint128"
-            },
-            {
-              "type": "null"
             }
           ]
         },

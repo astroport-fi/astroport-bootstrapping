@@ -57,79 +57,79 @@ async function main() {
     // Migrating Liquidity to Astroport :: LUNA/UST
     // Migrating Liquidity to Astroport :: LUNA/UST
     // Migrating Liquidity to Astroport :: LUNA/UST
-    // if (!network.luna_ust_liquidity_migrated) {
-    //   // if Astroport pool address not provided
-    //   if (
-    //     !network.luna_ust_astroport_pool ||
-    //     network.luna_ust_astroport_pool == ""
-    //   ) {
-    //     console.log(
-    //       `${terra.config.chainID} :: Set LUNA/UST Astroport pool address to migrate liquidity`
-    //     );
-    //   } else {
-    //     console.log(
-    //       `${terra.config.chainID} :: Lockdrop :: Migrating Liquidity to Astroport :: LUNA/UST`
-    //     );
-    //     let tx = await executeContract(
-    //       terra,
-    //       wallet,
-    //       network.lockdropAddress,
-    //       {
-    //         migrate_liquidity: {
-    //           terraswap_lp_token: network.luna_ust_terraswap_lp_token_address,
-    //           astroport_pool_addr: network.luna_ust_astroport_pool,
-    //         },
-    //       },
-    //       [],
-    //       "Lockdrop :: Liquidity Migration to Astroport :: LUNA/UST"
-    //     );
+    if (!network.luna_ust_liquidity_migrated) {
+      // if Astroport pool address not provided
+      if (
+        !network.luna_ust_astroport_pool ||
+        network.luna_ust_astroport_pool == ""
+      ) {
+        console.log(
+          `${terra.config.chainID} :: Set LUNA/UST Astroport pool address to migrate liquidity`
+        );
+      } else {
+        console.log(
+          `${terra.config.chainID} :: Lockdrop :: Migrating Liquidity to Astroport :: LUNA/UST`
+        );
+        let tx = await executeContract(
+          terra,
+          wallet,
+          network.lockdropAddress,
+          {
+            migrate_liquidity: {
+              terraswap_lp_token: network.luna_ust_terraswap_lp_token_address,
+              astroport_pool_addr: network.luna_ust_astroport_pool,
+            },
+          },
+          [],
+          "Lockdrop :: Liquidity Migration to Astroport :: LUNA/UST"
+        );
 
-    //     console.log(
-    //       `Lockdrop :: Liquidity successfully migrated :: LUNA/UST :: ${tx.txhash}\n`
-    //     );
-    //     network.luna_ust_liquidity_migrated = true;
-    //     writeArtifact(network, terra.config.chainID);
-    //   }
-    // }
+        console.log(
+          `Lockdrop :: Liquidity successfully migrated :: LUNA/UST :: ${tx.txhash}\n`
+        );
+        network.luna_ust_liquidity_migrated = true;
+        writeArtifact(network, terra.config.chainID);
+      }
+    }
 
     // Migrating Liquidity to Astroport :: BLUNA/LUNA
     // Migrating Liquidity to Astroport :: BLUNA/LUNA
     // Migrating Liquidity to Astroport :: BLUNA/LUNA
     // Migrating Liquidity to Astroport :: BLUNA/LUNA
-    // if (!network.bluna_luna_liquidity_migrated) {
-    //   // if Astroport pool address not provided
-    //   if (
-    //     !network.bluna_luna_astroport_pool ||
-    //     network.bluna_luna_astroport_pool == ""
-    //   ) {
-    //     console.log(
-    //       `${terra.config.chainID} :: Set BLUNA/LUNA Astroport pool address to migrate liquidity`
-    //     );
-    //   } else {
-    //     console.log(
-    //       `${terra.config.chainID} :: Lockdrop :: Migrating Liquidity to Astroport :: BLUNA/LUNA`
-    //     );
-    //     let tx = await executeContract(
-    //       terra,
-    //       wallet,
-    //       network.lockdropAddress,
-    //       {
-    //         migrate_liquidity: {
-    //           terraswap_lp_token: network.bluna_luna_terraswap_lp_token_address,
-    //           astroport_pool_addr: network.bluna_luna_astroport_pool,
-    //         },
-    //       },
-    //       [],
-    //       "Lockdrop :: Liquidity Migration to Astroport :: BLUNA/LUNA"
-    //     );
+    if (!network.bluna_luna_liquidity_migrated) {
+      // if Astroport pool address not provided
+      if (
+        !network.bluna_luna_astroport_pool ||
+        network.bluna_luna_astroport_pool == ""
+      ) {
+        console.log(
+          `${terra.config.chainID} :: Set BLUNA/LUNA Astroport pool address to migrate liquidity`
+        );
+      } else {
+        console.log(
+          `${terra.config.chainID} :: Lockdrop :: Migrating Liquidity to Astroport :: BLUNA/LUNA`
+        );
+        let tx = await executeContract(
+          terra,
+          wallet,
+          network.lockdropAddress,
+          {
+            migrate_liquidity: {
+              terraswap_lp_token: network.bluna_luna_terraswap_lp_token_address,
+              astroport_pool_addr: network.bluna_luna_astroport_pool,
+            },
+          },
+          [],
+          "Lockdrop :: Liquidity Migration to Astroport :: BLUNA/LUNA"
+        );
 
-    //     console.log(
-    //       `Lockdrop :: Liquidity successfully migrated :: BLUNA/LUNA :: ${tx.txhash}\n`
-    //     );
-    //     network.bluna_luna_liquidity_migrated = true;
-    //     writeArtifact(network, terra.config.chainID);
-    //   }
-    // }
+        console.log(
+          `Lockdrop :: Liquidity successfully migrated :: BLUNA/LUNA :: ${tx.txhash}\n`
+        );
+        network.bluna_luna_liquidity_migrated = true;
+        writeArtifact(network, terra.config.chainID);
+      }
+    }
 
     // Migrating Liquidity to Astroport :: ANC/UST
     // Migrating Liquidity to Astroport :: ANC/UST

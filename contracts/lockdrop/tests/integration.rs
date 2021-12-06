@@ -422,6 +422,7 @@ fn instantiate_lockdrop_contract(app: &mut App, owner: Addr) -> (Addr, Instantia
         max_lock_duration: 52u64,
         weekly_multiplier: 1u64,
         weekly_divider: 12u64,
+        max_positions_per_user: 14,
     };
 
     app.update_block(|b| {
@@ -506,7 +507,6 @@ fn instantiate_all_contracts(
         merkle_roots: Some(vec!["merkle_roots".to_string()]),
         from_timestamp: Some(1_000_00),
         to_timestamp: 10000_000_00,
-        total_airdrop_size: Uint128::new(100_000_000_000),
     };
 
     let airdrop_instance = app
@@ -948,7 +948,7 @@ fn proper_initialization_lockdrop() {
         resp.weekly_multiplier
     );
     assert_eq!(lockdrop_instantiate_msg.weekly_divider, resp.weekly_divider);
-    assert_eq!(None, resp.lockdrop_incentives);
+    assert_eq!(Uint128::zero(), resp.lockdrop_incentives);
 
     // Check state
     let resp: StateResponse = app
@@ -1079,10 +1079,7 @@ fn test_update_config() {
         update_msg.clone().generator_address.unwrap(),
         resp.generator.unwrap()
     );
-    assert_eq!(
-        Uint128::from(1000000000u64),
-        resp.lockdrop_incentives.unwrap()
-    );
+    assert_eq!(Uint128::from(1000000000u64), resp.lockdrop_incentives);
 
     app.update_block(|b| {
         b.height += 17280;
@@ -1668,7 +1665,7 @@ fn test_increase_lockup() {
     );
     assert_eq!(false, user_resp.lockup_infos[0].withdrawal_flag);
     assert_eq!(
-        Some(user_resp.total_astro_rewards),
+        user_resp.total_astro_rewards,
         user_resp.lockup_infos[0].astro_rewards
     );
     assert_eq!(5u64, user_resp.lockup_infos[0].duration);
@@ -1729,7 +1726,7 @@ fn test_increase_lockup() {
         user_resp.lockup_infos[0].lp_units_locked
     );
     assert_eq!(
-        Some(user_resp.total_astro_rewards),
+        user_resp.total_astro_rewards,
         user_resp.lockup_infos[0].astro_rewards
     );
     assert_eq!(16648000u64, user_resp.lockup_infos[0].unlock_timestamp);
@@ -2689,7 +2686,7 @@ fn test_claim_rewards() {
     let lockup_response = astroport_periphery::lockdrop::LockUpInfoResponse {
         lp_units_locked: Uint128::from(1000000000u64),
         withdrawal_flag: false,
-        astro_rewards: Some(Uint128::from(500000000u64)),
+        astro_rewards: Uint128::from(500000000u64),
         duration: 10u64,
         generator_astro_debt: Uint128::from(0u64),
         claimable_generator_astro_debt: Uint128::from(0u64),
@@ -2836,7 +2833,7 @@ fn test_claim_rewards() {
     let lockup_response = astroport_periphery::lockdrop::LockUpInfoResponse {
         lp_units_locked: Uint128::from(1000000000u64),
         withdrawal_flag: false,
-        astro_rewards: Some(Uint128::from(500000000u64)),
+        astro_rewards: Uint128::from(500000000u64),
         duration: 10u64,
         generator_astro_debt: Uint128::from(0u64),
         claimable_generator_astro_debt: Uint128::from(172800000000u64),
@@ -2891,7 +2888,7 @@ fn test_claim_rewards() {
     let lockup_response = astroport_periphery::lockdrop::LockUpInfoResponse {
         lp_units_locked: Uint128::from(1000000000u64),
         withdrawal_flag: false,
-        astro_rewards: Some(Uint128::from(500000000u64)),
+        astro_rewards: Uint128::from(500000000u64),
         duration: 10u64,
         generator_astro_debt: Uint128::from(172800000000u64),
         claimable_generator_astro_debt: Uint128::from(0u64),
@@ -2952,7 +2949,7 @@ fn test_claim_rewards() {
     let lockup_response = astroport_periphery::lockdrop::LockUpInfoResponse {
         lp_units_locked: Uint128::from(1000000000u64),
         withdrawal_flag: false,
-        astro_rewards: Some(Uint128::from(500000000u64)),
+        astro_rewards: Uint128::from(500000000u64),
         duration: 10u64,
         generator_astro_debt: Uint128::from(0u64),
         claimable_generator_astro_debt: Uint128::from(172800000000u64),
@@ -2994,7 +2991,7 @@ fn test_claim_rewards() {
     let lockup_response = astroport_periphery::lockdrop::LockUpInfoResponse {
         lp_units_locked: Uint128::from(1000000000u64),
         withdrawal_flag: false,
-        astro_rewards: Some(Uint128::from(500000000u64)),
+        astro_rewards: Uint128::from(500000000u64),
         duration: 10u64,
         generator_astro_debt: Uint128::from(172800000000u64),
         claimable_generator_astro_debt: Uint128::from(0u64),
@@ -3115,7 +3112,7 @@ fn test_claim_rewards_and_unlock() {
     let lockup_response = astroport_periphery::lockdrop::LockUpInfoResponse {
         lp_units_locked: Uint128::from(1000000000u64),
         withdrawal_flag: false,
-        astro_rewards: Some(Uint128::from(500000000u64)),
+        astro_rewards: Uint128::from(500000000u64),
         duration: 10u64,
         generator_astro_debt: Uint128::from(0u64),
         claimable_generator_astro_debt: Uint128::from(0u64),
@@ -3230,7 +3227,7 @@ fn test_claim_rewards_and_unlock() {
     let lockup_response = astroport_periphery::lockdrop::LockUpInfoResponse {
         lp_units_locked: Uint128::from(1000000000u64),
         withdrawal_flag: false,
-        astro_rewards: Some(Uint128::from(500000000u64)),
+        astro_rewards: Uint128::from(500000000u64),
         duration: 10u64,
         generator_astro_debt: Uint128::from(0u64),
         claimable_generator_astro_debt: Uint128::from(259200000000u64),
@@ -3353,7 +3350,7 @@ fn test_claim_rewards_and_unlock() {
     let lockup_response = astroport_periphery::lockdrop::LockUpInfoResponse {
         lp_units_locked: Uint128::from(1000000000u64),
         withdrawal_flag: false,
-        astro_rewards: Some(Uint128::from(500000000u64)),
+        astro_rewards: Uint128::from(500000000u64),
         duration: 10u64,
         generator_astro_debt: Uint128::from(0u64),
         claimable_generator_astro_debt: Uint128::from(259200000000u64),
@@ -3523,7 +3520,7 @@ fn test_delegate_astro_to_auction() {
     let lockup_response = astroport_periphery::lockdrop::LockUpInfoResponse {
         lp_units_locked: Uint128::from(1000000000u64),
         withdrawal_flag: false,
-        astro_rewards: Some(Uint128::from(500000000u64)),
+        astro_rewards: Uint128::from(500000000u64),
         duration: 10u64,
         generator_astro_debt: Uint128::from(0u64),
         claimable_generator_astro_debt: Uint128::from(0u64),
