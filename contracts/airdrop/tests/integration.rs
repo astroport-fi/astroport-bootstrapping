@@ -40,7 +40,6 @@ fn init_contracts(app: &mut App) -> (Addr, Addr, InstantiateMsg, u64) {
             minter: owner.to_string(),
             cap: None,
         }),
-        init_hook: None,
     };
 
     let astro_token_instance = app
@@ -1099,11 +1098,14 @@ fn test_delegate_astro_to_bootstrap_auction() {
         airdrop_instance.to_string(),
     );
 
-    let pair_contract = Box::new(ContractWrapper::new(
-        astroport_pair::contract::execute,
-        astroport_pair::contract::instantiate,
-        astroport_pair::contract::query,
-    ));
+    let pair_contract = Box::new(
+        ContractWrapper::new(
+            astroport_pair::contract::execute,
+            astroport_pair::contract::instantiate,
+            astroport_pair::contract::query,
+        )
+        .with_reply(astroport_pair::contract::reply),
+    );
 
     let pair_code_id = app.store_code(pair_contract);
 
@@ -1117,8 +1119,7 @@ fn test_delegate_astro_to_bootstrap_auction() {
             },
         ],
         factory_addr: Addr::unchecked("factory_addr"),
-        init_hook: None,
-        pair_type: astroport::factory::PairType::Xyk {},
+        init_params: None,
         token_code_id,
     };
     let pair_instance = app

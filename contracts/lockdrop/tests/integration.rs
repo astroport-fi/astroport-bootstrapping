@@ -43,7 +43,6 @@ fn instantiate_astro_token(app: &mut App, owner: Addr) -> Addr {
             minter: owner.to_string(),
             cap: None,
         }),
-        init_hook: None,
     };
 
     let astro_token_instance = app
@@ -108,31 +107,39 @@ fn instantiate_terraswap(app: &mut App, owner: Addr) -> Addr {
 fn instantiate_astroport(app: &mut App, owner: Addr) -> Addr {
     let mut pair_configs = vec![];
     // Astroport Pair
-    let astroport_pair_contract = Box::new(ContractWrapper::new(
-        astroport_pair::contract::execute,
-        astroport_pair::contract::instantiate,
-        astroport_pair::contract::query,
-    ));
+    let astroport_pair_contract = Box::new(
+        ContractWrapper::new(
+            astroport_pair::contract::execute,
+            astroport_pair::contract::instantiate,
+            astroport_pair::contract::query,
+        )
+        .with_reply(astroport_pair::contract::reply),
+    );
     let astroport_pair_code_id = app.store_code(astroport_pair_contract);
     pair_configs.push(astroport::factory::PairConfig {
         code_id: astroport_pair_code_id,
         pair_type: astroport::factory::PairType::Xyk {},
         total_fee_bps: 5u16,
         maker_fee_bps: 3u16,
+        is_disabled: None,
     });
 
     // Astroport Pair :: Stable
-    let astroport_pair_stable_contract = Box::new(ContractWrapper::new(
-        astroport_pair_stable::contract::execute,
-        astroport_pair_stable::contract::instantiate,
-        astroport_pair_stable::contract::query,
-    ));
+    let astroport_pair_stable_contract = Box::new(
+        ContractWrapper::new(
+            astroport_pair_stable::contract::execute,
+            astroport_pair_stable::contract::instantiate,
+            astroport_pair_stable::contract::query,
+        )
+        .with_reply(astroport_pair_stable::contract::reply),
+    );
     let astroport_pair_stable_code_id = app.store_code(astroport_pair_stable_contract);
     pair_configs.push(astroport::factory::PairConfig {
         code_id: astroport_pair_stable_code_id,
         pair_type: astroport::factory::PairType::Stable {},
         total_fee_bps: 5u16,
         maker_fee_bps: 3u16,
+        is_disabled: None,
     });
 
     // Astroport LP Token
@@ -144,11 +151,14 @@ fn instantiate_astroport(app: &mut App, owner: Addr) -> Addr {
     let astroport_token_code_id = app.store_code(astroport_token_contract);
 
     // Astroport Factory Contract
-    let astroport_factory_contract = Box::new(ContractWrapper::new(
-        astroport_factory::contract::execute,
-        astroport_factory::contract::instantiate,
-        astroport_factory::contract::query,
-    ));
+    let astroport_factory_contract = Box::new(
+        ContractWrapper::new(
+            astroport_factory::contract::execute,
+            astroport_factory::contract::instantiate,
+            astroport_factory::contract::query,
+        )
+        .with_reply(astroport_factory::contract::reply),
+    );
 
     let astroport_factory_code_id = app.store_code(astroport_factory_contract);
 
@@ -156,10 +166,8 @@ fn instantiate_astroport(app: &mut App, owner: Addr) -> Addr {
         /// Pair contract code IDs which are allowed to create pairs
         pair_configs: pair_configs,
         token_code_id: astroport_token_code_id,
-        init_hook: None,
-        fee_address: Some(Addr::unchecked("fee_address".to_string())),
-        generator_address: Addr::unchecked("generator_address".to_string()),
-        gov: Some(Addr::unchecked("gov".to_string())),
+        fee_address: Some("fee_address".to_string()),
+        generator_address: "generator_address".to_string(),
         owner: owner.clone().to_string(),
     };
 
@@ -243,6 +251,7 @@ fn instantiate_generator_and_vesting(
         astro_token: astro_token_instance.to_string(),
         tokens_per_block: Uint128::from(0u128),
         vesting_contract: vesting_instance.clone().to_string(),
+        owner: owner.to_string(),
     };
 
     let generator_instance = app
@@ -258,8 +267,10 @@ fn instantiate_generator_and_vesting(
 
     let tokens_per_block = Uint128::new(10_000000);
 
-    let msg = astroport::generator::ExecuteMsg::SetTokensPerBlock {
-        amount: tokens_per_block,
+    let msg = astroport::generator::ExecuteMsg::UpdateConfig {
+        owner: None,
+        tokens_per_block: Some(tokens_per_block),
+        vesting_contract: None,
     };
     app.execute_contract(owner.clone(), generator_instance.clone(), &msg, &[])
         .unwrap();
@@ -277,29 +288,25 @@ fn instantiate_generator_and_vesting(
 
     let amount = Uint128::new(630720000000);
 
-    let msg = Cw20ExecuteMsg::IncreaseAllowance {
-        spender: vesting_instance.clone().to_string(),
+    let msg = Cw20ExecuteMsg::Send {
+        contract: vesting_instance.to_string(),
         amount,
-        expires: None,
+        msg: to_binary(&astroport::vesting::Cw20HookMsg::RegisterVestingAccounts {
+            vesting_accounts: vec![astroport::vesting::VestingAccount {
+                address: generator_instance.to_string(),
+                schedules: vec![astroport::vesting::VestingSchedule {
+                    start_point: astroport::vesting::VestingSchedulePoint {
+                        time: current_block.time,
+                        amount,
+                    },
+                    end_point: None,
+                }],
+            }],
+        })
+        .unwrap(),
     };
 
     app.execute_contract(owner.clone(), astro_token_instance.clone(), &msg, &[])
-        .unwrap();
-
-    let msg = astroport::vesting::ExecuteMsg::RegisterVestingAccounts {
-        vesting_accounts: vec![astroport::vesting::VestingAccount {
-            address: generator_instance.to_string(),
-            schedules: vec![astroport::vesting::VestingSchedule {
-                start_point: astroport::vesting::VestingSchedulePoint {
-                    time: current_block.time,
-                    amount,
-                },
-                end_point: None,
-            }],
-        }],
-    };
-
-    app.execute_contract(owner.clone(), vesting_instance.clone(), &msg, &[])
         .unwrap();
 
     // let msg = astroport::generator::ExecuteMsg::Add {
@@ -464,7 +471,7 @@ fn instantiate_all_contracts(
         astroport_factory_instance.clone(),
         &astroport::factory::ExecuteMsg::CreatePair {
             asset_infos: pair_info.clone(),
-            init_hook: None,
+            init_params: None,
             pair_type: astroport::factory::PairType::Xyk {},
         },
         &[],
@@ -855,7 +862,7 @@ fn initialize_and_migrate_liquidity_for_pool(
                     denom: "uusd".to_string(),
                 },
             ],
-            init_hook: None,
+            init_params: None,
             pair_type: astroport::factory::PairType::Xyk {},
         },
         &[],
@@ -979,7 +986,7 @@ fn test_update_config() {
         astroport_factory_instance.clone(),
         &astroport::factory::ExecuteMsg::CreatePair {
             asset_infos: pair_info.clone(),
-            init_hook: None,
+            init_params: None,
             pair_type: astroport::factory::PairType::Xyk {},
         },
         &[],
@@ -2144,7 +2151,6 @@ fn test_migrate_liquidity() {
                     minter: owner.to_string(),
                     cap: None,
                 }),
-                init_hook: None,
             },
             &[],
             String::from("ANC"),
@@ -2341,7 +2347,7 @@ fn test_migrate_liquidity() {
                     denom: "uusd".to_string(),
                 },
             ],
-            init_hook: None,
+            init_params: None,
             pair_type: astroport::factory::PairType::Xyk {},
         },
         &[],
@@ -2498,7 +2504,6 @@ fn test_stake_lp_tokens() {
                     minter: owner.to_string(),
                     cap: None,
                 }),
-                init_hook: None,
             },
             &[],
             String::from("ANC"),
@@ -2523,7 +2528,6 @@ fn test_stake_lp_tokens() {
             alloc_point: Uint64::from(10u64),
             reward_proxy: None,
             lp_token: astro_lp_address.clone(),
-            with_update: true,
         },
         &[],
     )
@@ -2626,7 +2630,6 @@ fn test_claim_rewards() {
                     minter: owner.to_string(),
                     cap: None,
                 }),
-                init_hook: None,
             },
             &[],
             String::from("ANC"),
@@ -2651,7 +2654,6 @@ fn test_claim_rewards() {
             alloc_point: Uint64::from(10u64),
             reward_proxy: None,
             lp_token: astro_lp_address.clone(),
-            with_update: true,
         },
         &[],
     )
@@ -3054,7 +3056,6 @@ fn test_claim_rewards_and_unlock() {
                     minter: owner.to_string(),
                     cap: None,
                 }),
-                init_hook: None,
             },
             &[],
             String::from("ANC"),
@@ -3079,7 +3080,6 @@ fn test_claim_rewards_and_unlock() {
             alloc_point: Uint64::from(10u64),
             reward_proxy: None,
             lp_token: astro_lp_address.clone(),
-            with_update: true,
         },
         &[],
     )
@@ -3464,7 +3464,6 @@ fn test_delegate_astro_to_auction() {
                     minter: owner.to_string(),
                     cap: None,
                 }),
-                init_hook: None,
             },
             &[],
             String::from("ANC"),
@@ -3489,7 +3488,6 @@ fn test_delegate_astro_to_auction() {
             alloc_point: Uint64::from(10u64),
             reward_proxy: None,
             lp_token: astro_lp_address.clone(),
-            with_update: true,
         },
         &[],
     )
