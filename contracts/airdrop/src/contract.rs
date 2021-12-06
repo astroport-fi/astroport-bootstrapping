@@ -1,16 +1,17 @@
 use astroport_periphery::airdrop::{
-    ClaimResponse, ConfigResponse, ExecuteMsg, InstantiateMsg, QueryMsg, StateResponse,
-    UserInfoResponse,
+    ClaimResponse, ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, QueryMsg,
+    StateResponse, UserInfoResponse,
 };
 use astroport_periphery::auction::Cw20HookMsg::DelegateAstroTokens;
 use astroport_periphery::helpers::{build_send_cw20_token_msg, build_transfer_cw20_token_msg};
 use cosmwasm_std::{
-    attr, entry_point, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdError,
-    StdResult, Uint128,
+    attr, entry_point, from_binary, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response,
+    StdError, StdResult, Uint128,
 };
 
 use crate::crypto::verify_claim;
 use crate::state::{Config, State, CONFIG, STATE, USERS};
+use cw20::Cw20ReceiveMsg;
 
 //----------------------------------------------------------------------------------------
 // Entry points
@@ -39,10 +40,6 @@ pub fn instantiate(
         info.sender
     };
 
-    if msg.total_airdrop_size.is_zero() {
-        return Err(StdError::generic_err("Invalid total airdrop amount"));
-    }
-
     let config = Config {
         owner,
         astro_token_address: deps.api.addr_validate(&msg.astro_token_address)?,
@@ -54,9 +51,9 @@ pub fn instantiate(
     };
 
     let state = State {
-        total_airdrop_size: msg.total_airdrop_size,
+        total_airdrop_size: Uint128::zero(),
         total_delegated_amount: Uint128::zero(),
-        unclaimed_tokens: msg.total_airdrop_size,
+        unclaimed_tokens: Uint128::zero(),
     };
 
     CONFIG.save(deps.storage, &config)?;
@@ -73,6 +70,7 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, StdError> {
     match msg {
+        ExecuteMsg::Receive(msg) => receive_cw20(deps, env, info, msg),
         ExecuteMsg::UpdateConfig {
             owner,
             auction_contract_address,
@@ -101,6 +99,30 @@ pub fn execute(
         ExecuteMsg::WithdrawAirdropReward {} => handle_withdraw_airdrop_rewards(deps, env, info),
         ExecuteMsg::TransferUnclaimedTokens { recipient, amount } => {
             handle_transfer_unclaimed_tokens(deps, env, info, recipient, amount)
+        }
+    }
+}
+
+pub fn receive_cw20(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    cw20_msg: Cw20ReceiveMsg,
+) -> Result<Response, StdError> {
+    let config = CONFIG.load(deps.storage)?;
+
+    if info.sender != config.astro_token_address {
+        return Err(StdError::generic_err("Only astro tokens are received!"));
+    }
+
+    // CHECK ::: Amount needs to be valid
+    if cw20_msg.amount.is_zero() {
+        return Err(StdError::generic_err("Amount must be greater than 0"));
+    }
+
+    match from_binary(&cw20_msg.msg)? {
+        Cw20HookMsg::IncreaseAstroIncentives {} => {
+            handle_increase_astro_incentives(deps, cw20_msg.amount)
         }
     }
 }
@@ -189,6 +211,21 @@ pub fn handle_update_config(
     Ok(Response::new().add_attributes(attributes))
 }
 
+/// @dev Facilitates increasing ASTRO airdrop amount
+pub fn handle_increase_astro_incentives(
+    deps: DepsMut,
+    amount: Uint128,
+) -> Result<Response, StdError> {
+    let mut state = STATE.load(deps.storage)?;
+    state.total_airdrop_size += amount;
+    state.unclaimed_tokens += amount;
+
+    STATE.save(deps.storage, &state)?;
+    Ok(Response::new()
+        .add_attribute("action", "astro_airdrop_increased")
+        .add_attribute("total_airdrop_size", state.total_airdrop_size))
+}
+
 /// @dev Function to enable ASTRO Claims by users. Called along-with Bootstrap Auction contract's LP Pool provide liquidity tx
 pub fn handle_enable_claims(deps: DepsMut, info: MessageInfo) -> StdResult<Response> {
     let mut config = CONFIG.load(deps.storage)?;
@@ -256,22 +293,27 @@ pub fn handle_claim(
         return Err(StdError::generic_err("Already claimed"));
     }
 
-    // Update amounts
-    state.unclaimed_tokens -= claim_amount;
-    user_info.claimed_amount = claim_amount;
-
     let mut messages = vec![];
+
+    // check is sufficient ASTRO available
+    if state.unclaimed_tokens < claim_amount {
+        return Err(StdError::generic_err("Insufficient ASTRO available"));
+    }
 
     // TRANSFER ASTRO IF CLAIMS ARE ALLOWED (i.e LP bootstrap auction has concluded)
     if config.are_claims_enabled {
         messages.push(build_transfer_cw20_token_msg(
             recipient.clone(),
             config.astro_token_address.to_string(),
-            user_info.claimed_amount,
+            claim_amount,
         )?);
 
         user_info.tokens_withdrawn = true;
     }
+
+    // Update amounts
+    state.unclaimed_tokens -= claim_amount;
+    user_info.claimed_amount = claim_amount;
 
     USERS.save(deps.storage, &recipient, &user_info)?;
     STATE.save(deps.storage, &state)?;
@@ -300,11 +342,6 @@ pub fn handle_delegate_astro_to_bootstrap_auction(
 
     let mut state = STATE.load(deps.storage)?;
     let mut user_info = USERS.load(deps.storage, &info.sender)?;
-
-    // CHECK :: HAS USER ALREADY WITHDRAWN THEIR REWARDS ?
-    if user_info.tokens_withdrawn {
-        return Err(StdError::generic_err("Tokens have already been withdrawn"));
-    }
 
     state.total_delegated_amount += amount_to_delegate;
     user_info.delegated_amount += amount_to_delegate;

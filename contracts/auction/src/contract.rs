@@ -32,10 +32,18 @@ const UUSD_DENOM: &str = "uusd";
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
     msg: InstantiateMsg,
 ) -> StdResult<Response> {
+    // CHECK :: init_timestamp needs to be valid
+    if env.block.time.seconds() > msg.init_timestamp {
+        return Err(StdError::generic_err(format!(
+            "Invalid init_timestamp. Current timestamp : {}",
+            env.block.time.seconds()
+        )));
+    }
+
     let config = Config {
         owner: msg
             .owner
@@ -198,6 +206,11 @@ pub fn handle_update_config(
     }
 
     if let Some(generator_contract) = new_config.generator_contract {
+        // check if the LP tokens are already staked or not
+        if state.is_lp_staked {
+            return Err(StdError::generic_err("ASTRO-UST LP tokens already staked"));
+        }
+
         let generator_addr = deps.api.addr_validate(&generator_contract)?;
         config.generator_contract = Some(generator_addr.clone());
         attributes.push(attr("generator", generator_addr.to_string()));
@@ -289,7 +302,9 @@ pub fn handle_deposit_ust(
 
     // Retrieve UST sent by the user
     if info.funds.len() != 1 || info.funds[0].denom != UUSD_DENOM {
-        return Err(StdError::generic_err("You may delegate USD coin only"));
+        return Err(StdError::generic_err(
+            "You may delegate UST native coin only",
+        ));
     }
 
     let fund = &info.funds[0];
@@ -708,6 +723,11 @@ pub fn handle_claim_rewards_and_withdraw_lp_shares(
     Ok(Response::new().add_messages(cosmos_msgs))
 }
 
+/// @dev Calculates ASTRO - UST LP shares and auction incentives
+/// User LP shares (ASTRO delegation share) = (1/2) *  (ASTRO delegated / total ASTRO delegated)
+/// User LP shares (UST deposit share) = (1/2) *  (UST deposited / total UST deposited)
+/// User's total LP shares  = User's ASTRO delegation LP share + User's UST deposit LP share
+/// User's auction incentives (ASTRO) = (User's total LP shares / Total LP shares minted) * Total ASTRO auction incentives
 fn update_user_incentives_and_lp_share(
     config: &Config,
     state: &State,
@@ -989,7 +1009,7 @@ pub fn calculate_withdrawable_lp_shares(
 // Query functions
 //----------------------------------------------------------------------------------------
 
-/// @dev Returns the airdrop configuration
+/// @dev Returns the auction configuration
 fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
     let config = CONFIG.load(deps.storage)?;
     Ok(ConfigResponse {
@@ -1007,7 +1027,7 @@ fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
     })
 }
 
-/// @dev Returns the airdrop contract state
+/// @dev Returns the auction contract state
 fn query_state(deps: Deps) -> StdResult<StateResponse> {
     let state = STATE.load(deps.storage)?;
     Ok(StateResponse {
@@ -1020,7 +1040,7 @@ fn query_state(deps: Deps) -> StdResult<StateResponse> {
     })
 }
 
-/// @dev Returns details around user's ASTRO Airdrop claim
+/// @dev Returns User's Info
 fn query_user_info(deps: Deps, env: Env, user_address: String) -> StdResult<UserInfoResponse> {
     let config = CONFIG.load(deps.storage)?;
     let mut state = STATE.load(deps.storage)?;
@@ -1029,23 +1049,41 @@ fn query_user_info(deps: Deps, env: Env, user_address: String) -> StdResult<User
         .may_load(deps.storage, &user_address)?
         .unwrap_or_default();
 
+    // User Info Response
+    let mut user_info_response = UserInfoResponse {
+        astro_delegated: user_info.astro_delegated,
+        ust_delegated: user_info.ust_delegated,
+        ust_withdrawn: user_info.ust_withdrawn,
+        lp_shares: user_info.lp_shares,
+        claimed_lp_shares: user_info.claimed_lp_shares,
+        withdrawable_lp_shares: Some(Uint128::zero()),
+        auction_incentive_amount: user_info.auction_incentive_amount,
+        astro_incentive_transferred: user_info.astro_incentive_transferred,
+        generator_astro_debt: user_info.generator_astro_debt,
+        claimable_generator_astro: Uint128::zero(),
+    };
+
+    // If ASTRO - UST Pool info is present
     if let Some(PoolInfo {
         astro_ust_pool_address: _,
         astro_ust_lp_token_address,
     }) = &config.pool_info
     {
-        let mut claimable_generator_astro = Uint128::zero();
+        // If ASTRO - UST LP Tokens have been minted
         if let Some(lp_balance) = state.lp_shares_minted {
             if user_info.auction_incentive_amount.is_none() {
                 update_user_incentives_and_lp_share(&config, &state, lp_balance, &mut user_info)?;
+                user_info_response.auction_incentive_amount = user_info.auction_incentive_amount;
+                user_info_response.lp_shares = user_info.lp_shares;
             }
             let astroport_lp_amount = user_info.lp_shares.unwrap() - user_info.claimed_lp_shares;
+            // If LP tokens are staked and user has a > 0 LP share balance, we calculate user's claimable ASTRO staking rewards
             if state.is_lp_staked && !astroport_lp_amount.is_zero() {
                 let generator = config
                     .generator_contract
                     .clone()
                     .expect("Generator should be set at this moment!");
-
+                // Auction contract's staked LP balance
                 let lp_balance: Uint128 = deps.querier.query_wasm_smart(
                     &generator,
                     &GenQueryMsg::Deposit {
@@ -1066,30 +1104,22 @@ fn query_user_info(deps: Deps, env: Env, user_address: String) -> StdResult<User
                 state.generator_astro_per_share = state.generator_astro_per_share
                     + Decimal::from_ratio(pending_rewards.pending, lp_balance);
 
-                claimable_generator_astro = state.generator_astro_per_share * astroport_lp_amount
+                // Calculated claimable ASTRO staking rewards
+                user_info_response.claimable_generator_astro = state.generator_astro_per_share
+                    * astroport_lp_amount
                     - user_info.generator_astro_debt;
             }
         }
-        let withdrawable_lp_shares = calculate_withdrawable_lp_shares(
+        // Updated withdrawable LP shares balance
+        user_info_response.withdrawable_lp_shares = calculate_withdrawable_lp_shares(
             env.block.time.seconds(),
             &config,
             &state,
             &user_info,
         )?;
 
-        Ok(UserInfoResponse {
-            astro_delegated: user_info.astro_delegated,
-            ust_delegated: user_info.ust_delegated,
-            ust_withdrawn: user_info.ust_withdrawn,
-            lp_shares: user_info.lp_shares,
-            claimed_lp_shares: user_info.claimed_lp_shares,
-            withdrawable_lp_shares,
-            auction_incentive_amount: user_info.auction_incentive_amount,
-            astro_incentive_transferred: user_info.astro_incentive_transferred,
-            generator_astro_debt: user_info.generator_astro_debt,
-            claimable_generator_astro,
-        })
+        Ok(user_info_response)
     } else {
-        Err(StdError::generic_err("Pool info isn't set yet!"))
+        Ok(user_info_response)
     }
 }

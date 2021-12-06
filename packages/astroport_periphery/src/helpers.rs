@@ -1,7 +1,6 @@
-use cosmwasm_bignumber::Uint256;
 use cosmwasm_std::{
-    to_binary, Addr, Api, Binary, Coin, CosmosMsg, QuerierWrapper, QueryRequest, StdResult,
-    Uint128, WasmMsg, WasmQuery,
+    to_binary, Addr, Binary, CosmosMsg, QuerierWrapper, QueryRequest, StdResult, Uint128, WasmMsg,
+    WasmQuery,
 };
 use cw20::{BalanceResponse, Cw20ExecuteMsg, Cw20QueryMsg};
 
@@ -46,28 +45,6 @@ pub fn build_send_cw20_token_msg(
     }))
 }
 
-/// Used when unwrapping an optional address sent in a contract call by a user.
-/// Validates addreess if present, otherwise uses a given default value.
-pub fn option_string_to_addr(
-    api: &dyn Api,
-    option_string: Option<String>,
-    default: Addr,
-) -> StdResult<Addr> {
-    match option_string {
-        Some(input_addr) => api.addr_validate(&input_addr),
-        None => Ok(default),
-    }
-}
-
-// native coins
-pub fn get_denom_amount_from_coins(coins: &[Coin], denom: &str) -> Uint256 {
-    coins
-        .iter()
-        .find(|c| c.denom == denom)
-        .map(|c| Uint256::from(c.amount))
-        .unwrap_or_else(Uint256::zero)
-}
-
 // CW20
 pub fn cw20_get_balance(
     querier: &QuerierWrapper,
@@ -102,8 +79,4 @@ pub fn build_approve_cw20_msg(
         })?,
         funds: vec![],
     }))
-}
-
-pub fn zero_address() -> Addr {
-    Addr::unchecked("")
 }

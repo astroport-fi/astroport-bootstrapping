@@ -40,7 +40,9 @@ pub struct Config {
     /// Lockdrop Reward divider
     pub weekly_divider: u64,
     /// Total ASTRO lockdrop incentives to be distributed among the users
-    pub lockdrop_incentives: Option<Uint128>,
+    pub lockdrop_incentives: Uint128,
+    /// Max lockup positions a user can have
+    pub max_positions_per_user: u32,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -78,6 +80,8 @@ pub struct UserInfo {
     pub delegated_astro_rewards: Uint128,
     /// ASTRO tokens transferred to user
     pub astro_transferred: bool,
+    /// Number of lockup positions the user is having
+    pub lockup_positions_index: u32,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -88,7 +92,7 @@ pub struct LockupInfo {
     /// Boolean value indicating if the user's has withdrawn funds post the only 1 withdrawal limit cutoff
     pub withdrawal_flag: bool,
     /// ASTRO tokens received as rewards for participation in the lockdrop
-    pub astro_rewards: Option<Uint128>,
+    pub astro_rewards: Uint128,
     /// Generator ASTRO tokens loockup received as generator rewards
     pub generator_astro_debt: Uint128,
     /// Generator Proxy tokens lockup received as generator rewards

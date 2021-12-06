@@ -6,7 +6,7 @@
   "type": "module",
   "dependencies": {
     "@hoprnet/hopr-utils": "^1.76.0-next.30",
-    "@terra-money/terra.js": "^2.0.0-beta.16",
+    "@terra-money/terra.js": "^2.1.8",
     "@uniqys/types": "^0.3.6",
     "bcrypto": "^4.1.0",
     "bignumber.js": "^9.0.1",
