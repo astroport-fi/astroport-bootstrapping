@@ -69,13 +69,14 @@ pub fn build_approve_cw20_msg(
     token_contract_address: String,
     spender_address: String,
     allowance_amount: Uint128,
+    expiration_block: u64,
 ) -> StdResult<CosmosMsg> {
     Ok(CosmosMsg::Wasm(WasmMsg::Execute {
         contract_addr: token_contract_address,
         msg: to_binary(&Cw20ExecuteMsg::IncreaseAllowance {
             spender: spender_address,
             amount: allowance_amount,
-            expires: None,
+            expires: Some(cw20::Expiration::AtHeight(expiration_block)),
         })?,
         funds: vec![],
     }))

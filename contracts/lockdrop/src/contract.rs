@@ -652,7 +652,7 @@ pub fn handle_stake_lp_tokens(
         msg: to_binary(&Cw20ExecuteMsg::IncreaseAllowance {
             spender: generator.to_string(),
             amount,
-            expires: None,
+            expires: Some(cw20::Expiration::AtHeight(env.block.height + 1u64)),
         })?,
     }));
 
@@ -1411,7 +1411,7 @@ pub fn callback_deposit_liquidity_in_astroport(
                         funds: vec![],
                         msg: to_binary(&Cw20ExecuteMsg::IncreaseAllowance {
                             spender: astroport_pool.to_string(),
-                            expires: None,
+                            expires: Some(cw20::Expiration::AtHeight(env.block.height + 1u64)),
                             amount,
                         })?,
                     }

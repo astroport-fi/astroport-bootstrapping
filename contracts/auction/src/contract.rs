@@ -482,6 +482,7 @@ pub fn handle_init_pool(
             config.astro_token_address.to_string(),
             astro_ust_pool_address.to_string(),
             state.total_astro_delegated,
+            env.block.height + 1u64,
         )?);
 
         msgs.push(build_provide_liquidity_to_lp_pool_msg(
@@ -553,7 +554,7 @@ fn build_provide_liquidity_to_lp_pool_msg(
 /// @dev Admin function to stake Astroport LP tokens with the generator contract
 pub fn handle_stake_lp_tokens(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
 ) -> Result<Response, StdError> {
     let config = CONFIG.load(deps.storage)?;
@@ -592,6 +593,7 @@ pub fn handle_stake_lp_tokens(
             astro_ust_lp_token_address.to_string(),
             generator.to_string(),
             lp_shares_minted,
+            env.block.height + 1u64,
         )?));
         response.messages.push(SubMsg::new(WasmMsg::Execute {
             contract_addr: astro_ust_lp_token_address.to_string(),
