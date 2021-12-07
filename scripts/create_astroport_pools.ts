@@ -46,41 +46,41 @@ async function main() {
   // ASTROPORT :: CREATE PAIR :: LUNA/UST
   // ASTROPORT :: CREATE PAIR :: LUNA/UST
   // ASTROPORT :: CREATE PAIR :: LUNA/UST
-  // if (!network.luna_ust_astroport_pool) {
-  //   console.log(
-  //     `${terra.config.chainID} :: Creating LUNA/UST pool on Astroport`
-  //   );
-  // create pair tx
-  //   let tx = await executeContract(
-  //     terra,
-  //     wallet,
-  //     network.astroport_factory_address,
-  //     {
-  //       create_pair: {
-  //         pair_type: { xyk: {} },
-  //         asset_infos: [
-  //           { native_token: { denom: "uusd" } },
-  //           { native_token: { denom: "uluna" } },
-  //         ],
-  //         init_params: null,
-  //       },
-  //     },
-  //     [],
-  //     "Astroport :: Initializing LUNA/UST Pool"
-  //   );
-  //   let tx_resp = extract_astroport_pool_info(tx);
-  //   network.luna_ust_astroport_pool = tx_resp.pool_address;
-  //   network.luna_ust_astroport_lp_token_address = tx_resp.lp_token_address;
-  //   writeArtifact(network, terra.config.chainID);
-  //   console.log(
-  //     `LUNA/UST pool on Astroport successfully initialized :: ${terra.config.chainID}\n`
-  //   );
-  //   await delay(300);
-  // } else {
-  //   console.log(
-  //     `LUNA/UST pool on already exists on Astroport :: ${terra.config.chainID}`
-  //   );
-  // }
+  if (!network.luna_ust_astroport_pool) {
+    console.log(
+      `${terra.config.chainID} :: Creating LUNA/UST pool on Astroport`
+    );
+    // create pair tx
+    let tx = await executeContract(
+      terra,
+      wallet,
+      network.astroport_factory_address,
+      {
+        create_pair: {
+          pair_type: { xyk: {} },
+          asset_infos: [
+            { native_token: { denom: "uusd" } },
+            { native_token: { denom: "uluna" } },
+          ],
+          init_params: null,
+        },
+      },
+      [],
+      "Astroport :: Initializing LUNA/UST Pool"
+    );
+    let tx_resp = extract_astroport_pool_info(tx);
+    network.luna_ust_astroport_pool = tx_resp.pool_address;
+    network.luna_ust_astroport_lp_token_address = tx_resp.lp_token_address;
+    writeArtifact(network, terra.config.chainID);
+    console.log(
+      `LUNA/UST pool on Astroport successfully initialized :: ${terra.config.chainID}\n`
+    );
+    await delay(300);
+  } else {
+    console.log(
+      `LUNA/UST pool on already exists on Astroport :: ${terra.config.chainID}`
+    );
+  }
 
   // ASTROPORT :: CREATE PAIR :: LUNA/BLUNA
   // ASTROPORT :: CREATE PAIR :: LUNA/BLUNA
