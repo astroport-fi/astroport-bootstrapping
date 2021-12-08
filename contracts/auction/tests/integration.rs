@@ -276,7 +276,6 @@ fn instantiate_airdrop_lockdrop_contracts(
         merkle_roots: Some(vec!["merkle_roots".to_string()]),
         from_timestamp: Some(1_000_00),
         to_timestamp: 100_000_00,
-        total_airdrop_size: Uint128::new(100_000_000_000),
     };
 
     let lockdrop_msg = astroport_periphery::lockdrop::InstantiateMsg {
@@ -288,6 +287,7 @@ fn instantiate_airdrop_lockdrop_contracts(
         weekly_divider: 51,
         min_lock_duration: 1u64,
         max_lock_duration: 52u64,
+        max_positions_per_user: 24,
     };
 
     let airdrop_instance = app
@@ -300,6 +300,28 @@ fn instantiate_airdrop_lockdrop_contracts(
             None,
         )
         .unwrap();
+
+    // mint ASTRO for to Owner
+    mint_some_astro(
+        app,
+        Addr::unchecked(owner.clone()),
+        astro_token_instance.clone(),
+        Uint128::from(100_000_000_000u64),
+        owner.clone().to_string(),
+    );
+
+    // Set ASTRO airdrop incentives
+    app.execute_contract(
+        Addr::unchecked(owner.clone()),
+        astro_token_instance.clone(),
+        &Cw20ExecuteMsg::Send {
+            amount: Uint128::from(100_000_000_000u64),
+            contract: airdrop_instance.to_string(),
+            msg: to_binary(&Cw20HookMsg::IncreaseAstroIncentives {}).unwrap(),
+        },
+        &[],
+    )
+    .unwrap();
 
     // open claim period for successful deposit
     app.update_block(|b| {

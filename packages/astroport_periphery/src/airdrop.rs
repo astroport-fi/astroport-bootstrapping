@@ -1,4 +1,5 @@
 use cosmwasm_std::{Addr, Uint128};
+use cw20::Cw20ReceiveMsg;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -9,12 +10,12 @@ pub struct InstantiateMsg {
     pub merkle_roots: Option<Vec<String>>,
     pub from_timestamp: Option<u64>,
     pub to_timestamp: u64,
-    pub total_airdrop_size: Uint128,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
+    Receive(Cw20ReceiveMsg),
     /// Admin function to update the configuration parameters
     UpdateConfig {
         owner: Option<String>,
@@ -43,6 +44,12 @@ pub enum ExecuteMsg {
         recipient: String,
         amount: Uint128,
     },
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Cw20HookMsg {
+    IncreaseAstroIncentives {},
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -90,3 +97,6 @@ pub struct SignatureResponse {
     pub public_key: String,
     pub recovered_address: String,
 }
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct MigrateMsg {}

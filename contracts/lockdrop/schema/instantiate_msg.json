@@ -6,6 +6,7 @@
     "deposit_window",
     "init_timestamp",
     "max_lock_duration",
+    "max_positions_per_user",
     "min_lock_duration",
     "weekly_divider",
     "weekly_multiplier",
@@ -28,6 +29,12 @@
       "description": "Max. no. of weeks allowed for lockup",
       "type": "integer",
       "format": "uint64",
+      "minimum": 0.0
+    },
+    "max_positions_per_user": {
+      "description": "Max lockup positions a user can have",
+      "type": "integer",
+      "format": "uint32",
       "minimum": 0.0
     },
     "min_lock_duration": {

@@ -10,79 +10,82 @@ import {
   MsgInstantiateContract,
   MsgMigrateContract,
   MsgStoreCode,
-  StdFee,
-  Wallet
-} from '@terra-money/terra.js';
-import { readFileSync, writeFileSync } from 'fs';
-import path from 'path'
+  Wallet,
+  PublicKey,
+  Fee,
+} from "@terra-money/terra.js";
+import { readFileSync, writeFileSync } from "fs";
+import path from "path";
 
-export const ARTIFACTS_PATH = '../artifacts'
+export const ARTIFACTS_PATH = "../artifacts";
 
-export function readArtifact(name: string = 'artifact') {
+// Reads json containing contract addresses located in /artifacts folder. Naming convention : bombay-12 / columbus-5
+export function readArtifact(name: string = "artifact") {
   try {
-    const data = readFileSync(path.join(ARTIFACTS_PATH, `${name}.json`), 'utf8')
-    return JSON.parse(data)
+    const data = readFileSync(
+      path.join(ARTIFACTS_PATH, `${name}.json`),
+      "utf8"
+    );
+    return JSON.parse(data);
   } catch (e) {
-    return {}
+    return {};
   }
 }
 
 export interface Client {
-  wallet: Wallet
-  terra: LCDClient | LocalTerra
+  wallet: Wallet;
+  terra: LCDClient | LocalTerra;
 }
 
-
+// Creates `Client` instance with `terra` and `wallet` to be used for interacting with terra
 export function newClient(): Client {
-  const client = <Client>{}
+  const client = <Client>{};
+
   if (process.env.WALLET) {
     client.terra = new LCDClient({
       URL: String(process.env.LCD_CLIENT_URL),
-      chainID: String(process.env.CHAIN_ID)
-    })
-    client.wallet = recover(client.terra, process.env.WALLET)
+      chainID: String(process.env.CHAIN_ID),
+    });
+    client.wallet = recover(client.terra, process.env.WALLET);
   } else {
-    client.terra = new LocalTerra()
-    client.wallet = (client.terra as LocalTerra).wallets.test1
+    client.terra = new LocalTerra();
+    client.wallet = (client.terra as LocalTerra).wallets.test1;
   }
-  return client
+
+  return client;
 }
 
-export function writeArtifact(data: object, name: string = 'artifact') {
-  writeFileSync(path.join(ARTIFACTS_PATH, `${name}.json`), JSON.stringify(data, null, 2))
+export function writeArtifact(data: object, name: string = "artifact") {
+  writeFileSync(
+    path.join(ARTIFACTS_PATH, `${name}.json`),
+    JSON.stringify(data, null, 2)
+  );
 }
 
 // Tequila lcd is load balanced, so txs can't be sent too fast, otherwise account sequence queries
 // may resolve an older state depending on which lcd you end up with. Generally 1000 ms is is enough
 // for all nodes to sync up.
-let TIMEOUT = 1000
+let TIMEOUT = 1000;
 
 export function setTimeoutDuration(t: number) {
-  TIMEOUT = t
+  TIMEOUT = t;
 }
 
 export function getTimeoutDuration() {
-  return TIMEOUT
+  return TIMEOUT;
 }
 
-// LocalTerra doesn't estimate fees properly, so we set the fee in this environment sufficiently high to
-// ensure all transactions succeed.
-const LOCAL_TERRA_FEE = new StdFee(
-  30000000,
-  [new Coin('uusd', 45000000)]
-)
-
-
-
-export async function performTransaction(terra: LocalTerra | LCDClient, wallet: Wallet, msg: Msg) {
+export async function performTransaction(
+  terra: LocalTerra | LCDClient,
+  wallet: Wallet,
+  msg: Msg,
+  memo?: string
+) {
   let options: CreateTxOptions = {
     msgs: [msg],
-    gasPrices: [new Coin("uusd", 0.15)]
-  }
-
-  if (terra instanceof LocalTerra) {
-    options.fee = LOCAL_TERRA_FEE
-  }
+    gasPrices: [new Coin("uusd", 0.15)],
+    memo: memo,
+  };
 
   const tx = await wallet.createAndSignTx(options);
 
@@ -92,53 +95,132 @@ export async function performTransaction(terra: LocalTerra | LCDClient, wallet: 
       `transaction failed. code: ${result.code}, codespace: ${result.codespace}, raw_log: ${result.raw_log}`
     );
   }
-  await new Promise(resolve => setTimeout(resolve, TIMEOUT));
-  return result
+  await new Promise((resolve) => setTimeout(resolve, TIMEOUT));
+  return result;
 }
 
-export async function createTransaction(terra: LocalTerra | LCDClient, wallet: Wallet, msg: Msg) {
+// Creates a tx : to be signed
+export async function createTransaction(
+  terra: LocalTerra | LCDClient,
+  wallet: Wallet,
+  msg: Msg,
+  memo?: string
+) {
   let options: CreateTxOptions = {
     msgs: [msg],
-    gasPrices: [new Coin("uusd", 0.15)]
-  }
+    gasPrices: [new Coin("uusd", 0.15)],
+    memo: memo,
+  };
 
-  if (terra instanceof LocalTerra) {
-    options.fee = LOCAL_TERRA_FEE
-  }
-
-  return await wallet.createTx(options)
+  return await wallet.createTx(options);
 }
 
-export async function uploadContract(terra: LocalTerra | LCDClient, wallet: Wallet, filepath: string) {
-  const contract = readFileSync(filepath, 'base64');
+export async function uploadContract(
+  terra: LocalTerra | LCDClient,
+  wallet: Wallet,
+  filepath: string
+) {
+  const contract = readFileSync(filepath, "base64");
   const uploadMsg = new MsgStoreCode(wallet.key.accAddress, contract);
   let result = await performTransaction(terra, wallet, uploadMsg);
-  return Number(result.logs[0].eventsByType.store_code.code_id[0]) // code_id
+  return Number(result.logs[0].eventsByType.store_code.code_id[0]); // code_id
 }
 
-export async function instantiateContract(terra: LocalTerra | LCDClient, wallet: Wallet, codeId: number, msg: object) {
-  const instantiateMsg = new MsgInstantiateContract(wallet.key.accAddress, wallet.key.accAddress, codeId, msg, undefined);
-  let result = await performTransaction(terra, wallet, instantiateMsg)
-  const attributes = result.logs[0].events[0].attributes
-  return attributes[attributes.length - 1].value // contract address
+export async function instantiateContract(
+  terra: LocalTerra | LCDClient,
+  wallet: Wallet,
+  codeId: number,
+  msg: object,
+  memo?: string
+) {
+  const instantiateMsg = new MsgInstantiateContract(
+    wallet.key.accAddress,
+    wallet.key.accAddress,
+    codeId,
+    msg,
+    undefined
+  );
+  let result = await performTransaction(terra, wallet, instantiateMsg, memo);
+  const attributes = result.logs[0].events[0].attributes;
+  return attributes[attributes.length - 1].value; // contract address
 }
 
-export async function executeContract(terra: LocalTerra | LCDClient, wallet: Wallet, contractAddress: string, msg: object, coins?: any) {
-  const executeMsg = new MsgExecuteContract(wallet.key.accAddress, contractAddress, msg, coins);
-  return await performTransaction(terra, wallet, executeMsg);
+export async function executeContract(
+  terra: LocalTerra | LCDClient,
+  wallet: Wallet,
+  contractAddress: string,
+  msg: object,
+  coins?: any,
+  memo?: string
+) {
+  const executeMsg = new MsgExecuteContract(
+    wallet.key.accAddress,
+    contractAddress,
+    msg,
+    coins
+  );
+  return await performTransaction(terra, wallet, executeMsg, memo);
 }
 
-export async function queryContract(terra: LocalTerra | LCDClient, contractAddress: string, query: object): Promise<any> {
-  return await terra.wasm.contractQuery(contractAddress, query)
+// returns a created Tx object
+export async function executeContractJsonForMultiSig(
+  terra: LocalTerra | LCDClient,
+  multisigAddress: string,
+  sequence_number: number,
+  pub_key: PublicKey | null,
+  contract_address: string,
+  execute_msg: any,
+  memo?: string
+) {
+  const tx = await terra.tx.create(
+    [
+      {
+        address: multisigAddress,
+        sequenceNumber: sequence_number,
+        publicKey: pub_key,
+      },
+    ],
+    {
+      msgs: [
+        new MsgExecuteContract(multisigAddress, contract_address, execute_msg),
+      ],
+      memo: memo,
+    }
+  );
+  return tx;
 }
 
-export async function deployContract(terra: LocalTerra | LCDClient, wallet: Wallet, filepath: string, initMsg: object) {
+export async function queryContract(
+  terra: LocalTerra | LCDClient,
+  contractAddress: string,
+  query: object
+): Promise<any> {
+  return await terra.wasm.contractQuery(contractAddress, query);
+}
+
+export async function deployContract(
+  terra: LocalTerra | LCDClient,
+  wallet: Wallet,
+  filepath: string,
+  initMsg: object,
+  memo?: string
+) {
   const codeId = await uploadContract(terra, wallet, filepath);
-  return await instantiateContract(terra, wallet, codeId, initMsg);
+  return await instantiateContract(terra, wallet, codeId, initMsg, memo);
 }
 
-export async function migrate(terra: LocalTerra | LCDClient, wallet: Wallet, contractAddress: string, newCodeId: number) {
-  const migrateMsg = new MsgMigrateContract(wallet.key.accAddress, contractAddress, newCodeId, {});
+export async function migrate(
+  terra: LocalTerra | LCDClient,
+  wallet: Wallet,
+  contractAddress: string,
+  newCodeId: number
+) {
+  const migrateMsg = new MsgMigrateContract(
+    wallet.key.accAddress,
+    contractAddress,
+    newCodeId,
+    {}
+  );
   return await performTransaction(terra, wallet, migrateMsg);
 }
 
@@ -156,18 +238,73 @@ export function initialize(terra: LCDClient) {
   return terra.wallet(mk);
 }
 
-export async function transferCW20Tokens(terra: LCDClient, wallet: Wallet, tokenAddress: string, recipient: string, amount: number) {
-  let transfer_msg = { "transfer": { "recipient": recipient, "amount": amount.toString() } }
+export async function transferCW20Tokens(
+  terra: LCDClient,
+  wallet: Wallet,
+  tokenAddress: string,
+  recipient: string,
+  amount: number
+) {
+  let transfer_msg = {
+    transfer: { recipient: recipient, amount: amount.toString() },
+  };
   let resp = await executeContract(terra, wallet, tokenAddress, transfer_msg);
 }
 
-
-
-export async function getCW20Balance(terra: LocalTerra | LCDClient, token_addr: string, user_address: string) {
-  let curBalance = await terra.wasm.contractQuery<{ balance: string }>(token_addr, { "balance": { "address": user_address } });
-  return curBalance.balance
+export async function getCW20Balance(
+  terra: LocalTerra | LCDClient,
+  token_addr: string,
+  user_address: string
+) {
+  let curBalance = await terra.wasm.contractQuery<{ balance: string }>(
+    token_addr,
+    { balance: { address: user_address } }
+  );
+  return curBalance.balance;
 }
 
 export function toEncodedBinary(object: any) {
-  return Buffer.from(JSON.stringify(object)).toString('base64');
+  return Buffer.from(JSON.stringify(object)).toString("base64");
+}
+
+// Returns `pool_address`, `lp_token_address` of the terraswap pool that's created
+export function extract_terraswap_pool_info(response: any) {
+  let pool_address = "";
+  let lp_token_address = "";
+  if (response.height > 0) {
+    let events_array = JSON.parse(response["raw_log"])[0]["events"];
+    let attributes = events_array[1]["attributes"];
+    for (let i = 0; i < attributes.length; i++) {
+      // console.log(attributes[i]);
+      if (attributes[i]["key"] == "liquidity_token_addr") {
+        lp_token_address = attributes[i]["value"];
+      }
+      if (attributes[i]["key"] == "pair_contract_addr") {
+        pool_address = attributes[i]["value"];
+      }
+    }
+  }
+
+  return { pool_address: pool_address, lp_token_address: lp_token_address };
+}
+
+// Returns `pool_address`, `lp_token_address` of the Astroport pool that's created
+export function extract_astroport_pool_info(response: any) {
+  let pool_address = "";
+  let lp_token_address = "";
+  if (response.height > 0) {
+    let events_array = JSON.parse(response["raw_log"])[0]["events"];
+    let attributes = events_array[1]["attributes"];
+    for (let i = 0; i < attributes.length; i++) {
+      // console.log(attributes[i]);
+      if (attributes[i]["key"] == "liquidity_token_addr") {
+        lp_token_address = attributes[i]["value"];
+      }
+      if (attributes[i]["key"] == "pair_contract_addr") {
+        pool_address = attributes[i]["value"];
+      }
+    }
+  }
+
+  return { pool_address: pool_address, lp_token_address: lp_token_address };
 }

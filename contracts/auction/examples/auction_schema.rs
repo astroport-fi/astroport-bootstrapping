@@ -5,8 +5,8 @@ use cosmwasm_schema::{export_schema, remove_schemas, schema_for};
 
 use astroport_auction::state::{Config, State, UserInfo};
 use astroport_periphery::auction::{
-    CallbackMsg, ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, QueryMsg, StateResponse,
-    UpdateConfigMsg, UserInfoResponse,
+    CallbackMsg, ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg,
+    StateResponse, UpdateConfigMsg, UserInfoResponse,
 };
 
 fn main() {
@@ -18,6 +18,7 @@ fn main() {
     export_schema(&schema_for!(InstantiateMsg), &out_dir);
     export_schema(&schema_for!(ExecuteMsg), &out_dir);
     export_schema(&schema_for!(QueryMsg), &out_dir);
+    export_schema(&schema_for!(MigrateMsg), &out_dir);
     export_schema(&schema_for!(Cw20HookMsg), &out_dir);
     export_schema(&schema_for!(CallbackMsg), &out_dir);
 

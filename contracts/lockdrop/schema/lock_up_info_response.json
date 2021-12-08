@@ -3,6 +3,7 @@
   "title": "LockUpInfoResponse",
   "type": "object",
   "required": [
+    "astro_rewards",
     "claimable_generator_astro_debt",
     "claimable_generator_proxy_debt",
     "duration",
@@ -16,12 +17,9 @@
   "properties": {
     "astro_rewards": {
       "description": "ASTRO tokens received as rewards for participation in the lockdrop",
-      "anyOf": [
+      "allOf": [
         {
           "$ref": "#/definitions/Uint128"
-        },
-        {
-          "type": "null"
         }
       ]
     },

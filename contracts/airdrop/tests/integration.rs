@@ -1,12 +1,13 @@
 use astroport_periphery::{
     airdrop::{
-        ClaimResponse, ConfigResponse, ExecuteMsg, InstantiateMsg, QueryMsg, StateResponse,
-        UserInfoResponse,
+        ClaimResponse, ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, QueryMsg,
+        StateResponse, UserInfoResponse,
     },
     auction::{ExecuteMsg as AuctionExecuteMsg, UpdateConfigMsg},
 };
 use cosmwasm_std::testing::{mock_env, MockApi, MockQuerier, MockStorage};
-use cosmwasm_std::{attr, Addr, Timestamp, Uint128};
+use cosmwasm_std::{attr, to_binary, Addr, Timestamp, Uint128};
+use cw20::Cw20ExecuteMsg;
 use terra_multi_test::{App, BankKeeper, ContractWrapper, Executor, TerraMockQuerier};
 
 fn mock_app() -> App {
@@ -68,7 +69,6 @@ fn init_contracts(app: &mut App) -> (Addr, Addr, InstantiateMsg, u64) {
         merkle_roots: Some(vec!["merkle_roots".to_string()]),
         from_timestamp: Some(1571897419),
         to_timestamp: 1581797419,
-        total_airdrop_size: Uint128::new(100_000_000_000),
     };
 
     // Init contract
@@ -148,7 +148,7 @@ fn enable_claims(app: &mut App, airdrop_instance: Addr, owner: Addr) {
 #[test]
 fn proper_initialization() {
     let mut app = mock_app();
-    let (airdrop_instance, _, init_msg, _) = init_contracts(&mut app);
+    let (airdrop_instance, astro_token_instance, init_msg, _) = init_contracts(&mut app);
 
     let resp: ConfigResponse = app
         .wrap()
@@ -158,7 +158,7 @@ fn proper_initialization() {
     // Check config
     assert_eq!(init_msg.astro_token_address, resp.astro_token_address);
     assert_eq!(None, resp.auction_contract_address);
-    assert_eq!(init_msg.owner.unwrap(), resp.owner);
+    assert_eq!(init_msg.owner.clone().unwrap(), resp.owner);
     assert_eq!(init_msg.merkle_roots.unwrap(), resp.merkle_roots);
     assert_eq!(init_msg.from_timestamp.unwrap(), resp.from_timestamp);
     assert_eq!(init_msg.to_timestamp, resp.to_timestamp);
@@ -169,9 +169,41 @@ fn proper_initialization() {
         .query_wasm_smart(&airdrop_instance, &QueryMsg::State {})
         .unwrap();
 
-    assert_eq!(init_msg.total_airdrop_size, resp.total_airdrop_size);
-    assert_eq!(init_msg.total_airdrop_size, resp.unclaimed_tokens);
+    assert_eq!(Uint128::zero(), resp.total_airdrop_size);
+    assert_eq!(Uint128::zero(), resp.unclaimed_tokens);
     assert_eq!(Uint128::zero(), resp.total_delegated_amount);
+
+    // mint ASTRO for to Owner
+    mint_some_astro(
+        &mut app,
+        Addr::unchecked(init_msg.owner.clone().unwrap()),
+        astro_token_instance.clone(),
+        Uint128::new(100_000_000_000),
+        init_msg.owner.clone().unwrap(),
+    );
+
+    // Set ASTRO airdrop incentives
+    app.execute_contract(
+        Addr::unchecked(init_msg.owner.clone().unwrap()),
+        astro_token_instance,
+        &Cw20ExecuteMsg::Send {
+            amount: Uint128::new(100_000_000000),
+            contract: airdrop_instance.to_string(),
+            msg: to_binary(&Cw20HookMsg::IncreaseAstroIncentives {}).unwrap(),
+        },
+        &[],
+    )
+    .unwrap();
+
+    // Check state
+    let resp: StateResponse = app
+        .wrap()
+        .query_wasm_smart(&airdrop_instance, &QueryMsg::State {})
+        .unwrap();
+
+    assert_eq!(Uint128::new(100_000_000000), resp.total_airdrop_size);
+    assert_eq!(Uint128::new(100_000_000000), resp.unclaimed_tokens);
+    assert_eq!(Uint128::new(0), resp.total_delegated_amount);
 }
 
 #[test]
@@ -243,22 +275,35 @@ fn update_config() {
 #[test]
 fn test_transfer_unclaimed_tokens() {
     let mut app = mock_app();
-    let (airdrop_instance, astro_instance, init_msg, _) = init_contracts(&mut app);
+    let (airdrop_instance, astro_token_instance, init_msg, _) = init_contracts(&mut app);
 
-    // mint ASTRO for to Airdrop Contract
+    // mint ASTRO for to Owner
     mint_some_astro(
         &mut app,
         Addr::unchecked(init_msg.owner.clone().unwrap()),
-        astro_instance.clone(),
-        Uint128::new(100_000_000_000),
-        airdrop_instance.clone().to_string(),
+        astro_token_instance.clone(),
+        Uint128::from(100_000_000_000u64),
+        init_msg.owner.clone().unwrap(),
     );
+
+    // Set ASTRO airdrop incentives
+    app.execute_contract(
+        Addr::unchecked(init_msg.owner.clone().unwrap()),
+        astro_token_instance.clone(),
+        &Cw20ExecuteMsg::Send {
+            amount: Uint128::from(100_000_000_000u64),
+            contract: airdrop_instance.to_string(),
+            msg: to_binary(&Cw20HookMsg::IncreaseAstroIncentives {}).unwrap(),
+        },
+        &[],
+    )
+    .unwrap();
 
     // Check Airdrop Contract balance
     let bal_resp: cw20::BalanceResponse = app
         .wrap()
         .query_wasm_smart(
-            &astro_instance,
+            &astro_token_instance.clone(),
             &cw20::Cw20QueryMsg::Balance {
                 address: airdrop_instance.clone().to_string(),
             },
@@ -361,14 +406,27 @@ fn test_claim_by_terra_user() {
     let mut app = mock_app();
     let (airdrop_instance, astro_instance, init_msg, _) = init_contracts(&mut app);
 
-    // mint ASTRO for to Airdrop Contract
+    // mint ASTRO for to Owner
     mint_some_astro(
         &mut app,
         Addr::unchecked(init_msg.owner.clone().unwrap()),
         astro_instance.clone(),
-        Uint128::new(100_000_000_000),
-        airdrop_instance.clone().to_string(),
+        Uint128::from(100_000_000_000u64),
+        init_msg.owner.clone().unwrap(),
     );
+
+    // Set ASTRO airdrop incentives
+    app.execute_contract(
+        Addr::unchecked(init_msg.owner.clone().unwrap()),
+        astro_instance.clone(),
+        &Cw20ExecuteMsg::Send {
+            amount: Uint128::from(100_000_000_000u64),
+            contract: airdrop_instance.to_string(),
+            msg: to_binary(&Cw20HookMsg::IncreaseAstroIncentives {}).unwrap(),
+        },
+        &[],
+    )
+    .unwrap();
 
     // Check Airdrop Contract balance
     let bal_resp: cw20::BalanceResponse = app
@@ -877,14 +935,27 @@ fn test_withdraw_airdrop_rewards() {
     let mut app = mock_app();
     let (airdrop_instance, astro_instance, init_msg, _) = init_contracts(&mut app);
 
-    // mint ASTRO for to Airdrop Contract
+    // mint ASTRO for to Owner
     mint_some_astro(
         &mut app,
         Addr::unchecked(init_msg.owner.clone().unwrap()),
         astro_instance.clone(),
-        Uint128::new(100_000_000_000),
-        airdrop_instance.clone().to_string(),
+        Uint128::from(100_000_000_000u64),
+        init_msg.owner.clone().unwrap(),
     );
+
+    // Set ASTRO airdrop incentives
+    app.execute_contract(
+        Addr::unchecked(init_msg.owner.clone().unwrap()),
+        astro_instance.clone(),
+        &Cw20ExecuteMsg::Send {
+            amount: Uint128::from(100_000_000_000u64),
+            contract: airdrop_instance.to_string(),
+            msg: to_binary(&Cw20HookMsg::IncreaseAstroIncentives {}).unwrap(),
+        },
+        &[],
+    )
+    .unwrap();
 
     // Check Airdrop Contract balance
     let bal_resp: cw20::BalanceResponse = app
@@ -1089,14 +1160,27 @@ fn test_delegate_astro_to_bootstrap_auction() {
 
     let owner = Addr::unchecked(init_msg.owner.clone().unwrap());
 
-    // mint ASTRO for to Airdrop Contract
+    // mint ASTRO for to Owner
     mint_some_astro(
         &mut app,
-        owner.clone(),
+        Addr::unchecked(init_msg.owner.clone().unwrap()),
         astro_instance.clone(),
-        Uint128::new(100_000_000_000),
-        airdrop_instance.to_string(),
+        Uint128::from(100_000_000_000u64),
+        init_msg.owner.clone().unwrap(),
     );
+
+    // Set ASTRO airdrop incentives
+    app.execute_contract(
+        Addr::unchecked(init_msg.owner.clone().unwrap()),
+        astro_instance.clone(),
+        &Cw20ExecuteMsg::Send {
+            amount: Uint128::from(100_000_000_000u64),
+            contract: airdrop_instance.to_string(),
+            msg: to_binary(&Cw20HookMsg::IncreaseAstroIncentives {}).unwrap(),
+        },
+        &[],
+    )
+    .unwrap();
 
     let pair_contract = Box::new(
         ContractWrapper::new(

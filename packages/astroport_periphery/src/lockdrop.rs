@@ -23,6 +23,8 @@ pub struct InstantiateMsg {
     pub weekly_multiplier: u64,
     /// Lockdrop Reward divider
     pub weekly_divider: u64,
+    /// Max lockup positions a user can have
+    pub max_positions_per_user: u32,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -69,6 +71,7 @@ pub enum ExecuteMsg {
     MigrateLiquidity {
         terraswap_lp_token: String,
         astroport_pool_addr: String,
+        slippage_tolerance: Option<Decimal>,
     },
     // ADMIN Function ::: To stake LP Tokens with the generator contract
     StakeLpTokens {
@@ -119,6 +122,7 @@ pub enum CallbackMsg {
         terraswap_lp_token: Addr,
         astroport_pool: Addr,
         prev_assets: [terraswap::asset::Asset; 2],
+        slippage_tolerance: Option<Decimal>,
     },
 }
 
@@ -177,7 +181,9 @@ pub struct ConfigResponse {
     /// Lockdrop Reward divider
     pub weekly_divider: u64,
     /// Total ASTRO lockdrop incentives to be distributed among the users
-    pub lockdrop_incentives: Option<Uint128>,
+    pub lockdrop_incentives: Uint128,
+    /// Max lockup positions a user can have
+    pub max_positions_per_user: u32,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -229,6 +235,8 @@ pub struct UserInfoResponse {
     pub claimable_generator_astro_debt: Uint128,
     /// Proxy tokens receivable as generator rewards that user can claim
     pub claimable_generator_proxy_debt: Uint128,
+    /// Number of lockup positions the user is having
+    pub lockup_positions_index: u32,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -240,7 +248,7 @@ pub struct LockUpInfoResponse {
     /// Boolean value indicating if the user's has withdrawn funds post the only 1 withdrawal limit cutoff
     pub withdrawal_flag: bool,
     /// ASTRO tokens received as rewards for participation in the lockdrop
-    pub astro_rewards: Option<Uint128>,
+    pub astro_rewards: Uint128,
     pub duration: u64,
     /// Generator ASTRO tokens lockup received as generator rewards
     pub generator_astro_debt: Uint128,
@@ -257,3 +265,6 @@ pub struct LockUpInfoResponse {
     pub astroport_lp_token: Option<Addr>,
     pub astroport_lp_transferred: Option<Uint128>,
 }
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct MigrateMsg {}
