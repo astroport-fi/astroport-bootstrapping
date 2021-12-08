@@ -109,5 +109,3 @@
 #### Points to note
 
     - Astroport Core contracts need to be deployed and Generator needs to be set for Lockdrop before ASTRO becomes freely tradable
-
-"AtEdXhvF8/FqOfXrSnyPDKx2w43QMeM65HaJZev/XRzR","AhjPiGhEEoOR7Kv/NnOkwjfPSQIprMtvQfH49P5bSdI3","AnxpRHnIgK87A0KeaWFl4WHdvMAVZOXws9djv2oy8qCO","As6SGQO7FBxSDGsnYIR1UIjDN49H+GDq+0wztGD5Dxjf","A0amMNvS5QdZisrQoVCcI9g7xztKpONPQZwxJrW5Km1B"
