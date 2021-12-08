@@ -105,7 +105,3 @@
   export LCD_CLIENT_URL="https://lcd.terra.dev"
   export CHAIN_ID="columbus-5"
   ```
-
-#### Points to note
-
-    - Astroport Core contracts need to be deployed and Generator needs to be set for Lockdrop before ASTRO becomes freely tradable
