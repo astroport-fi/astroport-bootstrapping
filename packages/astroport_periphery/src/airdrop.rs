@@ -97,3 +97,6 @@ pub struct SignatureResponse {
     pub public_key: String,
     pub recovered_address: String,
 }
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct MigrateMsg {}

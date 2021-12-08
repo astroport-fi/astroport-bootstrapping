@@ -263,3 +263,6 @@ pub struct LockUpInfoResponse {
     pub astroport_lp_token: Option<Addr>,
     pub astroport_lp_transferred: Option<Uint128>,
 }
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct MigrateMsg {}

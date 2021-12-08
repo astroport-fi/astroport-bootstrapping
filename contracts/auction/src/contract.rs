@@ -7,8 +7,8 @@ use cosmwasm_std::{
 
 use astroport_periphery::airdrop::ExecuteMsg::EnableClaims as AirdropEnableClaims;
 use astroport_periphery::auction::{
-    CallbackMsg, ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, PoolInfo, QueryMsg,
-    StateResponse, UpdateConfigMsg, UserInfoResponse,
+    CallbackMsg, ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, MigrateMsg, PoolInfo,
+    QueryMsg, StateResponse, UpdateConfigMsg, UserInfoResponse,
 };
 use astroport_periphery::helpers::{build_approve_cw20_msg, cw20_get_balance};
 use astroport_periphery::lockdrop::ExecuteMsg::EnableClaims as LockdropEnableClaims;
@@ -159,6 +159,11 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::State {} => to_binary(&query_state(deps)?),
         QueryMsg::UserInfo { address } => to_binary(&query_user_info(deps, _env, address)?),
     }
+}
+
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn migrate(_deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response> {
+    Ok(Response::default())
 }
 
 //----------------------------------------------------------------------------------------
@@ -1119,9 +1124,6 @@ fn query_user_info(deps: Deps, env: Env, user_address: String) -> StdResult<User
             &state,
             &user_info,
         )?;
-
-        Ok(user_info_response)
-    } else {
-        Ok(user_info_response)
     }
+    Ok(user_info_response)
 }

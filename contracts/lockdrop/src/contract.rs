@@ -8,7 +8,8 @@ use cosmwasm_std::{
 
 use astroport_periphery::lockdrop::{
     CallbackMsg, ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, LockUpInfoResponse,
-    MigrationInfo, PoolResponse, QueryMsg, StateResponse, UpdateConfigMsg, UserInfoResponse,
+    MigrateMsg, MigrationInfo, PoolResponse, QueryMsg, StateResponse, UpdateConfigMsg,
+    UserInfoResponse,
 };
 
 use astroport::generator::{
@@ -232,6 +233,11 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
             duration,
         )?),
     }
+}
+
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn migrate(_deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response> {
+    Ok(Response::default())
 }
 
 //----------------------------------------------------------------------------------------
@@ -828,7 +834,7 @@ pub fn handle_withdraw_from_lockup(
         let mut user_info = USER_INFO
             .may_load(deps.storage, &user_address)?
             .unwrap_or_default();
-        user_info.lockup_positions_index = user_info.lockup_positions_index - 1;
+        user_info.lockup_positions_index -= 1;
         USER_INFO.save(deps.storage, &user_address, &user_info)?;
     } else {
         LOCKUP_INFO.save(deps.storage, lockup_key, &lockup_info)?;
@@ -1786,9 +1792,7 @@ fn update_user_lockup_positions_and_calc_rewards(
 
         let lockup_astro_rewards: Uint128;
 
-        if lockup_info.astro_rewards > Uint128::zero() {
-            lockup_astro_rewards = lockup_info.astro_rewards;
-        } else {
+        if lockup_info.astro_rewards == Uint128::zero() {
             // Weighted lockup balance (using terraswap LP units to calculate as pool's total weighted balance is calculated on terraswap LP deposits summed over each deposit tx)
             let weighted_lockup_balance =
                 calculate_weight(lockup_info.lp_units_locked, duration, config);
@@ -1803,8 +1807,9 @@ fn update_user_lockup_positions_and_calc_rewards(
             );
 
             LOCKUP_INFO.save(deps.storage, lockup_key, &lockup_info)?;
-            lockup_astro_rewards = lockup_info.astro_rewards;
         };
+
+        lockup_astro_rewards = lockup_info.astro_rewards;
 
         // Save updated Lockup state
         total_astro_rewards += lockup_astro_rewards;

@@ -127,3 +127,6 @@ pub struct UserInfoResponse {
     pub claimable_generator_astro: Uint128,
     pub generator_astro_debt: Uint128,
 }
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct MigrateMsg {}

@@ -5,8 +5,8 @@ use cosmwasm_schema::{export_schema, remove_schemas, schema_for};
 
 use astroport_airdrop::state::{Config, State};
 use astroport_periphery::airdrop::{
-    ClaimResponse, ConfigResponse, ExecuteMsg, InstantiateMsg, QueryMsg, SignatureResponse,
-    StateResponse, UserInfoResponse,
+    ClaimResponse, ConfigResponse, ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg,
+    SignatureResponse, StateResponse, UserInfoResponse,
 };
 
 fn main() {
@@ -18,6 +18,7 @@ fn main() {
     export_schema(&schema_for!(InstantiateMsg), &out_dir);
     export_schema(&schema_for!(ExecuteMsg), &out_dir);
     export_schema(&schema_for!(QueryMsg), &out_dir);
+    export_schema(&schema_for!(MigrateMsg), &out_dir);
 
     export_schema(&schema_for!(UserInfoResponse), &out_dir);
     export_schema(&schema_for!(StateResponse), &out_dir);

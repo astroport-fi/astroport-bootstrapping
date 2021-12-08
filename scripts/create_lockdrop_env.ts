@@ -59,8 +59,8 @@ async function main() {
   /*************************************** DEPLOYMENT :: ASTRO TOKEN ON BOMBAY TESTNET  *****************************************/
 
   // Deploy ASTRO (dummy) Token
-  if (!network.astrotokenAddress) {
-    network.astrotokenAddress = await instantiateContract(
+  if (!network.astro_token_address) {
+    network.astro_token_address = await instantiateContract(
       terra,
       wallet,
       network.cw20_token_code_id,
@@ -82,7 +82,7 @@ async function main() {
       "ASTRO Token for testing"
     );
     console.log(
-      `ASTRO Token deployed successfully, address : ${network.astrotokenAddress}`
+      `ASTRO Token deployed successfully, address : ${network.astro_token_address}`
     );
     writeArtifact(network, terra.config.chainID);
   } else {
@@ -301,7 +301,7 @@ async function main() {
           cap: String(1000_000_000_000000),
         },
       },
-      "ANC Token for testing"
+      "MIR Token for testing"
     );
     console.log(
       `MIR Token deployed successfully, address : ${network.mir_token}`
@@ -383,7 +383,7 @@ async function main() {
           cap: String(1000_000_000_000000),
         },
       },
-      "ANC Token for testing"
+      "ORION Token for testing"
     );
     console.log(
       `ORION Token deployed successfully, address : ${network.orion_token}`
@@ -466,7 +466,7 @@ async function main() {
           cap: String(1000_000_000_000000),
         },
       },
-      "ANC Token for testing"
+      "STT Token for testing"
     );
     console.log(
       `STT Token deployed successfully, address : ${network.stt_token}`
@@ -548,7 +548,7 @@ async function main() {
           cap: String(1000_000_000_000000),
         },
       },
-      "ANC Token for testing"
+      "VKR Token for testing"
     );
     console.log(
       `VKR Token deployed successfully, address : ${network.vkr_token}`
@@ -615,8 +615,8 @@ async function main() {
       wallet,
       network.cw20_token_code_id,
       {
-        name: "VKR Token",
-        symbol: "VKR",
+        name: "MINE Token",
+        symbol: "MINE",
         decimals: 6,
         initial_balances: [
           {
@@ -629,7 +629,7 @@ async function main() {
           cap: String(1000_000_000_000000),
         },
       },
-      "ANC Token for testing"
+      "MINE Token for testing"
     );
     console.log(
       `MINE Token deployed successfully, address : ${network.mine_token}`
@@ -698,8 +698,8 @@ async function main() {
       wallet,
       network.cw20_token_code_id,
       {
-        name: "VKR Token",
-        symbol: "VKR",
+        name: "PSI Token",
+        symbol: "PSI",
         decimals: 6,
         initial_balances: [
           {
@@ -712,7 +712,7 @@ async function main() {
           cap: String(1000_000_000_000000),
         },
       },
-      "ANC Token for testing"
+      "PSI Token for testing"
     );
     console.log(
       `PSI Token deployed successfully, address : ${network.psi_token}`
@@ -780,8 +780,8 @@ async function main() {
       wallet,
       network.cw20_token_code_id,
       {
-        name: "VKR Token",
-        symbol: "VKR",
+        name: "APOLLO Token",
+        symbol: "APOLLO",
         decimals: 6,
         initial_balances: [
           {
@@ -794,7 +794,7 @@ async function main() {
           cap: String(1000_000_000_000000),
         },
       },
-      "ANC Token for testing"
+      "APOLLO Token for testing"
     );
     console.log(
       `APOLLO Token deployed successfully, address : ${network.apollo_token}`
