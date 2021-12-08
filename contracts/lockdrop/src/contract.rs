@@ -105,7 +105,15 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
         ExecuteMsg::MigrateLiquidity {
             terraswap_lp_token,
             astroport_pool_addr,
-        } => handle_migrate_liquidity(deps, env, info, terraswap_lp_token, astroport_pool_addr),
+            slippage_tolerance,
+        } => handle_migrate_liquidity(
+            deps,
+            env,
+            info,
+            terraswap_lp_token,
+            astroport_pool_addr,
+            slippage_tolerance,
+        ),
 
         ExecuteMsg::StakeLpTokens { terraswap_lp_token } => {
             handle_stake_lp_tokens(deps, env, info, terraswap_lp_token)
@@ -204,12 +212,14 @@ fn _handle_callback(
             terraswap_lp_token,
             astroport_pool,
             prev_assets,
+            slippage_tolerance,
         } => callback_deposit_liquidity_in_astroport(
             deps,
             env,
             terraswap_lp_token,
             astroport_pool,
             prev_assets,
+            slippage_tolerance,
         ),
     }
 }
@@ -509,6 +519,7 @@ pub fn handle_migrate_liquidity(
     info: MessageInfo,
     terraswap_lp_token: String,
     astroport_pool_addr: String,
+    slippage_tolerance: Option<Decimal>,
 ) -> StdResult<Response> {
     let config = CONFIG.load(deps.storage)?;
 
@@ -591,6 +602,7 @@ pub fn handle_migrate_liquidity(
         terraswap_lp_token: terraswap_lp_token.clone(),
         astroport_pool: astroport_pool.clone(),
         prev_assets: assets.try_into().unwrap(),
+        slippage_tolerance: slippage_tolerance,
     }
     .to_cosmos_msg(&env)?;
     cosmos_msgs.push(update_state_msg);
@@ -1374,6 +1386,7 @@ pub fn callback_deposit_liquidity_in_astroport(
     terraswap_lp_token: Addr,
     astroport_pool: Addr,
     prev_assets: [terraswap::asset::Asset; 2],
+    slippage_tolerance: Option<Decimal>,
 ) -> StdResult<Response> {
     let mut cosmos_msgs = vec![];
 
@@ -1439,7 +1452,7 @@ pub fn callback_deposit_liquidity_in_astroport(
         funds: coins,
         msg: to_binary(&astroport::pair::ExecuteMsg::ProvideLiquidity {
             assets: assets.clone().try_into().unwrap(),
-            slippage_tolerance: None,
+            slippage_tolerance: slippage_tolerance,
             auto_stake: None,
             receiver: None,
         })?,

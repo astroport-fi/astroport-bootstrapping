@@ -896,6 +896,7 @@ fn initialize_and_migrate_liquidity_for_pool(
         &ExecuteMsg::MigrateLiquidity {
             terraswap_lp_token: terraswap_token_instance.clone(),
             astroport_pool_addr: astro_pool_address.to_string(),
+            slippage_tolerance: None,
         },
         &[],
     )
@@ -2411,6 +2412,7 @@ fn test_migrate_liquidity() {
         &ExecuteMsg::MigrateLiquidity {
             terraswap_lp_token: terraswap_token_instance.clone(),
             astroport_pool_addr: astro_pool_address.to_string(),
+            slippage_tolerance: None,
         },
         &[],
     )

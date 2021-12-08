@@ -71,6 +71,7 @@ pub enum ExecuteMsg {
     MigrateLiquidity {
         terraswap_lp_token: String,
         astroport_pool_addr: String,
+        slippage_tolerance: Option<Decimal>,
     },
     // ADMIN Function ::: To stake LP Tokens with the generator contract
     StakeLpTokens {
@@ -121,6 +122,7 @@ pub enum CallbackMsg {
         terraswap_lp_token: Addr,
         astroport_pool: Addr,
         prev_assets: [terraswap::asset::Asset; 2],
+        slippage_tolerance: Option<Decimal>,
     },
 }
 
