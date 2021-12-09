@@ -602,7 +602,7 @@ pub fn handle_migrate_liquidity(
         terraswap_lp_token: terraswap_lp_token.clone(),
         astroport_pool: astroport_pool.clone(),
         prev_assets: assets.try_into().unwrap(),
-        slippage_tolerance: slippage_tolerance,
+        slippage_tolerance,
     }
     .to_cosmos_msg(&env)?;
     cosmos_msgs.push(update_state_msg);
@@ -1447,12 +1447,14 @@ pub fn callback_deposit_liquidity_in_astroport(
         }
     }
 
+    coins.sort_by(|a, b| a.denom.cmp(&b.denom));
+
     cosmos_msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
         contract_addr: astroport_pool.to_string(),
         funds: coins,
         msg: to_binary(&astroport::pair::ExecuteMsg::ProvideLiquidity {
             assets: assets.clone().try_into().unwrap(),
-            slippage_tolerance: slippage_tolerance,
+            slippage_tolerance,
             auto_stake: None,
             receiver: None,
         })?,
