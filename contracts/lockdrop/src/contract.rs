@@ -23,7 +23,7 @@ use crate::state::{
 };
 use cw20::{BalanceResponse, Cw20ExecuteMsg, Cw20QueryMsg, Cw20ReceiveMsg};
 
-const SECONDS_PER_WEEK: u64 = 86400 * 7; // 3600;
+const SECONDS_PER_WEEK: u64 = 86400 * 7;
 
 //----------------------------------------------------------------------------------------
 // Entry Points
@@ -1086,8 +1086,14 @@ pub fn handle_claim_rewards_and_unlock_for_lockup(
                     }
                     .to_cosmos_msg(&env)?,
                 );
+            } else if user_info.astro_transferred {
+                return Err(StdError::generic_err(
+                    "No staking rewards available to claim, lockdrop reward already claimed!",
+                ));
             }
         }
+    } else if user_info.astro_transferred {
+        return Err(StdError::generic_err("No rewards available to claim!"));
     }
 
     cosmos_msgs.push(

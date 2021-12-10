@@ -1116,6 +1116,12 @@ fn query_user_info(deps: Deps, env: Env, user_address: String) -> StdResult<User
                     * astroport_lp_amount
                     - user_info.generator_astro_debt;
             }
+        } else if user_info_response.auction_incentive_amount.is_none() {
+            user_info_response.auction_incentive_amount = calculate_auction_reward_for_user(
+                &state,
+                &user_info,
+                config.astro_incentive_amount,
+            );
         }
         // Updated withdrawable LP shares balance
         user_info_response.withdrawable_lp_shares = calculate_withdrawable_lp_shares(
@@ -1124,6 +1130,45 @@ fn query_user_info(deps: Deps, env: Env, user_address: String) -> StdResult<User
             &state,
             &user_info,
         )?;
+    } else if user_info_response.auction_incentive_amount.is_none() {
+        user_info_response.auction_incentive_amount =
+            calculate_auction_reward_for_user(&state, &user_info, config.astro_incentive_amount);
     }
     Ok(user_info_response)
+}
+
+/// @dev Calculates ASTRO tokens receivable by a user for participating (providing UST & ASTRO) in the bootstraping phase of the ASTRO-UST Pool
+fn calculate_auction_reward_for_user(
+    state: &State,
+    user_info: &UserInfo,
+    total_astro_rewards: Option<Uint128>,
+) -> Option<Uint128> {
+    if !user_info.astro_delegated.is_zero() || !user_info.ust_delegated.is_zero() {
+        if let Some(total_astro_rewards) = total_astro_rewards {
+            let mut user_astro_incentives = Uint128::zero();
+
+            // ASTRO incentives from ASTRO delegated
+            if state.total_astro_delegated > Uint128::zero() {
+                let astro_incentives_from_astro = Decimal::from_ratio(
+                    user_info.astro_delegated,
+                    state.total_astro_delegated * Uint128::new(2),
+                ) * total_astro_rewards;
+                user_astro_incentives += astro_incentives_from_astro;
+            }
+
+            // ASTRO incentives from UST delegated
+            if state.total_ust_delegated > Uint128::zero() {
+                let astro_incentives_from_ust = Decimal::from_ratio(
+                    user_info.ust_delegated,
+                    state.total_ust_delegated * Uint128::new(2),
+                ) * total_astro_rewards;
+                user_astro_incentives += astro_incentives_from_ust;
+            }
+            Some(user_astro_incentives)
+        } else {
+            None
+        }
+    } else {
+        None
+    }
 }
