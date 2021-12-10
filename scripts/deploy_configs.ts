@@ -1,5 +1,5 @@
 export const mainnet: Config = {
-  // timestamp 1638835200 :: Date and time (GMT): Tuesday, 7 December 2021 00:00:00
+  // timestamp 1639440000 :: Date and time (GMT): Tuesday, 14 December 2021 00:00:00
   // 24 hrs = 86400 :: 86400*5 = 5 days of deposit window
   // 24 hrs = 86400 :: 86400*2 = 2 days of deposit window
   // Lockup duration :: Min 2 weeks and max 52 weeks
@@ -7,14 +7,14 @@ export const mainnet: Config = {
   lockdrop_InitMsg: {
     config: {
       owner: undefined,
-      init_timestamp: 1638835200,
+      init_timestamp: 1639440000,
       deposit_window: 86400 * 5,
       withdrawal_window: 86400 * 2,
       min_lock_duration: 2,
       max_lock_duration: 52,
       weekly_multiplier: 3,
       weekly_divider: 51,
-      max_positions_per_user: 14,
+      max_positions_per_user: 10,
     },
   },
 
@@ -23,8 +23,8 @@ export const mainnet: Config = {
       owner: undefined,
       astro_token_address: "",
       merkle_roots: [],
-      from_timestamp: 1638133200,
-      to_timestamp: 1638133200 + 7 * 24 * 60 * 60,
+      from_timestamp: 1639440000 + 86400 * 7,
+      to_timestamp: 1639440000 + 86400 * 7 + 86400 * 90,
     },
   },
 
@@ -34,21 +34,21 @@ export const mainnet: Config = {
       astro_token_address: "",
       airdrop_contract_address: "",
       lockdrop_contract_address: "",
-      lp_tokens_vesting_duration: 3 * 30 * 24 * 60 * 60,
-      init_timestamp: 1638133200 + 7 * 24 * 60 * 60,
-      deposit_window: 5 * 24 * 60 * 60,
-      withdrawal_window: 2 * 24 * 60 * 60,
+      lp_tokens_vesting_duration: 86400 * 30,
+      init_timestamp: 1639440000 + 86400 * 7,
+      deposit_window: 86400 * 5,
+      withdrawal_window: 86400 * 2,
     },
   },
 
   memos: {
     lockdrop:
-      "ASTROPORT Launch : Phase 1  Lockdrop for liquidity migration to Astroport",
+      "ASTROPORT Launch : Phase 1  -::- Lockdrop -::- Liquidity Migration",
     airdrop: "ASTROPORT Launch : ASTRO Airdrop",
     auction:
-      "ASTROPORT Launch : Auction for Bootstrapping ASTRO-UST LP Pool on Astroport",
+      "ASTROPORT Launch -::- Auction -::- ASTRO-UST LP Pool Bootstrapping",
     lockdrop_set_astro:
-      "ASTROPORT Launch : Phase 1  Lockdrop :: Update ASTRO Token address",
+      "ASTROPORT Launch : Phase 1  Lockdrop :: UpdateConfig -::- Set ASTRO & Auction addresses",
   },
 };
 
@@ -96,12 +96,12 @@ export const bombay_testnet: Config = {
 
   memos: {
     lockdrop:
-      "ASTROPORT Launch : Phase 1  Lockdrop for liquidity migration to Astroport",
+      "ASTROPORT Launch : Phase 1  -::- Lockdrop -::- Liquidity Migration",
     airdrop: "ASTROPORT Launch : ASTRO Airdrop",
     auction:
-      "ASTROPORT Launch : Auction for Bootstrapping ASTRO-UST LP Pool on Astroport",
+      "ASTROPORT Launch -::- Auction -::- ASTRO-UST LP Pool Bootstrapping",
     lockdrop_set_astro:
-      "ASTROPORT Launch : Phase 1  Lockdrop :: Update ASTRO Token address",
+      "ASTROPORT Launch : Phase 1  Lockdrop :: UpdateConfig -::- Set ASTRO & Auction addresses",
   },
 };
 
