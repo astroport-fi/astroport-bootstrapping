@@ -1086,13 +1086,13 @@ pub fn handle_claim_rewards_and_unlock_for_lockup(
                     }
                     .to_cosmos_msg(&env)?,
                 );
-            } else if user_info.astro_transferred {
+            } else if user_info.astro_transferred && !withdraw_lp_stake {
                 return Err(StdError::generic_err(
                     "No staking rewards available to claim, lockdrop reward already claimed!",
                 ));
             }
         }
-    } else if user_info.astro_transferred {
+    } else if user_info.astro_transferred && !withdraw_lp_stake {
         return Err(StdError::generic_err("No rewards available to claim!"));
     }
 
