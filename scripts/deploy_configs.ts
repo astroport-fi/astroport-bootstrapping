@@ -1,5 +1,5 @@
 export const mainnet: Config = {
-  // timestamp 1639440000 :: Date and time (GMT): Tuesday, 14 December 2021 00:00:00
+  // timestamp 1639465200 :: Date and time (GMT): Tuesday, 14 December 2021 07:00:00
   // 24 hrs = 86400 :: 86400*5 = 5 days of deposit window
   // 24 hrs = 86400 :: 86400*2 = 2 days of deposit window
   // Lockup duration :: Min 2 weeks and max 52 weeks
@@ -7,7 +7,7 @@ export const mainnet: Config = {
   lockdrop_InitMsg: {
     config: {
       owner: undefined,
-      init_timestamp: 1639440000,
+      init_timestamp: 1639465200,
       deposit_window: 86400 * 5,
       withdrawal_window: 86400 * 2,
       min_lock_duration: 2,
@@ -23,8 +23,8 @@ export const mainnet: Config = {
       owner: undefined,
       astro_token_address: "",
       merkle_roots: [],
-      from_timestamp: 1639440000 + 86400 * 7,
-      to_timestamp: 1639440000 + 86400 * 7 + 86400 * 90,
+      from_timestamp: 1639465200 + 86400 * 7,
+      to_timestamp: 1639465200 + 86400 * 7 + 86400 * 90,
     },
   },
 
@@ -35,7 +35,7 @@ export const mainnet: Config = {
       airdrop_contract_address: "",
       lockdrop_contract_address: "",
       lp_tokens_vesting_duration: 86400 * 30,
-      init_timestamp: 1639440000 + 86400 * 7,
+      init_timestamp: 1639465200 + 86400 * 7,
       deposit_window: 86400 * 5,
       withdrawal_window: 86400 * 2,
     },
