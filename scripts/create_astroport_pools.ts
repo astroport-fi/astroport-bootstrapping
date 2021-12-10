@@ -10,7 +10,7 @@ import { join } from "path";
 
 const ARTIFACTS_PATH = "../artifacts";
 
-// ########### LOCKDROP :: LP TOKENS ELIGIBLE ###########
+// ########### ASTROPORT DEX :: INITIALIZES POOLS ###########
 
 // - LUNA/UST
 // - LUNA/BLUNA
@@ -22,6 +22,7 @@ const ARTIFACTS_PATH = "../artifacts";
 // - MINE/UST
 // - PSI/UST
 // - APOLLO/UST
+// - ASTRO/UST
 
 async function main() {
   const { terra, wallet } = newClient();
@@ -42,9 +43,6 @@ async function main() {
 
   /*************************************** BOMBAY TESTNET :::: ASTROPORT :: CREATE PAIR :: LUNA/UST *****************************************/
 
-  // ASTROPORT :: CREATE PAIR :: LUNA/UST
-  // ASTROPORT :: CREATE PAIR :: LUNA/UST
-  // ASTROPORT :: CREATE PAIR :: LUNA/UST
   // ASTROPORT :: CREATE PAIR :: LUNA/UST
   if (!network.luna_ust_astroport_pool) {
     console.log(
@@ -82,9 +80,6 @@ async function main() {
     );
   }
 
-  // ASTROPORT :: CREATE PAIR :: LUNA/BLUNA
-  // ASTROPORT :: CREATE PAIR :: LUNA/BLUNA
-  // ASTROPORT :: CREATE PAIR :: LUNA/BLUNA
   // ASTROPORT :: CREATE PAIR :: LUNA/BLUNA
   if (!network.bluna_luna_astroport_pool) {
     console.log(
@@ -125,9 +120,6 @@ async function main() {
   }
 
   // ASTROPORT :: CREATE PAIR :: ANC/UST
-  // ASTROPORT :: CREATE PAIR :: ANC/UST
-  // ASTROPORT :: CREATE PAIR :: ANC/UST
-  // ASTROPORT :: CREATE PAIR :: ANC/UST
   if (!network.anc_ust_astroport_pool) {
     console.log(
       `${terra.config.chainID} :: Creating ANC/UST pool on Astroport`
@@ -164,9 +156,6 @@ async function main() {
     );
   }
 
-  // ASTROPORT :: CREATE PAIR :: MIR/UST
-  // ASTROPORT :: CREATE PAIR :: MIR/UST
-  // ASTROPORT :: CREATE PAIR :: MIR/UST
   // ASTROPORT :: CREATE PAIR :: MIR/UST
   if (!network.mir_ust_astroport_pool) {
     console.log(
@@ -205,9 +194,6 @@ async function main() {
   }
 
   // ASTROPORT :: CREATE PAIR :: ORION/UST
-  // ASTROPORT :: CREATE PAIR :: ORION/UST
-  // ASTROPORT :: CREATE PAIR :: ORION/UST
-  // ASTROPORT :: CREATE PAIR :: ORION/UST
   if (!network.orion_ust_astroport_pool) {
     console.log(
       `${terra.config.chainID} :: Creating ORION/UST pool on Astroport`
@@ -244,9 +230,6 @@ async function main() {
     );
   }
 
-  // ASTROPORT :: CREATE PAIR :: STT/UST
-  // ASTROPORT :: CREATE PAIR :: STT/UST
-  // ASTROPORT :: CREATE PAIR :: STT/UST
   // ASTROPORT :: CREATE PAIR :: STT/UST
   if (!network.stt_ust_astroport_pool) {
     console.log(
@@ -285,9 +268,6 @@ async function main() {
   }
 
   // ASTROPORT :: CREATE PAIR :: VKR/UST
-  // ASTROPORT :: CREATE PAIR :: VKR/UST
-  // ASTROPORT :: CREATE PAIR :: VKR/UST
-  // ASTROPORT :: CREATE PAIR :: VKR/UST
   if (!network.vkr_ust_astroport_pool) {
     console.log(
       `${terra.config.chainID} :: Creating VKR/UST pool on Astroport`
@@ -324,9 +304,6 @@ async function main() {
     );
   }
 
-  // ASTROPORT :: CREATE PAIR :: MINE/UST
-  // ASTROPORT :: CREATE PAIR :: MINE/UST
-  // ASTROPORT :: CREATE PAIR :: MINE/UST
   // ASTROPORT :: CREATE PAIR :: MINE/UST
   if (!network.mine_ust_astroport_pool) {
     console.log(
@@ -365,9 +342,6 @@ async function main() {
   }
 
   // ASTROPORT :: CREATE PAIR :: PSI/UST
-  // ASTROPORT :: CREATE PAIR :: PSI/UST
-  // ASTROPORT :: CREATE PAIR :: PSI/UST
-  // ASTROPORT :: CREATE PAIR :: PSI/UST
   if (!network.psi_ust_astroport_pool) {
     console.log(
       `${terra.config.chainID} :: Creating PSI/UST pool on Astroport`
@@ -405,9 +379,6 @@ async function main() {
   }
 
   // ASTROPORT :: CREATE PAIR :: APOLLO/UST
-  // ASTROPORT :: CREATE PAIR :: APOLLO/UST
-  // ASTROPORT :: CREATE PAIR :: APOLLO/UST
-  // ASTROPORT :: CREATE PAIR :: APOLLO/UST
   if (!network.apollo_ust_astroport_pool) {
     console.log(
       `${terra.config.chainID} :: Creating APOLLO/UST pool on Astroport`
@@ -444,9 +415,6 @@ async function main() {
     );
   }
 
-  // ASTROPORT :: CREATE PAIR :: ASTRO/UST
-  // ASTROPORT :: CREATE PAIR :: ASTRO/UST
-  // ASTROPORT :: CREATE PAIR :: ASTRO/UST
   // ASTROPORT :: CREATE PAIR :: ASTRO/UST
   if (!network.astro_ust_astroport_pool) {
     console.log(
