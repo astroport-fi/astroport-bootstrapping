@@ -45,7 +45,7 @@ pub fn instantiate(
     }
 
     // CHECK :: min_lock_duration , max_lock_duration need to be valid (min_lock_duration < max_lock_duration)
-    if msg.max_lock_duration < msg.min_lock_duration && msg.min_lock_duration > 0u64 {
+    if msg.max_lock_duration < msg.min_lock_duration || msg.min_lock_duration == 0u64 {
         return Err(StdError::generic_err("Invalid Lockup durations"));
     }
 

@@ -639,10 +639,29 @@ pub fn handle_claim_rewards_and_withdraw_lp_shares(
     let mut cosmos_msgs = vec![];
 
     if let Some(lp_balance) = state.lp_shares_minted {
-        if user_info.auction_incentive_amount.is_none() {
-            update_user_incentives_and_lp_share(&config, &state, lp_balance, &mut user_info)?;
+        // Calculate user's LP shares & ASTRO incentives (if possible)
+        if user_info.lp_shares.is_none() {
+            update_user_lp_shares(&state, lp_balance, &mut user_info)?;
+            update_user_astro_incentives(
+                config.astro_incentive_amount,
+                user_info.lp_shares,
+                lp_balance,
+                &mut user_info,
+            )?;
             USERS.save(deps.storage, &user_address, &user_info)?;
         }
+        // If user's ASTRO incentives are not set, but the total ASTRO incentives have been set
+        if config.astro_incentive_amount.is_some() && user_info.auction_incentive_amount.is_none() {
+            update_user_astro_incentives(
+                config.astro_incentive_amount,
+                user_info.lp_shares,
+                lp_balance,
+                &mut user_info,
+            )?;
+            USERS.save(deps.storage, &user_address, &user_info)?;
+        }
+
+        // If user wants to withdraw LP tokens, then we calculate the max amount he can withdraw for check
         if let Some(withdraw_lp_shares) = withdraw_lp_shares {
             let max_withdrawable = calculate_withdrawable_lp_shares(
                 env.block.time.seconds(),
@@ -730,21 +749,15 @@ pub fn handle_claim_rewards_and_withdraw_lp_shares(
     Ok(Response::new().add_messages(cosmos_msgs))
 }
 
-/// @dev Calculates ASTRO - UST LP shares and auction incentives
+/// @dev Calculates user's ASTRO - UST LP shares based on amount delegated
 /// User LP shares (ASTRO delegation share) = (1/2) *  (ASTRO delegated / total ASTRO delegated)
 /// User LP shares (UST deposit share) = (1/2) *  (UST deposited / total UST deposited)
 /// User's total LP shares  = User's ASTRO delegation LP share + User's UST deposit LP share
-/// User's auction incentives (ASTRO) = (User's total LP shares / Total LP shares minted) * Total ASTRO auction incentives
-fn update_user_incentives_and_lp_share(
-    config: &Config,
+fn update_user_lp_shares(
     state: &State,
     lp_balance: Uint128,
     mut user_info: &mut UserInfo,
 ) -> StdResult<()> {
-    let astro_incentive_amount = config
-        .astro_incentive_amount
-        .ok_or_else(|| StdError::generic_err("Astro incentives should be set"))?;
-
     let user_lp_share = (Decimal::from_ratio(
         user_info.astro_delegated,
         state.total_astro_delegated * Uint128::new(2),
@@ -754,9 +767,26 @@ fn update_user_incentives_and_lp_share(
     )) * lp_balance;
     user_info.lp_shares = Some(user_lp_share);
 
-    user_info.auction_incentive_amount =
-        Some(Decimal::from_ratio(user_lp_share, lp_balance) * astro_incentive_amount);
     Ok(())
+}
+
+/// @dev Calculates user's ASTRO incentives for auction participation
+/// Formula, == User's auction incentives (ASTRO) = (User's total LP shares / Total LP shares minted) * Total ASTRO auction incentives
+fn update_user_astro_incentives(
+    total_astro_incentives: Option<Uint128>,
+    user_lp_share: Option<Uint128>,
+    lp_balance: Uint128,
+    mut user_info: &mut UserInfo,
+) -> StdResult<()> {
+    if total_astro_incentives.is_none() || user_lp_share.is_none() {
+        Ok(())
+    } else {
+        user_info.auction_incentive_amount = Some(
+            Decimal::from_ratio(user_lp_share.unwrap(), lp_balance)
+                * total_astro_incentives.unwrap(),
+        );
+        Ok(())
+    }
 }
 
 //----------------------------------------------------------------------------------------
@@ -789,23 +819,23 @@ pub fn callback_withdraw_user_rewards_and_optionally_lp(
         let user_lp_shares = user_info
             .lp_shares
             .ok_or_else(|| StdError::generic_err("Lp share should be calculated"))?;
-        let user_auction_incentive_amount = user_info
-            .auction_incentive_amount
-            .ok_or_else(|| StdError::generic_err("Incentive amount should be calculated"))?;
 
         let astroport_lp_amount = user_lp_shares - user_info.claimed_lp_shares;
-
-        if !user_info.astro_incentive_transferred {
+        // Transfer ASTRO incentives when they have been calculated
+        if user_info.auction_incentive_amount.is_some() && !user_info.astro_incentive_transferred {
             cosmos_msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
                 contract_addr: config.astro_token_address.to_string(),
                 funds: vec![],
                 msg: to_binary(&Cw20ExecuteMsg::Transfer {
                     recipient: user_address.to_string(),
-                    amount: user_auction_incentive_amount,
+                    amount: user_info.auction_incentive_amount.unwrap(),
                 })?,
             }));
             user_info.astro_incentive_transferred = true;
-            attributes.push(attr("auction_astro_reward", user_auction_incentive_amount));
+            attributes.push(attr(
+                "auction_astro_reward",
+                user_info.auction_incentive_amount.unwrap(),
+            ));
         }
 
         if state.is_lp_staked {
@@ -1063,7 +1093,7 @@ fn query_user_info(deps: Deps, env: Env, user_address: String) -> StdResult<User
         ust_withdrawn: user_info.ust_withdrawn,
         lp_shares: user_info.lp_shares,
         claimed_lp_shares: user_info.claimed_lp_shares,
-        withdrawable_lp_shares: Some(Uint128::zero()),
+        withdrawable_lp_shares: None,
         auction_incentive_amount: user_info.auction_incentive_amount,
         astro_incentive_transferred: user_info.astro_incentive_transferred,
         generator_astro_debt: user_info.generator_astro_debt,
@@ -1078,10 +1108,22 @@ fn query_user_info(deps: Deps, env: Env, user_address: String) -> StdResult<User
     {
         // If ASTRO - UST LP Tokens have been minted
         if let Some(lp_balance) = state.lp_shares_minted {
-            if user_info.auction_incentive_amount.is_none() {
-                update_user_incentives_and_lp_share(&config, &state, lp_balance, &mut user_info)?;
-                user_info_response.auction_incentive_amount = user_info.auction_incentive_amount;
+            // Calculate user's LP shares & ASTRO incentives (if possible)
+            if user_info.lp_shares.is_none() {
+                update_user_lp_shares(&state, lp_balance, &mut user_info)?;
                 user_info_response.lp_shares = user_info.lp_shares;
+            }
+            // If user's ASTRO incentives are not set, but the total ASTRO incentives have been set
+            if config.astro_incentive_amount.is_some()
+                && user_info.auction_incentive_amount.is_none()
+            {
+                update_user_astro_incentives(
+                    config.astro_incentive_amount,
+                    user_info.lp_shares,
+                    lp_balance,
+                    &mut user_info,
+                )?;
+                user_info_response.auction_incentive_amount = user_info.auction_incentive_amount;
             }
             let astroport_lp_amount = user_info.lp_shares.unwrap() - user_info.claimed_lp_shares;
             // If LP tokens are staked and user has a > 0 LP share balance, we calculate user's claimable ASTRO staking rewards
@@ -1116,24 +1158,22 @@ fn query_user_info(deps: Deps, env: Env, user_address: String) -> StdResult<User
                     * astroport_lp_amount
                     - user_info.generator_astro_debt;
             }
-        } else if user_info_response.auction_incentive_amount.is_none() {
-            user_info_response.auction_incentive_amount = calculate_auction_reward_for_user(
+
+            // Updated withdrawable LP shares balance
+            user_info_response.withdrawable_lp_shares = calculate_withdrawable_lp_shares(
+                env.block.time.seconds(),
+                &config,
                 &state,
                 &user_info,
-                config.astro_incentive_amount,
-            );
+            )?;
         }
-        // Updated withdrawable LP shares balance
-        user_info_response.withdrawable_lp_shares = calculate_withdrawable_lp_shares(
-            env.block.time.seconds(),
-            &config,
-            &state,
-            &user_info,
-        )?;
-    } else if user_info_response.auction_incentive_amount.is_none() {
+    }
+
+    if user_info_response.auction_incentive_amount.is_none() {
         user_info_response.auction_incentive_amount =
             calculate_auction_reward_for_user(&state, &user_info, config.astro_incentive_amount);
     }
+
     Ok(user_info_response)
 }
 
