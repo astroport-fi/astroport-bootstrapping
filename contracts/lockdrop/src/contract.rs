@@ -21,9 +21,14 @@ use cw_storage_plus::U64Key;
 use crate::state::{
     Config, LockupInfo, PoolInfo, State, ASSET_POOLS, CONFIG, LOCKUP_INFO, STATE, USER_INFO,
 };
+use cw2::set_contract_version;
 use cw20::{BalanceResponse, Cw20ExecuteMsg, Cw20QueryMsg, Cw20ReceiveMsg};
 
 const SECONDS_PER_WEEK: u64 = 86400 * 7;
+
+// version info for migration info
+const CONTRACT_NAME: &str = "astroport_lockdrop";
+const CONTRACT_VERSION: &str = "1";
 
 //----------------------------------------------------------------------------------------
 // Entry Points
@@ -36,6 +41,7 @@ pub fn instantiate(
     info: MessageInfo,
     msg: InstantiateMsg,
 ) -> StdResult<Response> {
+    set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     // CHECK :: init_timestamp needs to be valid
     if env.block.time.seconds() > msg.init_timestamp {
         return Err(StdError::generic_err(format!(

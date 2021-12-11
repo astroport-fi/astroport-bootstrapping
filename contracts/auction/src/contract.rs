@@ -13,17 +13,21 @@ use astroport_periphery::auction::{
 use astroport_periphery::helpers::{build_approve_cw20_msg, cw20_get_balance};
 use astroport_periphery::lockdrop::ExecuteMsg::EnableClaims as LockdropEnableClaims;
 
+use crate::state::{Config, State, UserInfo, CONFIG, STATE, USERS};
 use astroport::asset::{Asset, AssetInfo, PairInfo};
 use astroport::generator::{
     ExecuteMsg as GenExecuteMsg, PendingTokenResponse, QueryMsg as GenQueryMsg, RewardInfoResponse,
 };
 use astroport::pair::QueryMsg as AstroportPairQueryMsg;
-
-use crate::state::{Config, State, UserInfo, CONFIG, STATE, USERS};
 use astroport::querier::query_token_balance;
+use cw2::set_contract_version;
 use cw20::{BalanceResponse, Cw20ExecuteMsg, Cw20QueryMsg, Cw20ReceiveMsg};
 
 const UUSD_DENOM: &str = "uusd";
+
+// version info for migration info
+const CONTRACT_NAME: &str = "astroport_auction";
+const CONTRACT_VERSION: &str = "1";
 
 //----------------------------------------------------------------------------------------
 // Entry points
@@ -36,6 +40,7 @@ pub fn instantiate(
     info: MessageInfo,
     msg: InstantiateMsg,
 ) -> StdResult<Response> {
+    set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     // CHECK :: init_timestamp needs to be valid
     if env.block.time.seconds() > msg.init_timestamp {
         return Err(StdError::generic_err(format!(
