@@ -778,15 +778,13 @@ fn update_user_astro_incentives(
     lp_balance: Uint128,
     mut user_info: &mut UserInfo,
 ) -> StdResult<()> {
-    if total_astro_incentives.is_none() || user_lp_share.is_none() {
-        Ok(())
-    } else {
-        user_info.auction_incentive_amount = Some(
-            Decimal::from_ratio(user_lp_share.unwrap(), lp_balance)
-                * total_astro_incentives.unwrap(),
-        );
-        Ok(())
+    if let Some(total_astro_incentives) = total_astro_incentives {
+        if let Some(user_lp_share) = user_lp_share {
+            user_info.auction_incentive_amount =
+                Some(Decimal::from_ratio(user_lp_share, lp_balance) * total_astro_incentives);
+        }
     }
+    Ok(())
 }
 
 //----------------------------------------------------------------------------------------
