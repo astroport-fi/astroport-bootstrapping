@@ -1,0 +1,50 @@
+[
+  {
+    "address": "terra17mpuq65hw5kt7d44kpw4nk7x339xhznaa0duzv",
+    "amount": "2498087000",
+    "merkle_proof": [
+      "261fc09fd3d1316a455390d28d8866c2f5e89862c48be282ce2ba91dbf793269",
+      "1d6e1446388a3b1e3980eb40bd94e5fbbd5a92885501dd54594d694d6c030ae8",
+      "ee3493cbec4244a447783cf4958d2341c2587c2923e4fc07024bface10efbd61"
+    ],
+    "index": 0
+  },
+  {
+    "address": "terra1lv845g7szf9m3082qn3eehv9ewkjjr2kdyz0t6",
+    "amount": "2498730003",
+    "merkle_proof": [
+      "64fcc69fbd1aee71bede1d264198a3643067b57e11b270a51d9edfe0e0a69cd8",
+      "f82357af6efa10f23a787b3f7db1f89316425430c0c634294f87ec5db0d8ab32",
+      "ee3493cbec4244a447783cf4958d2341c2587c2923e4fc07024bface10efbd61"
+    ],
+    "index": 0
+  },
+  {
+    "address": "terra1mthww38ea56sjmwtswlvy0g4zzjspjwaw3e6t8",
+    "amount": "2503467000",
+    "merkle_proof": [
+      "fefa842e0bb16d25bff34bb92dbe7890c945fad13ab02d04ca3acf2edccadef2"
+    ],
+    "index": 0
+  },
+  {
+    "address": "terra1jdd392vxlx5u23yvekvvjzuna0gszttgtngfnt",
+    "amount": "2503467000",
+    "merkle_proof": [
+      "e8d6681818b3741cb46fbb79ca254ba2be86b54a2a8d8ace5d624a16bdc23dcc",
+      "f82357af6efa10f23a787b3f7db1f89316425430c0c634294f87ec5db0d8ab32",
+      "ee3493cbec4244a447783cf4958d2341c2587c2923e4fc07024bface10efbd61"
+    ],
+    "index": 0
+  },
+  {
+    "address": "terra1yskm9s4r0h0egg3lxe5wmmppr9s6lfau4j8yhc",
+    "amount": "2503516700",
+    "merkle_proof": [
+      "1078208148e42f2bccf929e8d2992936a7b2eb04eb6f9ba6f15e84a2ceaa3737",
+      "1d6e1446388a3b1e3980eb40bd94e5fbbd5a92885501dd54594d694d6c030ae8",
+      "ee3493cbec4244a447783cf4958d2341c2587c2923e4fc07024bface10efbd61"
+    ],
+    "index": 0
+  }
+]
