@@ -24,6 +24,8 @@ target
 /scripts/mainnet_gen_bluna_luna_generator_emissions_staking.ts
 /scripts/mainnet_bootstrap_astro_ust_pool.ts
 /scripts/list_of_users_eligible_for_airdrop.json
+/scripts/helpers/airdrop_data/*
+/scripts/testing_.ts
 test
 .idea
 .gitconfig
