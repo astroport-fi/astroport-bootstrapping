@@ -732,10 +732,22 @@ pub fn handle_claim_rewards_and_withdraw_lp_shares(
                         }
                         .to_cosmos_msg(&env)?,
                     );
+                }
+                // If no rewards to claim and no LP tokens to be withdrawn.
+                else if user_info.astro_incentive_transferred && withdraw_lp_shares.is_none() {
+                    return Err(StdError::generic_err(
+                        "Rewards already claimed. Provide number of LP tokens to claim!",
+                    ));
                 };
             } else {
                 return Err(StdError::generic_err("Pool info isn't set yet!"));
             }
+        }
+        // If no rewards to claim and no LP tokens to be withdrawn.
+        else if user_info.astro_incentive_transferred && withdraw_lp_shares.is_none() {
+            return Err(StdError::generic_err(
+                "Rewards already claimed. Provide number of LP tokens to claim!",
+            ));
         }
     } else {
         return Err(StdError::generic_err(

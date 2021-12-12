@@ -1018,7 +1018,9 @@ pub fn handle_claim_rewards_and_unlock_for_lockup(
     }
 
     if lockup_info.astroport_lp_transferred.is_some() {
-        return Err(StdError::generic_err("Everything was already withdrawn!"));
+        return Err(StdError::generic_err(
+            "Astro LP Tokens have already been claimed!",
+        ));
     }
 
     let mut cosmos_msgs = vec![];

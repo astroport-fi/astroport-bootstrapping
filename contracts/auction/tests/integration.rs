@@ -2268,6 +2268,11 @@ fn test_claim_rewards() {
 
     // ######    SUCCESS :: Successfully again claim staking rewards for User-1 ######
 
+    app.update_block(|b| {
+        b.height += 17280;
+        b.time = Timestamp::from_seconds(10992001)
+    });
+
     // Auction :: Check user-1 state (before claim)
     let user1info_before_claim2: astroport_periphery::auction::UserInfoResponse = app
         .wrap()
