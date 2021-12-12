@@ -13,6 +13,7 @@ import {
   Wallet,
   PublicKey,
   Fee,
+  MsgUpdateContractAdmin,
 } from "@terra-money/terra.js";
 import { readFileSync, writeFileSync } from "fs";
 import path from "path";
@@ -35,6 +36,7 @@ export function readArtifact(name: string = "artifact") {
 export interface Client {
   wallet: Wallet;
   terra: LCDClient | LocalTerra;
+  MULTI_SIG_TO_USE: String;
 }
 
 // Creates `Client` instance with `terra` and `wallet` to be used for interacting with terra
@@ -46,6 +48,7 @@ export function newClient(): Client {
       URL: String(process.env.LCD_CLIENT_URL),
       chainID: String(process.env.CHAIN_ID),
     });
+
     client.wallet = recover(client.terra, process.env.WALLET);
   } else {
     client.terra = new LocalTerra();
@@ -124,6 +127,22 @@ export async function uploadContract(
   const uploadMsg = new MsgStoreCode(wallet.key.accAddress, contract);
   let result = await performTransaction(terra, wallet, uploadMsg);
   return Number(result.logs[0].eventsByType.store_code.code_id[0]); // code_id
+}
+
+export async function transfer_ownership_to_multisig(
+  terra: LocalTerra | LCDClient,
+  wallet: Wallet,
+  multisig_address: string,
+  contract_address: string
+) {
+  let msg = new MsgUpdateContractAdmin(
+    wallet.key.accAddress,
+    multisig_address,
+    contract_address
+  );
+  // TransferOwnership : TX
+  let tx = await performTransaction(terra, wallet, msg);
+  return tx;
 }
 
 export async function instantiateContract(

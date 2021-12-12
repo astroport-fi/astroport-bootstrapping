@@ -102,7 +102,7 @@ async function main() {
       network.mir_generator_proxy_contract_code_id,
       {
         generator_contract_addr: network.astroport_generator_address,
-        pair_addr: network.mir_ust_astroport_pool,
+        pair_addr: network.mir_token,
         lp_token_addr: network.mir_ust_astroport_lp_token_address,
         reward_contract_addr: network.mir_lp_staking_contract_address, // MIR-UST LP Staking contract which gives MIR emissions
         reward_token_addr: network.mir_token,

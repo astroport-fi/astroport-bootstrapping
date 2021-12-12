@@ -95,7 +95,7 @@
   ```bash
   export WALLET="<mnemonic seed>"
   export LCD_CLIENT_URL="https://bombay-lcd.terra.dev"
-  export CHAIN_ID="<Chain_ID>"
+  export CHAIN_ID="bombay-12"
   ```
 
   For mainnet -

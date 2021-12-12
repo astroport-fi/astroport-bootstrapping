@@ -55,10 +55,10 @@ export function prepareDataForMerkleTree(
 ) {
   let dataArray = [];
   for (let i = str; i < end; i++) {
-    console.log(data[i]);
+    // console.log(data[i]);
     let dataObj = JSON.parse(JSON.stringify(data[i]));
     let ac = { address: dataObj[0], amount: dataObj[1].toString() };
-    console.log(ac);
+    // console.log(ac);
     dataArray.push(ac);
   }
   return dataArray;
