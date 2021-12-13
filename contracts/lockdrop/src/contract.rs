@@ -469,6 +469,15 @@ pub fn handle_update_pool(
     // CHECK ::: Is LP Token Pool initialized
     let mut pool_info = ASSET_POOLS.load(deps.storage, &terraswap_lp_token)?;
 
+    // CHECK ::: Incentives cannot be decreased when lockdrop in process
+    if env.block.time.seconds() > config.init_timestamp
+        && incentives_share < pool_info.incentives_share
+    {
+        return Err(StdError::generic_err(
+            "Lockdrop in process. Incentives cannot be decreased for any pool",
+        ));
+    }
+
     // update total incentives
     state.total_incentives_share =
         state.total_incentives_share - pool_info.incentives_share + incentives_share;
@@ -978,10 +987,19 @@ pub fn handle_claim_rewards_and_unlock_for_lockup(
     duration: u64,
     withdraw_lp_stake: bool,
 ) -> StdResult<Response> {
+    let config = CONFIG.load(deps.storage)?;
     let state = STATE.load(deps.storage)?;
 
     if !state.are_claims_allowed {
         return Err(StdError::generic_err("Reward claim not allowed"));
+    }
+
+    if env.block.time.seconds()
+        < config.init_timestamp + config.deposit_window + config.withdrawal_window
+    {
+        return Err(StdError::generic_err(
+            "Deposit / withdraw windows are still open",
+        ));
     }
 
     let config = CONFIG.load(deps.storage)?;
