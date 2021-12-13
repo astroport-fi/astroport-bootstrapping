@@ -1097,10 +1097,6 @@ pub fn handle_claim_rewards_and_unlock_for_lockup(
                     }
                     .to_cosmos_msg(&env)?,
                 );
-            } else if user_info.astro_transferred && !withdraw_lp_stake {
-                return Err(StdError::generic_err(
-                    "No staking rewards available to claim, lockdrop reward already claimed!",
-                ));
             }
         } else if user_info.astro_transferred && !withdraw_lp_stake {
             return Err(StdError::generic_err("No rewards available to claim!"));
@@ -1242,32 +1238,6 @@ pub fn callback_withdraw_user_rewards_for_lockup_optional_withdraw(
         attr("duration", duration.to_string()),
     ];
 
-    // Transfers claimable one time ASTRO rewards to the user that the user gets for all his lock
-    if let Some(astro_token) = &config.astro_token {
-        if !user_info.astro_transferred {
-            // Calculating how much Astro user can claim (from total one time reward)
-            let total_claimable_astro_rewards = user_info
-                .total_astro_rewards
-                .checked_sub(user_info.delegated_astro_rewards)?;
-            if total_claimable_astro_rewards > Uint128::zero() {
-                cosmos_msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
-                    contract_addr: astro_token.to_string(),
-                    funds: vec![],
-                    msg: to_binary(&Cw20ExecuteMsg::Transfer {
-                        recipient: user_address.to_string(),
-                        amount: total_claimable_astro_rewards,
-                    })?,
-                }));
-            }
-            user_info.astro_transferred = true;
-            attributes.push(attr(
-                "total_claimable_astro_reward",
-                total_claimable_astro_rewards,
-            ));
-            USER_INFO.save(deps.storage, &user_address, &user_info)?;
-        }
-    }
-
     if let Some(MigrationInfo {
         astroport_lp_token, ..
     }) = &pool_info.migration_info
@@ -1331,6 +1301,16 @@ pub fn callback_withdraw_user_rewards_for_lockup_optional_withdraw(
             }
             attributes.push(attr("generator_astro_reward", pending_astro_rewards));
 
+            // If this is a void transaction (no state change), then return error.
+            // Void tx scenario = ASTRO already claimed, 0 pending ASTRO staking reward, no proxy rewards, not unlocking LP tokens in this tx
+            if !withdraw_lp_stake
+                && user_info.astro_transferred
+                && pending_astro_rewards == Uint128::zero()
+                && rwi.proxy_reward_token.is_none()
+            {
+                return Err(StdError::generic_err("No rewards available to claim!"));
+            }
+
             // If this LP token is getting dual incentives
             if let Some(proxy_reward_token) = rwi.proxy_reward_token {
                 // Calculate claimable proxy staking rewards for this lockup
@@ -1339,6 +1319,16 @@ pub fn callback_withdraw_user_rewards_for_lockup_optional_withdraw(
                 let pending_proxy_rewards =
                     total_lockup_proxy_rewards - lockup_info.generator_proxy_debt;
                 lockup_info.generator_proxy_debt = total_lockup_proxy_rewards;
+
+                // If this is a void transaction (no state change), then return error.
+                // Void tx scenario = ASTRO already claimed, 0 pending ASTRO staking reward, 0 pending proxy rewards, not unlocking LP tokens in this tx
+                if !withdraw_lp_stake
+                    && user_info.astro_transferred
+                    && pending_astro_rewards == Uint128::zero()
+                    && pending_proxy_rewards == Uint128::zero()
+                {
+                    return Err(StdError::generic_err("No rewards available to claim!"));
+                }
 
                 // If claimable proxy staking rewards > 0, claim them
                 if pending_proxy_rewards > Uint128::zero() {
@@ -1386,6 +1376,32 @@ pub fn callback_withdraw_user_rewards_for_lockup_optional_withdraw(
         LOCKUP_INFO.save(deps.storage, lockup_key, &lockup_info)?;
     } else if withdraw_lp_stake {
         return Err(StdError::generic_err("Pool should be migrated!"));
+    }
+
+    // Transfers claimable one time ASTRO rewards to the user that the user gets for all his lock
+    if let Some(astro_token) = &config.astro_token {
+        if !user_info.astro_transferred {
+            // Calculating how much Astro user can claim (from total one time reward)
+            let total_claimable_astro_rewards = user_info
+                .total_astro_rewards
+                .checked_sub(user_info.delegated_astro_rewards)?;
+            if total_claimable_astro_rewards > Uint128::zero() {
+                cosmos_msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
+                    contract_addr: astro_token.to_string(),
+                    funds: vec![],
+                    msg: to_binary(&Cw20ExecuteMsg::Transfer {
+                        recipient: user_address.to_string(),
+                        amount: total_claimable_astro_rewards,
+                    })?,
+                }));
+            }
+            user_info.astro_transferred = true;
+            attributes.push(attr(
+                "total_claimable_astro_reward",
+                total_claimable_astro_rewards,
+            ));
+            USER_INFO.save(deps.storage, &user_address, &user_info)?;
+        }
     }
 
     Ok(Response::new()
