@@ -5,7 +5,6 @@
   "required": [
     "astro_transferred",
     "claimable_generator_astro_debt",
-    "claimable_generator_proxy_debt",
     "delegated_astro_rewards",
     "lockup_infos",
     "lockup_positions_index",
@@ -18,14 +17,6 @@
     },
     "claimable_generator_astro_debt": {
       "description": "ASTRO tokens receivable as generator rewards that user can claim",
-      "allOf": [
-        {
-          "$ref": "#/definitions/Uint128"
-        }
-      ]
-    },
-    "claimable_generator_proxy_debt": {
-      "description": "Proxy tokens receivable as generator rewards that user can claim",
       "allOf": [
         {
           "$ref": "#/definitions/Uint128"

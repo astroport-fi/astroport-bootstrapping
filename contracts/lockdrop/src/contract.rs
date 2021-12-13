@@ -1587,7 +1587,6 @@ pub fn query_user_info(deps: Deps, env: Env, user: String) -> StdResult<UserInfo
     let mut lockup_infos = vec![];
 
     let mut claimable_generator_astro_debt = Uint128::zero();
-    let mut claimable_generator_proxy_debt = Uint128::zero();
     for pool in ASSET_POOLS
         .keys(deps.storage, None, None, Order::Ascending)
         .map(|v| Addr::unchecked(String::from_utf8(v).expect("Addr deserialization error!")))
@@ -1600,7 +1599,6 @@ pub fn query_user_info(deps: Deps, env: Env, user: String) -> StdResult<UserInfo
             let lockup_info = query_lockup_info(deps, &env, &user, pool.to_string(), duration)?;
             total_astro_rewards += lockup_info.astro_rewards;
             claimable_generator_astro_debt += lockup_info.claimable_generator_astro_debt;
-            claimable_generator_proxy_debt += lockup_info.claimable_generator_proxy_debt;
             lockup_infos.push(lockup_info);
         }
     }
@@ -1611,7 +1609,6 @@ pub fn query_user_info(deps: Deps, env: Env, user: String) -> StdResult<UserInfo
         astro_transferred: user_info.astro_transferred,
         lockup_infos,
         claimable_generator_astro_debt,
-        claimable_generator_proxy_debt,
         lockup_positions_index: user_info.lockup_positions_index,
     })
 }
