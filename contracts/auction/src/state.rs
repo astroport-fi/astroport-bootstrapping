@@ -74,4 +74,6 @@ pub struct UserInfo {
     pub astro_incentive_transferred: bool,
     // ASTRO staking incentives (LP token staking) withdrawn by the user
     pub generator_astro_debt: Uint128,
+    // Ratio of ASTRO rewards claimed to amount. Used to calculate ASTRO incentives claimable by each user
+    pub user_gen_astro_per_share: Decimal,
 }

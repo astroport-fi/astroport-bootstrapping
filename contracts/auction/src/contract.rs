@@ -591,6 +591,13 @@ pub fn handle_stake_lp_tokens(
         astro_ust_pool_address: _,
     }) = config.pool_info
     {
+        // QUERY CURRENT LP TOKEN BALANCE (FOR SAFETY - IN ANY CASE)
+        let cur_lp_balance = query_token_balance(
+            &deps.querier,
+            astro_ust_lp_token_address.clone(),
+            env.contract.address.clone(),
+        )?;
+
         // Init response
         let mut response = Response::new()
             .add_attribute("action", "Auction::ExecuteMsg::StakeLPTokens")
@@ -602,7 +609,7 @@ pub fn handle_stake_lp_tokens(
         response.messages.push(SubMsg::new(build_approve_cw20_msg(
             astro_ust_lp_token_address.to_string(),
             generator.to_string(),
-            lp_shares_minted,
+            cur_lp_balance,
             env.block.height + 1u64,
         )?));
         response.messages.push(SubMsg::new(WasmMsg::Execute {
@@ -611,7 +618,7 @@ pub fn handle_stake_lp_tokens(
             msg: to_binary(&Cw20ExecuteMsg::Send {
                 contract: generator.to_string(),
                 msg: to_binary(&astroport::generator::Cw20HookMsg::Deposit {})?,
-                amount: lp_shares_minted,
+                amount: cur_lp_balance,
             })?,
         }));
 
@@ -675,7 +682,9 @@ pub fn handle_claim_rewards_and_withdraw_lp_shares(
                 &user_info,
             )?;
             if max_withdrawable.is_none() || withdraw_lp_shares > max_withdrawable.unwrap() {
-                return Err(StdError::generic_err("No available LP shares to withdraw"));
+                return Err(StdError::generic_err(
+                    "No available LP shares to withdraw / Invalid amount",
+                ));
             }
         }
 
@@ -733,12 +742,6 @@ pub fn handle_claim_rewards_and_withdraw_lp_shares(
                         .to_cosmos_msg(&env)?,
                     );
                 }
-                // If no rewards to claim and no LP tokens to be withdrawn.
-                else if user_info.astro_incentive_transferred && withdraw_lp_shares.is_none() {
-                    return Err(StdError::generic_err(
-                        "Rewards already claimed. Provide number of LP tokens to claim!",
-                    ));
-                };
             } else {
                 return Err(StdError::generic_err("Pool info isn't set yet!"));
             }
@@ -836,22 +839,6 @@ pub fn callback_withdraw_user_rewards_and_optionally_lp(
             .ok_or_else(|| StdError::generic_err("Lp share should be calculated"))?;
 
         let astroport_lp_amount = user_lp_shares - user_info.claimed_lp_shares;
-        // Transfer ASTRO incentives when they have been calculated
-        if user_info.auction_incentive_amount.is_some() && !user_info.astro_incentive_transferred {
-            cosmos_msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
-                contract_addr: config.astro_token_address.to_string(),
-                funds: vec![],
-                msg: to_binary(&Cw20ExecuteMsg::Transfer {
-                    recipient: user_address.to_string(),
-                    amount: user_info.auction_incentive_amount.unwrap(),
-                })?,
-            }));
-            user_info.astro_incentive_transferred = true;
-            attributes.push(attr(
-                "auction_astro_reward",
-                user_info.auction_incentive_amount.unwrap(),
-            ));
-        }
 
         if state.is_lp_staked {
             let generator = config.generator_contract.expect("Generator should be set!");
@@ -863,8 +850,19 @@ pub fn callback_withdraw_user_rewards_and_optionally_lp(
                 },
             )?;
 
-            let total_user_astro_rewards = state.generator_astro_per_share * astroport_lp_amount;
-            let pending_astro_rewards = total_user_astro_rewards - user_info.generator_astro_debt;
+            // Calculate ASTRO staking reward receivable by the user
+            let pending_astro_rewards = (state.generator_astro_per_share * astroport_lp_amount)
+                - (user_info.user_gen_astro_per_share * astroport_lp_amount);
+            user_info.user_gen_astro_per_share = state.generator_astro_per_share;
+            user_info.generator_astro_debt += pending_astro_rewards;
+
+            // If no rewards / LP tokens to be claimed
+            if pending_astro_rewards == Uint128::zero()
+                && user_info.astro_incentive_transferred
+                && withdraw_lp_shares.is_none()
+            {
+                return Err(StdError::generic_err("Nothing to claim!"));
+            }
 
             cosmos_msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
                 contract_addr: rwi.base_reward_token.to_string(),
@@ -889,6 +887,23 @@ pub fn callback_withdraw_user_rewards_and_optionally_lp(
             }
         }
 
+        // Transfer ASTRO incentives when they have been calculated
+        if user_info.auction_incentive_amount.is_some() && !user_info.astro_incentive_transferred {
+            cosmos_msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
+                contract_addr: config.astro_token_address.to_string(),
+                funds: vec![],
+                msg: to_binary(&Cw20ExecuteMsg::Transfer {
+                    recipient: user_address.to_string(),
+                    amount: user_info.auction_incentive_amount.unwrap(),
+                })?,
+            }));
+            user_info.astro_incentive_transferred = true;
+            attributes.push(attr(
+                "auction_astro_reward",
+                user_info.auction_incentive_amount.unwrap(),
+            ));
+        }
+
         if let Some(withdrawn_lp_shares) = withdraw_lp_shares {
             cosmos_msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
                 contract_addr: astro_ust_lp_token_address.to_string(),
@@ -901,8 +916,6 @@ pub fn callback_withdraw_user_rewards_and_optionally_lp(
             attributes.push(attr("lp_withdrawn", withdrawn_lp_shares));
             user_info.claimed_lp_shares += withdrawn_lp_shares;
         }
-        user_info.generator_astro_debt =
-            state.generator_astro_per_share * (user_lp_shares - user_info.claimed_lp_shares);
         USERS.save(deps.storage, &user_address, &user_info)?;
     } else {
         return Err(StdError::generic_err("Pool info isn't set yet!"));
@@ -1113,6 +1126,7 @@ fn query_user_info(deps: Deps, env: Env, user_address: String) -> StdResult<User
         astro_incentive_transferred: user_info.astro_incentive_transferred,
         generator_astro_debt: user_info.generator_astro_debt,
         claimable_generator_astro: Uint128::zero(),
+        user_gen_astro_per_share: user_info.user_gen_astro_per_share,
     };
 
     // If ASTRO - UST Pool info is present
@@ -1169,9 +1183,9 @@ fn query_user_info(deps: Deps, env: Env, user_address: String) -> StdResult<User
                     + Decimal::from_ratio(pending_rewards.pending, lp_balance);
 
                 // Calculated claimable ASTRO staking rewards
-                user_info_response.claimable_generator_astro = state.generator_astro_per_share
-                    * astroport_lp_amount
-                    - user_info.generator_astro_debt;
+                user_info_response.claimable_generator_astro = (state.generator_astro_per_share
+                    * astroport_lp_amount)
+                    - (user_info.user_gen_astro_per_share * astroport_lp_amount);
             }
 
             // Updated withdrawable LP shares balance
