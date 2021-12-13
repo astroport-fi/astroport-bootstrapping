@@ -864,6 +864,7 @@ pub fn callback_withdraw_user_rewards_and_optionally_lp(
                 return Err(StdError::generic_err("Nothing to claim!"));
             }
 
+            // COSMOS MSG ::: CLAIM Pending Generator ASTRO Rewards
             cosmos_msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
                 contract_addr: rwi.base_reward_token.to_string(),
                 funds: vec![],
@@ -874,7 +875,7 @@ pub fn callback_withdraw_user_rewards_and_optionally_lp(
             }));
             attributes.push(attr("generator_astro_reward", pending_astro_rewards));
 
-            //  COSMOSMSG :: If LP Tokens are staked, we unstake the amount which needs to be returned to the user
+            //  COSMOS MSG :: If LP Tokens are staked, we unstake the amount which needs to be returned to the user
             if let Some(withdrawn_lp_shares) = withdraw_lp_shares {
                 cosmos_msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
                     contract_addr: generator.to_string(),
