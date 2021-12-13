@@ -8,8 +8,8 @@ use cosmwasm_std::{
 
 use astroport_periphery::lockdrop::{
     CallbackMsg, ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, LockUpInfoResponse,
-    MigrateMsg, MigrationInfo, PoolResponse, QueryMsg, StateResponse, UpdateConfigMsg,
-    UserInfoResponse,
+    LockUpInfoSummary, MigrateMsg, MigrationInfo, PoolResponse, QueryMsg, StateResponse,
+    UpdateConfigMsg, UserInfoResponse, UserInfoWithListResponse,
 };
 
 use astroport::generator::{
@@ -237,6 +237,9 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::State {} => to_binary(&query_state(deps)?),
         QueryMsg::Pool { terraswap_lp_token } => to_binary(&query_pool(deps, terraswap_lp_token)?),
         QueryMsg::UserInfo { address } => to_binary(&query_user_info(deps, env, address)?),
+        QueryMsg::UserInfoWithLockupsList { address } => {
+            to_binary(&query_user_info_with_lockups_list(deps, env, address)?)
+        }
         QueryMsg::LockUpInfo {
             user_address,
             terraswap_lp_token,
@@ -1575,6 +1578,44 @@ pub fn query_user_info(deps: Deps, env: Env, user: String) -> StdResult<UserInfo
         lockup_infos,
         claimable_generator_astro_debt,
         claimable_generator_proxy_debt,
+        lockup_positions_index: user_info.lockup_positions_index,
+    })
+}
+
+/// @dev Returns summarized details regarding the user with lockups list
+pub fn query_user_info_with_lockups_list(
+    deps: Deps,
+    _env: Env,
+    user: String,
+) -> StdResult<UserInfoWithListResponse> {
+    let user_address = deps.api.addr_validate(&user)?;
+    let user_info = USER_INFO
+        .may_load(deps.storage, &user_address)?
+        .unwrap_or_default();
+
+    let mut lockup_infos = vec![];
+
+    for pool in ASSET_POOLS
+        .keys(deps.storage, None, None, Order::Ascending)
+        .map(|v| Addr::unchecked(String::from_utf8(v).expect("Addr deserialization error!")))
+    {
+        for duration in LOCKUP_INFO
+            .prefix((&pool, &user_address))
+            .keys(deps.storage, None, None, Order::Ascending)
+            .map(|v| u64::from_be_bytes(v.try_into().expect("Duration deserialization error!")))
+        {
+            lockup_infos.push(LockUpInfoSummary {
+                pool_address: pool.to_string(),
+                duration,
+            });
+        }
+    }
+
+    Ok(UserInfoWithListResponse {
+        total_astro_rewards: user_info.total_astro_rewards,
+        delegated_astro_rewards: user_info.delegated_astro_rewards,
+        astro_transferred: user_info.astro_transferred,
+        lockup_infos,
         lockup_positions_index: user_info.lockup_positions_index,
     })
 }

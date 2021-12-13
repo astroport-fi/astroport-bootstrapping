@@ -149,6 +149,9 @@ pub enum QueryMsg {
     UserInfo {
         address: String,
     },
+    UserInfoWithLockupsList {
+        address: String,
+    },
     LockUpInfo {
         user_address: String,
         terraswap_lp_token: String,
@@ -237,6 +240,26 @@ pub struct UserInfoResponse {
     pub claimable_generator_proxy_debt: Uint128,
     /// Number of lockup positions the user is having
     pub lockup_positions_index: u32,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct UserInfoWithListResponse {
+    /// Total ASTRO tokens user received as rewards for participation in the lockdrop
+    pub total_astro_rewards: Uint128,
+    /// Total ASTRO tokens user delegated to the LP bootstrap auction pool
+    pub delegated_astro_rewards: Uint128,
+    /// ASTRO tokens transferred to user
+    pub astro_transferred: bool,
+    /// Lockup positions
+    pub lockup_infos: Vec<LockUpInfoSummary>,
+    /// Number of lockup positions the user is having
+    pub lockup_positions_index: u32,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct LockUpInfoSummary {
+    pub pool_address: String,
+    pub duration: u64,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
