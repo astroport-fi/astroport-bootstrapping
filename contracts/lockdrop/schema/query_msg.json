@@ -69,6 +69,26 @@
     {
       "type": "object",
       "required": [
+        "user_info_with_lockups_list"
+      ],
+      "properties": {
+        "user_info_with_lockups_list": {
+          "type": "object",
+          "required": [
+            "address"
+          ],
+          "properties": {
+            "address": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
         "lock_up_info"
       ],
       "properties": {
