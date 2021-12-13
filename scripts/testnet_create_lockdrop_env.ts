@@ -71,12 +71,12 @@ async function main() {
         initial_balances: [
           {
             address: wallet.key.accAddress,
-            amount: String(1_000_000_000_000000),
+            amount: String(10_000_000_000_000000),
           },
         ],
         mint: {
           minter: wallet.key.accAddress,
-          cap: String(1_000_000_000_000000),
+          cap: String(10_000_000_000_000000),
         },
       },
       "ASTRO Token for testing"

@@ -1,3 +1,5 @@
+use crate::crypto::verify_claim;
+use crate::state::{Config, State, CONFIG, STATE, USERS};
 use astroport_periphery::airdrop::{
     ClaimResponse, ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg,
     StateResponse, UserInfoResponse,
@@ -8,10 +10,12 @@ use cosmwasm_std::{
     attr, entry_point, from_binary, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response,
     StdError, StdResult, Uint128,
 };
-
-use crate::crypto::verify_claim;
-use crate::state::{Config, State, CONFIG, STATE, USERS};
+use cw2::set_contract_version;
 use cw20::Cw20ReceiveMsg;
+
+// version info for migration info
+const CONTRACT_NAME: &str = "astroport_airdrop";
+const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 //----------------------------------------------------------------------------------------
 // Entry points
@@ -24,6 +28,7 @@ pub fn instantiate(
     info: MessageInfo,
     msg: InstantiateMsg,
 ) -> StdResult<Response> {
+    set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     let from_timestamp = msg
         .from_timestamp
         .unwrap_or_else(|| env.block.time.seconds());

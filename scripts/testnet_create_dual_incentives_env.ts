@@ -78,7 +78,7 @@ async function main() {
         anchor_token: network.anc_token,
         staking_token: network.anc_ust_astroport_lp_token_address,
         distribution_schedule: [
-          [INIT_TIMETAMP, TILL_TIMETAMP, String(INCENTIVES)],
+          [INIT_BLOCK_HEIGHT, TILL_BLOCK_HEIGHT, String(INCENTIVES)],
         ],
       }
     );
@@ -127,7 +127,7 @@ async function main() {
     writeArtifact(network, terra.config.chainID);
   }
 
-  // Deploy :: MIR-UST STAKING CONTRACT
+  // // Deploy :: MIR-UST STAKING CONTRACT
   if (!network.mir_lp_staking_contract_address) {
     console.log("Deploying mirror staking contract...");
     network.mir_lp_staking_contract_address = await instantiateContract(
@@ -139,7 +139,7 @@ async function main() {
         mirror_token: network.mir_token,
         mint_contract: wallet.key.accAddress, // mock value
         oracle_contract: wallet.key.accAddress, // mock value
-        terraswap_factory: wallet.key.accAddress, // mock value
+        terraswap_factory: network.terraswap_factory_address, // mock value
         base_denom: "uusd",
         premium_min_update_interval: 0,
         short_reward_contract: wallet.key.accAddress, // mock value
@@ -167,8 +167,8 @@ async function main() {
       network.mir_lp_staking_contract_address,
       {
         register_asset: {
-          asset_token: network.mir_ust_astroport_pool,
-          staking_token: pool_info.liquidity_token,
+          asset_token: network.mir_token,
+          staking_token: network.mir_ust_astroport_lp_token_address,
         },
       }
     );
@@ -194,7 +194,7 @@ async function main() {
         msg: Buffer.from(
           JSON.stringify({
             deposit_reward: {
-              rewards: [[network.mir_ust_astroport_pool, String(INCENTIVES)]],
+              rewards: [[network.mir_token, String(INCENTIVES)]],
             },
           })
         ).toString("base64"),
@@ -244,7 +244,6 @@ async function main() {
     console.log(
       `ORION-UST STAKING CONTRACT deployed successfully, address : ${network.orion_lp_staking_contract_address}`
     );
-    network.orion_lp_staking_contract_address = true;
     writeArtifact(network, terra.config.chainID);
   } else {
     console.log(`ORION-UST STAKING CONTRACT already deployed on bombay-12`);
@@ -632,85 +631,85 @@ async function main() {
   // ##################### APOLLO-UST STAKING CONTRACT #####################
 
   // APOLLO-FACTORY  CONTRACT ID
-  if (!network.apollo_factory_contract_code_id) {
-    network.apollo_factory_contract_code_id = await uploadContract(
-      terra,
-      wallet,
-      join(ARTIFACTS_PATH, "apollo_factory.wasm")
-    );
-    console.log(
-      `apollo_factory id = ${network.apollo_factory_contract_code_id}`
-    );
-    writeArtifact(network, terra.config.chainID);
-  }
+  // if (!network.apollo_factory_contract_code_id) {
+  //   network.apollo_factory_contract_code_id = await uploadContract(
+  //     terra,
+  //     wallet,
+  //     join(ARTIFACTS_PATH, "apollo_factory.wasm")
+  //   );
+  //   console.log(
+  //     `apollo_factory id = ${network.apollo_factory_contract_code_id}`
+  //   );
+  //   writeArtifact(network, terra.config.chainID);
+  // }
 
-  // APOLLO-UST STAKING CONTRACT ID
-  if (!network.apollo_lp_staking_contract_code_id) {
-    network.apollo_lp_staking_contract_code_id = await uploadContract(
-      terra,
-      wallet,
-      join(ARTIFACTS_PATH, "apollo_staking.wasm")
-    );
-    console.log(
-      `apollo_LP_staking id = ${network.apollo_lp_staking_contract_code_id}`
-    );
-    writeArtifact(network, terra.config.chainID);
-  }
+  // // APOLLO-UST STAKING CONTRACT ID
+  // if (!network.apollo_lp_staking_contract_code_id) {
+  //   network.apollo_lp_staking_contract_code_id = await uploadContract(
+  //     terra,
+  //     wallet,
+  //     join(ARTIFACTS_PATH, "apollo_staking.wasm")
+  //   );
+  //   console.log(
+  //     `apollo_LP_staking id = ${network.apollo_lp_staking_contract_code_id}`
+  //   );
+  //   writeArtifact(network, terra.config.chainID);
+  // }
 
   // Deploy :: APOLLO FACTORY CONTRACT
-  if (
-    network.apollo_factory_contract_code_id &&
-    !network.apollo_factory_address
-  ) {
-    network.apollo_factory_address = await instantiateContract(
-      terra,
-      wallet,
-      network.apollo_factory_contract_code_id,
-      {
-        warchest: wallet.key.accAddress,
-        max_rewards: "3000000000000",
-        distribution_schedule: [[]],
-        oracle: wallet.key.accAddress,
-        apollo_token: network.apollo_token,
-        apollo_reward_percentage: "",
-      }
-    );
-    console.log(
-      `APOLLO FACTORY CONTRACT deployed successfully, address : ${network.apollo_factory_address}`
-    );
-    writeArtifact(network, terra.config.chainID);
-  } else {
-    console.log(`APOLLO FACTORY CONTRACT already deployed on bombay-12`);
-  }
+  // if (
+  //   network.apollo_factory_contract_code_id &&
+  //   !network.apollo_factory_address
+  // ) {
+  //   network.apollo_factory_address = await instantiateContract(
+  //     terra,
+  //     wallet,
+  //     network.apollo_factory_contract_code_id,
+  //     {
+  //       warchest: wallet.key.accAddress,
+  //       max_rewards: "3000000000000",
+  //       distribution_schedule: [[]],
+  //       oracle: wallet.key.accAddress,
+  //       apollo_token: network.apollo_token,
+  //       apollo_reward_percentage: "",
+  //     }
+  //   );
+  //   console.log(
+  //     `APOLLO FACTORY CONTRACT deployed successfully, address : ${network.apollo_factory_address}`
+  //   );
+  //   writeArtifact(network, terra.config.chainID);
+  // } else {
+  //   console.log(`APOLLO FACTORY CONTRACT already deployed on bombay-12`);
+  // }
 
   // Deploy :: APOLLO-UST STAKING CONTRACT
-  if (!network.apollo_lp_staking_contract_address) {
-    network.apollo_lp_staking_contract_address = await instantiateContract(
-      terra,
-      wallet,
-      network.apollo_lp_staking_contract_code_id,
-      {
-        apollo_factory: network.apollo_factory_address,
-        apollo_collector: wallet.key.accAddress,
-        base_token: network.apollo_ust_astroport_lp_token_address,
-        performance_fee: "",
-        base_denom: "uusd",
-        asset_token: network.apollo_token,
-        asset_token_pair: network.apollo_ust_astroport_pool,
-        max_spread: "",
-        swap_commission: wallet.key.accAddress,
-        oracle_contract: wallet.key.accAddress,
-        apollo_strategy_id: { minimum_time: "", percentage_loss: "0" },
-        reward_token: network.apollo_token,
-      }
-    );
-    console.log(
-      `APOLLO-UST STAKING CONTRACT deployed successfully, address : ${network.apollo_lp_staking_contract_address}`
-    );
-    writeArtifact(network, terra.config.chainID);
-  } else {
-    console.log(`PSI-UST STAKING CONTRACT already deployed on bombay-12`);
-  }
+  // if (!network.apollo_lp_staking_contract_address) {
+  //   network.apollo_lp_staking_contract_address = await instantiateContract(
+  //     terra,
+  //     wallet,
+  //     network.apollo_lp_staking_contract_code_id,
+  //     {
+  //       apollo_factory: network.apollo_factory_address,
+  //       apollo_collector: wallet.key.accAddress,
+  //       base_token: network.apollo_ust_astroport_lp_token_address,
+  //       performance_fee: "",
+  //       base_denom: "uusd",
+  //       asset_token: network.apollo_token,
+  //       asset_token_pair: network.apollo_ust_astroport_pool,
+  //       max_spread: "",
+  //       swap_commission: wallet.key.accAddress,
+  //       oracle_contract: wallet.key.accAddress,
+  //       apollo_strategy_id: { minimum_time: "", percentage_loss: "0" },
+  //       reward_token: network.apollo_token,
+  //     }
+  //   );
+  //   console.log(
+  //     `APOLLO-UST STAKING CONTRACT deployed successfully, address : ${network.apollo_lp_staking_contract_address}`
+  //   );
+  //   writeArtifact(network, terra.config.chainID);
+  // } else {
+  //   console.log(`PSI-UST STAKING CONTRACT already deployed on bombay-12`);
+  // }
 }
 
 function delay(ms: number) {

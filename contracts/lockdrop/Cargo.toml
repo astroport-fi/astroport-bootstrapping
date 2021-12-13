@@ -1,7 +1,7 @@
 [package]
 name = "astroport-lockdrop"
 version = "1.0.0"
-authors = ["alien Hunter <alienHunterOnMars@protonmail.com>"]
+authors = ["_astromartian"]
 edition = "2018"
 
 
@@ -39,7 +39,8 @@ astroport = {git = "https://github.com/astroport-fi/astroport.git", branch = "ma
 astroport-periphery =  { path = "../../packages/astroport_periphery" }
 terraswap = "2.4.0"
 cosmwasm-std = { version = "0.16.0", features = ["iterator"] }
-cw20 = { version = "0.8" } 
+cw20 = { version = "0.8" }
+cw2 = { version = "0.8" } 
 cw-storage-plus = "0.8"
 schemars = "0.8.3"
 serde = { version = "1.0.127", default-features = false, features = ["derive"] }

@@ -126,6 +126,7 @@ pub struct UserInfoResponse {
     pub astro_incentive_transferred: bool,
     pub claimable_generator_astro: Uint128,
     pub generator_astro_debt: Uint128,
+    pub user_gen_astro_per_share: Decimal,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

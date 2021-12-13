@@ -405,7 +405,6 @@ fn instantiate_generator_and_vesting(
     let vesting_code_id = app.store_code(vesting_contract);
 
     let init_msg = astroport::vesting::InstantiateMsg {
-        owner: owner.to_string(),
         token_addr: astro_token_instance.clone().to_string(),
     };
 
@@ -473,10 +472,8 @@ fn instantiate_generator_and_vesting(
 
     let tokens_per_block = Uint128::new(10_000000);
 
-    let msg = astroport::generator::ExecuteMsg::UpdateConfig {
-        owner: None,
-        tokens_per_block: Some(tokens_per_block),
-        vesting_contract: None,
+    let msg = astroport::generator::ExecuteMsg::SetTokensPerBlock {
+        amount: tokens_per_block,
     };
     app.execute_contract(owner.clone(), generator_instance.clone(), &msg, &[])
         .unwrap();
@@ -2267,6 +2264,11 @@ fn test_claim_rewards() {
     );
 
     // ######    SUCCESS :: Successfully again claim staking rewards for User-1 ######
+
+    app.update_block(|b| {
+        b.height += 17280;
+        b.time = Timestamp::from_seconds(10992001)
+    });
 
     // Auction :: Check user-1 state (before claim)
     let user1info_before_claim2: astroport_periphery::auction::UserInfoResponse = app

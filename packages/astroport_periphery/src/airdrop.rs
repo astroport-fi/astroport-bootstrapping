@@ -92,11 +92,4 @@ pub struct ClaimResponse {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct SignatureResponse {
-    pub is_valid: bool,
-    pub public_key: String,
-    pub recovered_address: String,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct MigrateMsg {}

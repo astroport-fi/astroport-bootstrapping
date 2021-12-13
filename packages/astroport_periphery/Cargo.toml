@@ -1,10 +1,22 @@
 [package]
 name = "astroport-periphery"
 version = "1.0.0"
-authors = ["alien Hunter <alienHunterOnMars@protonmail.com>"]
+authors = ["_astromartian"]
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[profile.release]
+opt-level = 3
+debug = false
+rpath = false
+lto = true
+debug-assertions = false
+codegen-units = 1
+panic = 'abort'
+incremental = false
+overflow-checks = true
+
 
 [features]
 # for quicker tests, cargo test --lib
