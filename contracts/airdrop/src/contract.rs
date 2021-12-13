@@ -15,7 +15,7 @@ use cw20::Cw20ReceiveMsg;
 
 // version info for migration info
 const CONTRACT_NAME: &str = "astroport_airdrop";
-const CONTRACT_VERSION: &str = "1";
+const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 //----------------------------------------------------------------------------------------
 // Entry points

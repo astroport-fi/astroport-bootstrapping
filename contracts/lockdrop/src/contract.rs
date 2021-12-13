@@ -28,7 +28,7 @@ const SECONDS_PER_WEEK: u64 = 86400 * 7;
 
 // version info for migration info
 const CONTRACT_NAME: &str = "astroport_lockdrop";
-const CONTRACT_VERSION: &str = "1";
+const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 //----------------------------------------------------------------------------------------
 // Entry Points
