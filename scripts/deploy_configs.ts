@@ -34,7 +34,7 @@ export const mainnet: Config = {
       astro_token_address: "",
       airdrop_contract_address: "",
       lockdrop_contract_address: "",
-      lp_tokens_vesting_duration: 86400 * 30,
+      lp_tokens_vesting_duration: 86400 * 90,
       init_timestamp: 1639465200 + 86400 * 7,
       deposit_window: 86400 * 5,
       withdrawal_window: 86400 * 2,
