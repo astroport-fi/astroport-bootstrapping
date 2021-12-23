@@ -97,7 +97,7 @@ async function main() {
             { token: { contract_addr: network.bluna_token_address } },
             { native_token: { denom: "uluna" } },
           ],
-          init_params: Buffer.from(JSON.stringify({ amp: 100 })).toString(
+          init_params: Buffer.from(JSON.stringify({ amp: 1 })).toString(
             "base64"
           ),
         },
