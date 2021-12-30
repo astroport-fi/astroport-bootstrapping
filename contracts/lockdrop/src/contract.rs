@@ -271,19 +271,11 @@ pub fn handle_update_config(
     new_config: UpdateConfigMsg,
 ) -> StdResult<Response> {
     let mut config = CONFIG.load(deps.storage)?;
-    let state = STATE.load(deps.storage)?;
     let mut attributes = vec![attr("action", "update_config")];
 
     // CHECK :: Only owner can call this function
     if info.sender != config.owner {
         return Err(StdError::generic_err("Unauthorized"));
-    }
-
-    // CHECK ::: Configuration can only be updated before ASTRO token becomes freely tradable
-    if state.are_claims_allowed {
-        return Err(StdError::generic_err(
-            "ASTRO tokens are live. Configuration cannot be updated now",
-        ));
     }
 
     if let Some(owner) = new_config.owner {

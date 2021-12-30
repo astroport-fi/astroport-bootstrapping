@@ -1103,10 +1103,7 @@ fn test_update_config() {
             &[],
         )
         .unwrap_err();
-    assert_eq!(
-        err.to_string(),
-        "Generic error: ASTRO tokens are live. Configuration cannot be updated now"
-    );
+    assert_eq!(err.to_string(), "Generic error: ASTRO token already set");
 }
 
 #[test]
