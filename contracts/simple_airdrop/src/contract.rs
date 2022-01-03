@@ -109,6 +109,11 @@ pub fn receive_cw20(
         return Err(StdError::generic_err("Only astro tokens are received!"));
     }
 
+    // CHECK :: CAN ONLY BE CALLED BY THE OWNER
+    if cw20_msg.sender != config.owner {
+        return Err(StdError::generic_err("Sender not authorized!"));
+    }
+
     // CHECK ::: Amount needs to be valid
     if cw20_msg.amount.is_zero() {
         return Err(StdError::generic_err("Amount must be greater than 0"));

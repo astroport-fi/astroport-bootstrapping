@@ -1,32 +1,26 @@
 # Airdrop
 
-The Airdrop contract is for ASTRO tokens airdrop claim during the intital protocol launch.
+The Airdrop contract facilitates direct claiming of ASTRO tokens airdropped to among initially unaccounted bLUNA collateral depositors into Anchor at block #4451515
 
 ## Contract Design
 
 ### Handle Messages
 
-| Message                                       | Description                                                                                                                                                                                                                                            |
-| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `ExecuteMsg::Claim`                           | Executes an airdrop claim for Users.                                                                                                                                                                                                                   |
-| `ExecuteMsg::DelegateAstroToBootstrapAuction` | This function facilitates ASTRO tokens delegation to the Bootstrap auction contract after airdrop is claimed by the user during the bootstrap auction phase. Delegated ASTRO tokens are added to the user's position in the bootstrap auction contract |
-| `ExecuteMsg::EnableClaims`                    | Executed by the Bootstrap auction contract when liquidity is added to the ASTRO-UST pool. Enables ASTRO withdrawals by the airdrop recipients.                                                                                                         |
-| `ExecuteMsg::WithdrawAirdropReward`           | Facilitates ASTRO withdrawal for airdrop recipients once claim withdrawals are allowed                                                                                                                                                                 |
-| `ExecuteMsg::TransferUnclaimedTokens`         | Admin function. Transfers unclaimed ASTRO tokens available with the contract to the recipient address once the claim window is over                                                                                                                    |
-| `ExecuteMsg::UpdateConfig`                    | Admin function to update any of the configuration parameters.                                                                                                                                                                                          |
-
-- Before the completion of LP bootstrap via auction phase, airdrop claims create user position's within the contract via which users can choose how many ASTRO tokens they want to provide for the LP bootstrap via auction, and withdraw the remaining ASTRO post the completion of LP bootstrap via auction phase
-
-- Post the completion of LP bootstrap via auction phase, any airdrop claim by the user transfers the user's max ASTRO airdrop amount to the user's wallet.
+| Message                                | Description                                                                                                                         |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `ExecuteMsg::Claim`                    | Executes an airdrop claim for Users.                                                                                                |
+| `ExecuteMsg::TransferUnclaimedTokens`  | Admin function. Transfers unclaimed ASTRO tokens available with the contract to the recipient address once the claim window is over |
+| `ExecuteMsg::UpdateConfig`             | Admin function to update any of the configuration parameters.                                                                       |
+| `Cw20HookMsg::IncreaseAstroIncentives` | Admin Function to increase ASTRO incentives to be used for the airdrop                                                              |
 
 ### Query Messages
 
-| Message                    | Description                                                                                                         |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `QueryMsg::Config`         | Returns the config info                                                                                             |
-| `QueryMsg::State`          | Returns the contract's state info                                                                                   |
-| `QueryMsg::HasUserClaimed` | Returns a boolean value indicating if the corresponding address (terra / evm) have yet claimed their airdrop or not |
-| `QueryMsg::UserInfo`       | Returns user's airdrop claim state (total airdrop size and ASTRO delegated balances)                                |
+| Message                    | Description                                                                                           |
+| -------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `QueryMsg::Config`         | Returns the config info                                                                               |
+| `QueryMsg::State`          | Returns the contract's state info                                                                     |
+| `QueryMsg::HasUserClaimed` | Returns a boolean value indicating if the corresponding address have yet claimed their airdrop or not |
+| `QueryMsg::UserInfo`       | Returns user's airdrop claim state (total airdrop amount)                                             |
 
 ## How to Guide :: Get merkle proofs
 
@@ -70,7 +64,3 @@ claimees_data.json
 cargo schema
 cargo test
 ```
-
-## License
-
-TBD
