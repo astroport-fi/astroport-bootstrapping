@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "contracts/airdrop", 
+    "contracts/simple_airdrop", 
     "contracts/auction", 
     "contracts/lockdrop", 
     "packages/*"
