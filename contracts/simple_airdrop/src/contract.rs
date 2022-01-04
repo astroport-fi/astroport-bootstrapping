@@ -1,6 +1,6 @@
 use crate::crypto::verify_claim;
 use crate::state::{Config, State, CONFIG, STATE, USERS};
-use astroport_periphery::helpers::build_transfer_cw20_token_msg;
+use astroport_periphery::helpers::{build_transfer_cw20_token_msg, cw20_get_balance};
 use astroport_periphery::simple_airdrop::{
     ClaimResponse, ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg,
     StateResponse, UserInfoResponse,
@@ -298,7 +298,6 @@ pub fn handle_transfer_unclaimed_tokens(
     amount: Uint128,
 ) -> Result<Response, StdError> {
     let config = CONFIG.load(deps.storage)?;
-    let mut state = STATE.load(deps.storage)?;
 
     // CHECK :: CAN ONLY BE CALLED BY THE OWNER
     if info.sender != config.owner {
@@ -313,22 +312,27 @@ pub fn handle_transfer_unclaimed_tokens(
         )));
     }
 
-    // CHECK :: Amount needs to be less than unclaimed_tokens balance
-    if amount > state.unclaimed_tokens {
-        return Err(StdError::generic_err(
-            "Amount cannot exceed unclaimed token balance",
-        ));
+    let max_transferrable_tokens = cw20_get_balance(
+        &deps.querier,
+        config.astro_token_address.clone(),
+        env.contract.address,
+    )?;
+
+    // CHECK :: Amount needs to be less than max_transferrable_tokens balance
+    if amount > max_transferrable_tokens {
+        return Err(StdError::generic_err(format!(
+            "Amount cannot exceed max available ASTRO balance {}",
+            max_transferrable_tokens
+        )));
     }
 
     // COSMOS MSG :: TRANSFER ASTRO TOKENS
-    state.unclaimed_tokens -= amount;
     let transfer_msg = build_transfer_cw20_token_msg(
         deps.api.addr_validate(&recipient)?,
         config.astro_token_address.to_string(),
         amount,
     )?;
 
-    STATE.save(deps.storage, &state)?;
     Ok(Response::new()
         .add_message(transfer_msg)
         .add_attributes(vec![

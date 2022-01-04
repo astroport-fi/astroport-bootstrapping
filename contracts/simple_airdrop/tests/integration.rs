@@ -323,7 +323,7 @@ fn test_transfer_unclaimed_tokens() {
 
     assert_eq!(
         err.to_string(),
-        "Generic error: Amount cannot exceed unclaimed token balance"
+        "Generic error: Amount cannot exceed max available ASTRO balance 100000000000"
     );
 
     // Should successfully transfer and update state
@@ -348,7 +348,6 @@ fn test_transfer_unclaimed_tokens() {
         Uint128::from(100_000_000_000u64),
         state_resp.total_airdrop_size
     );
-    assert_eq!(Uint128::from(99990000000u64), state_resp.unclaimed_tokens);
 }
 
 #[cfg(test)]
