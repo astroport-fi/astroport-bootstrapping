@@ -700,8 +700,8 @@ pub fn handle_claim_rewards_and_withdraw_lp_shares(
                 let pending_rewards: PendingTokenResponse = deps.querier.query_wasm_smart(
                     &generator,
                     &GenQueryMsg::PendingToken {
-                        lp_token: astro_ust_lp_token_address.clone(),
-                        user: env.contract.address.clone(),
+                        lp_token: astro_ust_lp_token_address.to_string(),
+                        user: env.contract.address.to_string(),
                     },
                 )?;
 
@@ -712,7 +712,7 @@ pub fn handle_claim_rewards_and_withdraw_lp_shares(
                     let rwi: RewardInfoResponse = deps.querier.query_wasm_smart(
                         &generator,
                         &GenQueryMsg::RewardInfo {
-                            lp_token: astro_ust_lp_token_address.clone(),
+                            lp_token: astro_ust_lp_token_address.to_string(),
                         },
                     )?;
 
@@ -730,7 +730,7 @@ pub fn handle_claim_rewards_and_withdraw_lp_shares(
                         contract_addr: generator.to_string(),
                         funds: vec![],
                         msg: to_binary(&GenExecuteMsg::Withdraw {
-                            lp_token: astro_ust_lp_token_address,
+                            lp_token: astro_ust_lp_token_address.to_string(),
                             amount: Uint128::zero(),
                         })?,
                     }));
@@ -846,7 +846,7 @@ pub fn callback_withdraw_user_rewards_and_optionally_lp(
             let rwi: RewardInfoResponse = deps.querier.query_wasm_smart(
                 &generator,
                 &GenQueryMsg::RewardInfo {
-                    lp_token: astro_ust_lp_token_address.clone(),
+                    lp_token: astro_ust_lp_token_address.to_string(),
                 },
             )?;
 
@@ -881,7 +881,7 @@ pub fn callback_withdraw_user_rewards_and_optionally_lp(
                     contract_addr: generator.to_string(),
                     funds: vec![],
                     msg: to_binary(&GenExecuteMsg::Withdraw {
-                        lp_token: astro_ust_lp_token_address.clone(),
+                        lp_token: astro_ust_lp_token_address.to_string(),
                         amount: withdrawn_lp_shares,
                     })?,
                 }));
@@ -1004,15 +1004,15 @@ pub fn update_state_on_reward_claim(
         let rwi: RewardInfoResponse = deps.querier.query_wasm_smart(
             &generator,
             &GenQueryMsg::RewardInfo {
-                lp_token: astro_ust_lp_token_address.clone(),
+                lp_token: astro_ust_lp_token_address.to_string(),
             },
         )?;
 
         let lp_balance: Uint128 = deps.querier.query_wasm_smart(
             &generator,
             &GenQueryMsg::Deposit {
-                lp_token: astro_ust_lp_token_address,
-                user: env.contract.address.clone(),
+                lp_token: astro_ust_lp_token_address.to_string(),
+                user: env.contract.address.to_string(),
             },
         )?;
 
@@ -1166,8 +1166,8 @@ fn query_user_info(deps: Deps, env: Env, user_address: String) -> StdResult<User
                 let lp_balance: Uint128 = deps.querier.query_wasm_smart(
                     &generator,
                     &GenQueryMsg::Deposit {
-                        lp_token: astro_ust_lp_token_address.clone(),
-                        user: env.contract.address.clone(),
+                        lp_token: astro_ust_lp_token_address.to_string(),
+                        user: env.contract.address.to_string(),
                     },
                 )?;
 
@@ -1175,8 +1175,8 @@ fn query_user_info(deps: Deps, env: Env, user_address: String) -> StdResult<User
                 let pending_rewards: PendingTokenResponse = deps.querier.query_wasm_smart(
                     &generator,
                     &GenQueryMsg::PendingToken {
-                        lp_token: astro_ust_lp_token_address.clone(),
-                        user: env.contract.address.clone(),
+                        lp_token: astro_ust_lp_token_address.to_string(),
+                        user: env.contract.address.to_string(),
                     },
                 )?;
 

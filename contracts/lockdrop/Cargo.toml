@@ -48,7 +48,7 @@ cosmwasm-bignumber = "2.2.0"
 
 [dev-dependencies]
 cosmwasm-schema = { version = "0.16.0" }
-terra-multi-test = {git = "https://github.com/astroport-fi/terra-plus.git"}
+terra-multi-test = {git = "https://github.com/astroport-fi/terra-plus.git", tag = "v0.9.1-terra"}
 terraswap = "2.4.0"
 # Terraswap contracts
 terraswap-factory = {git = "https://github.com/astroport-fi/terraswap.git", branch = "main", package = "terraswap-factory"}
@@ -63,3 +63,4 @@ astroport-vesting = {git = "https://github.com/astroport-fi/astroport.git", bran
 astroport-generator = {git = "https://github.com/astroport-fi/astroport.git", branch = "master", package = "astroport-generator"}
 astroport-auction = {path = "../auction"}
 astroport-airdrop = {path = "../airdrop"}
+astroport-whitelist = { git = "https://github.com/astroport-fi/astroport.git", branch = "master" }
