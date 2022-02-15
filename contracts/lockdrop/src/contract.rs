@@ -161,7 +161,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
         ExecuteMsg::TogglePoolRewards {
             terraswap_lp_token,
             enable,
-        } => handle_toggle_rewards(deps, terraswap_lp_token, enable),
+        } => handle_toggle_rewards(deps, info, terraswap_lp_token, enable),
     }
 }
 
@@ -1196,9 +1196,16 @@ fn handle_claim_asset_reward(
 
 fn handle_toggle_rewards(
     deps: DepsMut,
+    info: MessageInfo,
     terraswap_lp_token: String,
     enable: bool,
 ) -> StdResult<Response> {
+    let config = CONFIG.load(deps.storage)?;
+    // CHECK ::: Only owner can call this function
+    if info.sender != config.owner {
+        return Err(StdError::generic_err("Unauthorized"));
+    }
+
     let terraswap_lp_token = deps.api.addr_validate(&terraswap_lp_token)?;
     ASSET_POOLS
         .update(deps.storage, &terraswap_lp_token, |pool_info_opt| {
