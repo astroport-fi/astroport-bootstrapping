@@ -14,6 +14,10 @@ pub const ASSET_POOLS: Map<&Addr, PoolInfo> = Map::new("LiquidityPools");
 pub const USER_INFO: Map<&Addr, UserInfo> = Map::new("users");
 /// Key consists of an Terraswap LP token address, an user address, and a duration
 pub const LOCKUP_INFO: Map<(&Addr, &Addr, U64Key), LockupInfo> = Map::new("lockup_position");
+/// Total received bluna reward by lockdrop contract
+pub const TOTAL_BLUNA_REWARD: Item<Uint256> = Item::new("total_bluna_reward");
+/// Latest used total bluna reward for user claim
+pub const USERS_BLUNA_REWARD_INDEX: Map<&Addr, Uint256> = Map::new("users_bluna_reward_index");
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Config {
@@ -70,6 +74,8 @@ pub struct PoolInfo {
     pub generator_proxy_per_share: Decimal,
     /// Boolean value indicating if the LP Tokens are staked with the Generator contract or not
     pub is_staked: bool,
+    /// Flag defines whether the asset has rewards or not
+    pub has_asset_rewards: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema, Default)]

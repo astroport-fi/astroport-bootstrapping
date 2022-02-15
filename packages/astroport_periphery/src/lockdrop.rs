@@ -90,6 +90,10 @@ pub enum ExecuteMsg {
         duration: u64,
         withdraw_lp_stake: bool,
     },
+    ClaimAssetReward {
+        terraswap_lp_token: String,
+        duration: u64,
+    },
     /// Callbacks; only callable by the contract itself.
     Callback(CallbackMsg),
 }
@@ -123,6 +127,12 @@ pub enum CallbackMsg {
         astroport_pool: Addr,
         prev_assets: [terraswap::asset::Asset; 2],
         slippage_tolerance: Option<Decimal>,
+    },
+    DistributeAssetReward {
+        previous_balance: Uint128,
+        terraswap_lp_token: Addr,
+        user_address: Addr,
+        lock_duration: u64,
     },
 }
 
