@@ -56,6 +56,11 @@ pub enum ExecuteMsg {
         terraswap_lp_token: String,
         incentives_share: u64,
     },
+    // ADMIN Function ::: Toggle poll rewards
+    TogglePoolRewards {
+        terraswap_lp_token: String,
+        enable: bool,
+    },
     // ADMIN Function ::: To set incentives_share for the Pool
     UpdatePool {
         terraswap_lp_token: String,

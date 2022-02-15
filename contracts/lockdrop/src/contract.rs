@@ -158,6 +158,10 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
             terraswap_lp_token,
             duration,
         ),
+        ExecuteMsg::TogglePoolRewards {
+            terraswap_lp_token,
+            enable,
+        } => handle_toggle_rewards(deps, terraswap_lp_token, enable),
     }
 }
 
@@ -1151,7 +1155,7 @@ pub fn handle_claim_rewards_and_unlock_for_lockup(
     Ok(Response::new().add_messages(cosmos_msgs))
 }
 
-pub fn handle_claim_asset_reward(
+fn handle_claim_asset_reward(
     deps: Deps,
     env: Env,
     user_address: Addr,
@@ -1188,6 +1192,31 @@ pub fn handle_claim_asset_reward(
     .to_cosmos_msg(&env)?;
 
     Ok(Response::default().add_messages(vec![pool_claim_msg, distribute_callback_msg]))
+}
+
+fn handle_toggle_rewards(
+    deps: DepsMut,
+    terraswap_lp_token: String,
+    enable: bool,
+) -> StdResult<Response> {
+    let terraswap_lp_token = deps.api.addr_validate(&terraswap_lp_token)?;
+    ASSET_POOLS
+        .update(deps.storage, &terraswap_lp_token, |pool_info_opt| {
+            let mut pool_info =
+                pool_info_opt.ok_or_else(|| StdError::generic_err("Pool was not found"))?;
+            pool_info.has_asset_rewards = enable;
+            Ok(pool_info)
+        })
+        .map(|pool_info| {
+            Response::default().add_attributes(vec![
+                ("action", "toggle_pool_rewards"),
+                ("lp_address", pool_info.terraswap_pool.as_str()),
+                (
+                    "has_asset_rewards",
+                    &pool_info.has_asset_rewards.to_string(),
+                ),
+            ])
+        })
 }
 
 //----------------------------------------------------------------------------------------
