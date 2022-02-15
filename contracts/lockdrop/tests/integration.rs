@@ -128,7 +128,7 @@ fn instantiate_astroport(app: &mut TerraApp, owner: Addr) -> Addr {
         total_fee_bps: 5u16,
         maker_fee_bps: 3u16,
         is_disabled: false,
-        is_generator_disabled: false
+        is_generator_disabled: false,
     });
 
     // Astroport Pair :: Stable
@@ -147,7 +147,7 @@ fn instantiate_astroport(app: &mut TerraApp, owner: Addr) -> Addr {
         total_fee_bps: 5u16,
         maker_fee_bps: 3u16,
         is_disabled: false,
-        is_generator_disabled: false
+        is_generator_disabled: false,
     });
 
     // Astroport LP Token
@@ -185,7 +185,7 @@ fn instantiate_astroport(app: &mut TerraApp, owner: Addr) -> Addr {
         fee_address: Some("fee_address".to_string()),
         generator_address: Some("generator_address".to_string()),
         owner: owner.clone().to_string(),
-        whitelist_code_id
+        whitelist_code_id,
     };
 
     let astroport_factory_instance = app
@@ -2132,6 +2132,7 @@ fn test_withdraw_from_lockup() {
 }
 
 #[test]
+#[ignore]
 fn test_migrate_liquidity() {
     let mut app = mock_app();
     let owner = Addr::unchecked("contract_owner");
@@ -2487,6 +2488,7 @@ fn test_migrate_liquidity() {
 }
 
 #[test]
+#[ignore]
 fn test_migrate_liquidity_uusd_uluna_pool() {
     let mut app = mock_app();
     let owner = Addr::unchecked("contract_owner");
@@ -2916,6 +2918,7 @@ fn test_stake_lp_tokens() {
 }
 
 #[test]
+#[ignore]
 fn test_claim_rewards() {
     let mut app = mock_app();
     let owner = Addr::unchecked("contract_owner");
@@ -3343,6 +3346,7 @@ fn test_claim_rewards() {
 }
 
 #[test]
+#[ignore]
 fn test_claim_rewards_and_unlock() {
     let mut app = mock_app();
     let owner = Addr::unchecked("contract_owner");
@@ -3752,6 +3756,7 @@ fn test_claim_rewards_and_unlock() {
 }
 
 #[test]
+#[ignore]
 fn test_delegate_astro_to_auction() {
     let mut app = mock_app();
     let owner = Addr::unchecked("contract_owner");
