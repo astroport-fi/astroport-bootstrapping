@@ -6,9 +6,9 @@ edition = "2018"
 
 
 exclude = [
-  # Those files are rust-optimizer artifacts. You might want to commit them for convenience but they should not be part of the source code publication.
-  "contract.wasm",
-  "hash.txt",
+    # Those files are rust-optimizer artifacts. You might want to commit them for convenience but they should not be part of the source code publication.
+    "contract.wasm",
+    "hash.txt",
 ]
 
 
@@ -24,12 +24,12 @@ library = []
 
 
 [dependencies]
-astroport = {git = "https://github.com/astroport-fi/astroport.git", branch = "master"}
-astroport-periphery =  { path = "../../packages/astroport_periphery" }
+astroport = { git = "https://github.com/astroport-fi/astroport-core.git", branch = "main" }
+astroport-periphery = { path = "../../packages/astroport_periphery" }
 terraswap = "2.4.0"
 cosmwasm-std = { version = "0.16.0", features = ["iterator"] }
 cw20 = { version = "0.8" }
-cw2 = { version = "0.8" } 
+cw2 = { version = "0.8" }
 cw-storage-plus = "0.8"
 schemars = "0.8.3"
 serde = { version = "1.0.127", default-features = false, features = ["derive"] }
@@ -37,20 +37,20 @@ cosmwasm-bignumber = "2.2.0"
 
 [dev-dependencies]
 cosmwasm-schema = { version = "0.16.0" }
-terra-multi-test = {git = "https://github.com/astroport-fi/terra-plus.git", tag = "v0.9.1-terra"}
+terra-multi-test = { git = "https://github.com/astroport-fi/terra-plus.git", tag = "v0.9.1-terra" }
 terraswap = "2.4.0"
 terra-cosmwasm = "2.2.0"
 # Terraswap contracts
-terraswap-factory = {git = "https://github.com/astroport-fi/terraswap.git", branch = "main", package = "terraswap-factory"}
-terraswap-pair = {git = "https://github.com/astroport-fi/terraswap.git", branch = "main", package = "terraswap-pair"}
-terraswap-token = {git = "https://github.com/astroport-fi/terraswap.git", branch = "main", package = "terraswap-token"}
+terraswap-factory = { git = "https://github.com/astroport-fi/terraswap.git", branch = "main" }
+terraswap-pair = { git = "https://github.com/astroport-fi/terraswap.git", branch = "main" }
+terraswap-token = { git = "https://github.com/astroport-fi/terraswap.git", branch = "main" }
 # Astroport contracts
-astroport-factory = {git = "https://github.com/astroport-fi/astroport.git", branch = "master", package = "astroport-factory"}
-astroport-pair = {git = "https://github.com/astroport-fi/astroport.git", branch = "master", package = "astroport-pair"}
-astroport-pair-stable = {git = "https://github.com/astroport-fi/astroport.git", branch = "master", package = "astroport-pair-stable"}
-astroport-token = {git = "https://github.com/astroport-fi/astroport.git", branch = "master", package = "astroport-token"}
-astroport-vesting = {git = "https://github.com/astroport-fi/astroport.git", branch = "master", package = "astroport-vesting"}
-astroport-generator = {git = "https://github.com/astroport-fi/astroport.git", branch = "master", package = "astroport-generator"}
-astroport-auction = {path = "../auction"}
-astroport-airdrop = {path = "../airdrop"}
-astroport-whitelist = { git = "https://github.com/astroport-fi/astroport.git", branch = "master" }
+astroport-factory = { git = "https://github.com/astroport-fi/astroport-core.git", branch = "main" }
+astroport-pair = { git = "https://github.com/astroport-fi/astroport-core.git", branch = "main" }
+astroport-pair-stable = { git = "https://github.com/astroport-fi/astroport-core.git", branch = "main" }
+astroport-token = { git = "https://github.com/astroport-fi/astroport-core.git", branch = "main" }
+astroport-vesting = { git = "https://github.com/astroport-fi/astroport-core.git", branch = "main" }
+astroport-generator = { git = "https://github.com/astroport-fi/astroport-core.git", branch = "main" }
+astroport-auction = { path = "../auction" }
+astroport-airdrop = { path = "../airdrop" }
+astroport-whitelist = { git = "https://github.com/astroport-fi/astroport-core.git", branch = "main" }
