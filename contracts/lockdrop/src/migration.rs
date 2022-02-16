@@ -15,7 +15,6 @@ pub struct PoolInfoV101 {
     pub generator_astro_per_share: Decimal,
     pub generator_proxy_per_share: Decimal,
     pub is_staked: bool,
-    pub has_asset_rewards: bool,
 }
 
 pub const ASSET_POOLS_V101: Map<&Addr, PoolInfoV101> = Map::new("LiquidityPools");
