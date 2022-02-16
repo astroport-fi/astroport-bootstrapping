@@ -39,6 +39,7 @@ cosmwasm-bignumber = "2.2.0"
 cosmwasm-schema = { version = "0.16.0" }
 terra-multi-test = {git = "https://github.com/astroport-fi/terra-plus.git", tag = "v0.9.1-terra"}
 terraswap = "2.4.0"
+terra-cosmwasm = "2.2.0"
 # Terraswap contracts
 terraswap-factory = {git = "https://github.com/astroport-fi/terraswap.git", branch = "main", package = "terraswap-factory"}
 terraswap-pair = {git = "https://github.com/astroport-fi/terraswap.git", branch = "main", package = "terraswap-pair"}

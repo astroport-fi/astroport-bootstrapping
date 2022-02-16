@@ -2096,3 +2096,382 @@ fn update_user_lockup_positions_and_calc_rewards(
 
     Ok(total_astro_rewards)
 }
+
+#[cfg(test)]
+mod unit_tests {
+    use super::*;
+    use crate::mock_querier::mock_dependencies;
+    use cosmwasm_std::testing::{mock_env, mock_info};
+    use cosmwasm_std::{Attribute, Timestamp};
+
+    #[test]
+    fn bluna_rewards_claim() {
+        let init_uusd_balance = Uint128::from(100u128);
+        let mut deps = mock_dependencies(&[Coin {
+            denom: "uusd".to_string(),
+            amount: init_uusd_balance,
+        }]);
+        let owner = "owner";
+        let mut env = mock_env();
+        env.block.time = Timestamp::from_seconds(0);
+        let lockdrop_instantiate_msg = InstantiateMsg {
+            owner: Some(owner.to_string()),
+            init_timestamp: 100_000,
+            deposit_window: 10_000_000,
+            withdrawal_window: 500_000,
+            min_lock_duration: 1u64,
+            max_lock_duration: 52u64,
+            weekly_multiplier: 1u64,
+            weekly_divider: 12u64,
+            max_positions_per_user: 14,
+        };
+        instantiate(
+            deps.as_mut(),
+            env.clone(),
+            mock_info(owner, &[]),
+            lockdrop_instantiate_msg,
+        )
+        .unwrap();
+
+        let user_addr = Addr::unchecked("user");
+        let astroport_lp_token = Addr::unchecked("astro_lp_addr");
+        let terraswap_lp_addr = Addr::unchecked("tswp_lp_token");
+        let migration_info = MigrationInfo {
+            terraswap_migrated_amount: Uint128::from(100_000000u128),
+            astroport_lp_token: astroport_lp_token.clone(),
+        };
+        let pool_info = PoolInfo {
+            terraswap_pool: Addr::unchecked(terraswap_lp_addr.clone()),
+            terraswap_amount_in_lockups: Default::default(),
+            migration_info: Some(migration_info),
+            incentives_share: 0,
+            weighted_amount: Default::default(),
+            generator_astro_per_share: Default::default(),
+            generator_proxy_per_share: Default::default(),
+            is_staked: false,
+            has_asset_rewards: false,
+        };
+        ASSET_POOLS
+            .save(deps.as_mut().storage, &terraswap_lp_addr, &pool_info)
+            .unwrap();
+
+        let lock_duration = 10;
+        // check the user cannot claim reward before rewards are enabled
+        let res = handle_claim_asset_reward(
+            deps.as_ref(),
+            env.clone(),
+            user_addr.clone(),
+            terraswap_lp_addr.to_string(),
+            lock_duration,
+        )
+        .unwrap_err();
+        assert_eq!(
+            res.to_string(),
+            "Generic error: This pool does not have rewards"
+        );
+
+        // enabling rewards
+        handle_toggle_rewards(
+            deps.as_mut(),
+            mock_info("owner", &[]),
+            terraswap_lp_addr.to_string(),
+            true,
+        )
+        .unwrap();
+
+        let res = handle_claim_asset_reward(
+            deps.as_ref(),
+            env.clone(),
+            user_addr.clone(),
+            terraswap_lp_addr.to_string(),
+            lock_duration,
+        )
+        .unwrap();
+
+        // check dispatched messages
+        if let CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr, msg, ..
+        }) = &res.messages[0].msg
+        {
+            assert_eq!(contract_addr.to_owned(), astroport_lp_token.to_string());
+            assert_eq!(
+                from_binary::<astroport::pair_stable_bluna::ExecuteMsg>(&msg).unwrap(),
+                astroport::pair_stable_bluna::ExecuteMsg::ClaimReward { receiver: None }
+            )
+        } else {
+            panic!("Wrong message")
+        }
+
+        if let CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr, msg, ..
+        }) = &res.messages[1].msg
+        {
+            assert_eq!(contract_addr.to_owned(), env.contract.address.to_string());
+            let real_message = ExecuteMsg::Callback(CallbackMsg::DistributeAssetReward {
+                terraswap_lp_token: terraswap_lp_addr,
+                user_address: user_addr,
+                lock_duration: 10,
+                previous_balance: init_uusd_balance,
+            });
+            assert_eq!(from_binary::<ExecuteMsg>(&msg).unwrap(), real_message);
+        } else {
+            panic!("Wrong message")
+        }
+    }
+
+    #[test]
+    fn check_calc_user_reward() {
+        let mut deps = mock_dependencies(&[]);
+        let total_lp_amount = Uint128::from(1000u128);
+        // user1 with 10% share
+        let user1 = Addr::unchecked("user1");
+        let user1_lp_amount = Uint128::from(100u128);
+        // user2 with 66% share
+        let user2 = Addr::unchecked("user2");
+        let user2_lp_amount = Uint128::from(660u128);
+        // user3 with 20% share
+        let user3 = Addr::unchecked("user3");
+        let user3_lp_amount = Uint128::from(200u128);
+        let mut total_reward_balance = Uint256::from(1000u128);
+
+        let res = calc_user_reward(
+            deps.as_mut(),
+            &user1,
+            user1_lp_amount,
+            total_lp_amount,
+            total_reward_balance,
+        )
+        .unwrap();
+
+        assert_eq!(res.u128(), 100u128);
+
+        // the user already received whole reward thus we get 0 here
+        let res = calc_user_reward(
+            deps.as_mut(),
+            &user1,
+            user1_lp_amount,
+            total_lp_amount,
+            total_reward_balance,
+        )
+        .unwrap();
+        assert_eq!(res.u128(), 0u128);
+
+        let res = calc_user_reward(
+            deps.as_mut(),
+            &user2,
+            user2_lp_amount,
+            total_lp_amount,
+            total_reward_balance,
+        )
+        .unwrap();
+        assert_eq!(res.u128(), 660u128);
+
+        // emulating newly arrived rewards
+        total_reward_balance += Uint256::from(100u128);
+
+        let res = calc_user_reward(
+            deps.as_mut(),
+            &user1,
+            user1_lp_amount,
+            total_lp_amount,
+            total_reward_balance,
+        )
+        .unwrap();
+
+        assert_eq!(res.u128(), 10u128);
+
+        // the user already received whole reward thus we get 0 here
+        let res = calc_user_reward(
+            deps.as_mut(),
+            &user1,
+            user1_lp_amount,
+            total_lp_amount,
+            total_reward_balance,
+        )
+        .unwrap();
+        assert_eq!(res.u128(), 0u128);
+
+        let res = calc_user_reward(
+            deps.as_mut(),
+            &user2,
+            user2_lp_amount,
+            total_lp_amount,
+            total_reward_balance,
+        )
+        .unwrap();
+        assert_eq!(res.u128(), 66u128);
+
+        // this is the first time user3 receives reward
+        let res = calc_user_reward(
+            deps.as_mut(),
+            &user3,
+            user3_lp_amount,
+            total_lp_amount,
+            total_reward_balance,
+        )
+        .unwrap();
+        // 200 from the first distribution and 20 from the second one
+        assert_eq!(res.u128(), 220u128);
+    }
+
+    #[test]
+    fn check_distribute_asset_reward() {
+        let mut uusd_balance = Uint128::from(100u128);
+        let mut deps = mock_dependencies(&[Coin {
+            denom: "uusd".to_string(),
+            amount: uusd_balance,
+        }]);
+        let owner = "owner";
+        let mut env = mock_env();
+        env.block.time = Timestamp::from_seconds(0);
+        let lockdrop_instantiate_msg = InstantiateMsg {
+            owner: Some(owner.to_string()),
+            init_timestamp: 100_000,
+            deposit_window: 10_000_000,
+            withdrawal_window: 500_000,
+            min_lock_duration: 1u64,
+            max_lock_duration: 52u64,
+            weekly_multiplier: 1u64,
+            weekly_divider: 12u64,
+            max_positions_per_user: 14,
+        };
+        instantiate(
+            deps.as_mut(),
+            env.clone(),
+            mock_info(owner, &[]),
+            lockdrop_instantiate_msg,
+        )
+        .unwrap();
+
+        let user_addr = Addr::unchecked("user");
+        let lock_duration = 10;
+        let astroport_lp_token = Addr::unchecked("astro_lp_addr");
+        let terraswap_lp_addr = Addr::unchecked("tswp_lp_token");
+        let migration_info = MigrationInfo {
+            terraswap_migrated_amount: Uint128::from(100_000000u128),
+            astroport_lp_token: astroport_lp_token.clone(),
+        };
+        let pool_info = PoolInfo {
+            terraswap_pool: Addr::unchecked(terraswap_lp_addr.clone()),
+            terraswap_amount_in_lockups: Uint128::from(1000u128),
+            migration_info: Some(migration_info),
+            incentives_share: 0,
+            weighted_amount: Default::default(),
+            generator_astro_per_share: Default::default(),
+            generator_proxy_per_share: Default::default(),
+            is_staked: false,
+            has_asset_rewards: true,
+        };
+        ASSET_POOLS
+            .save(deps.as_mut().storage, &terraswap_lp_addr, &pool_info)
+            .unwrap();
+
+        let lockup = LockupInfo {
+            lp_units_locked: Uint128::from(100u128),
+            astroport_lp_transferred: None,
+            withdrawal_flag: false,
+            astro_rewards: Default::default(),
+            generator_astro_debt: Default::default(),
+            generator_proxy_debt: Default::default(),
+            unlock_timestamp: 0,
+        };
+        let lockup_key = (&terraswap_lp_addr, &user_addr, U64Key::new(lock_duration));
+        LOCKUP_INFO
+            .save(deps.as_mut().storage, lockup_key, &lockup)
+            .unwrap();
+        let resp = callback_distribute_asset_reward(
+            deps.as_mut(),
+            env.clone(),
+            uusd_balance,
+            terraswap_lp_addr.clone(),
+            user_addr.clone(),
+            lock_duration,
+        )
+        .unwrap();
+        assert_eq!(resp.messages.len(), 1);
+        assert_eq!(
+            &resp.attributes[0],
+            Attribute {
+                key: "lockdrop_claimed_reward".to_string(),
+                value: "0".to_string()
+            }
+        );
+        assert_eq!(
+            &resp.attributes[1],
+            Attribute {
+                key: "user".to_string(),
+                value: "user".to_string()
+            }
+        );
+        assert_eq!(
+            &resp.attributes[2],
+            Attribute {
+                key: "sent_bluna_reward".to_string(),
+                value: "10".to_string()
+            }
+        );
+
+        // the user already received reward
+        let resp = callback_distribute_asset_reward(
+            deps.as_mut(),
+            env.clone(),
+            uusd_balance,
+            terraswap_lp_addr.clone(),
+            user_addr.clone(),
+            lock_duration,
+        )
+        .unwrap();
+        assert_eq!(resp.messages.len(), 0);
+        assert_eq!(
+            &resp.attributes[2],
+            Attribute {
+                key: "sent_bluna_reward".to_string(),
+                value: "0".to_string()
+            }
+        );
+
+        // let's try to receive reward for non-existent lockup
+        let err = callback_distribute_asset_reward(
+            deps.as_mut(),
+            env.clone(),
+            uusd_balance,
+            terraswap_lp_addr.clone(),
+            user_addr.clone(),
+            100,
+        )
+        .unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "astroport_lockdrop::state::LockupInfo not found"
+        );
+
+        uusd_balance -= Uint128::from(10u128);
+
+        // emulating newly arrived rewards
+        deps.querier.with_balance(&[(
+            &env.contract.address.to_string(),
+            &[Coin {
+                denom: "uusd".to_string(),
+                amount: uusd_balance + Uint128::from(500u128),
+            }],
+        )]);
+        // the user should receive rewards from the seconds distribution
+        let resp = callback_distribute_asset_reward(
+            deps.as_mut(),
+            env.clone(),
+            uusd_balance,
+            terraswap_lp_addr.clone(),
+            user_addr.clone(),
+            lock_duration,
+        )
+        .unwrap();
+        assert_eq!(resp.messages.len(), 1);
+        assert_eq!(
+            &resp.attributes[2],
+            Attribute {
+                key: "sent_bluna_reward".to_string(),
+                value: "50".to_string()
+            }
+        );
+    }
+}

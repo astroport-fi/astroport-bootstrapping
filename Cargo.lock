@@ -121,6 +121,7 @@ dependencies = [
  "cw20",
  "schemars",
  "serde",
+ "terra-cosmwasm",
  "terra-multi-test 0.9.1 (git+https://github.com/astroport-fi/terra-plus.git?tag=v0.9.1-terra)",
  "terraswap 2.4.0",
  "terraswap-factory",
