@@ -1,6 +1,6 @@
 use std::convert::TryInto;
 
-use astroport::asset::{Asset, AssetInfo};
+use astroport::asset::{addr_validate_to_lower, Asset, AssetInfo};
 use astroport::generator::{
     ExecuteMsg as GenExecuteMsg, PendingTokenResponse, QueryMsg as GenQueryMsg, RewardInfoResponse,
 };
@@ -9,10 +9,11 @@ use cosmwasm_std::{
     Deps, DepsMut, Env, MessageInfo, Order, Response, StdError, StdResult, SubMsg, Uint128,
     Uint256, WasmMsg,
 };
-use cw2::set_contract_version;
+use cw2::{get_contract_version, set_contract_version};
 use cw20::{BalanceResponse, Cw20ExecuteMsg, Cw20QueryMsg, Cw20ReceiveMsg};
 use cw_storage_plus::U64Key;
 
+use crate::migration::ASSET_POOLS_V101;
 use astroport_periphery::auction::Cw20HookMsg::DelegateAstroTokens;
 use astroport_periphery::lockdrop::{
     CallbackMsg, ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, LockUpInfoResponse,
@@ -283,8 +284,53 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn migrate(_deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response> {
-    Ok(Response::default())
+pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response> {
+    use std::str;
+
+    let contract_version = get_contract_version(deps.storage)?;
+
+    let response = Response::new()
+        .add_attribute("previous_contract_name", &contract_version.contract)
+        .add_attribute("previous_contract_version", &contract_version.version);
+
+    match contract_version.contract.as_ref() {
+        "astroport_lockdrop" => match contract_version.version.as_ref() {
+            "1.0.1" => {
+                TOTAL_BLUNA_REWARD.save(deps.storage, &Uint256::zero())?;
+                let pools = ASSET_POOLS_V101
+                    .range(deps.storage, None, None, Order::Ascending)
+                    .map(|pair_result| {
+                        pair_result.map(|(addr_serialized, pool_info)| {
+                            let addr_str = str::from_utf8(&addr_serialized)
+                                .map_err(|_| StdError::generic_err("Deserialization error"))?;
+                            let addr = addr_validate_to_lower(deps.as_ref().api, addr_str)?;
+                            Ok((addr, pool_info))
+                        })
+                    })
+                    .collect::<StdResult<StdResult<Vec<_>>>>()??;
+                for (key, pool) in pools {
+                    let new_pool_info = PoolInfo {
+                        terraswap_pool: pool.terraswap_pool,
+                        terraswap_amount_in_lockups: pool.terraswap_amount_in_lockups,
+                        migration_info: pool.migration_info,
+                        incentives_share: pool.incentives_share,
+                        weighted_amount: pool.weighted_amount,
+                        generator_astro_per_share: pool.generator_astro_per_share,
+                        generator_proxy_per_share: pool.generator_proxy_per_share,
+                        is_staked: pool.is_staked,
+                        has_asset_rewards: false,
+                    };
+                    ASSET_POOLS.save(deps.storage, &key, &new_pool_info)?
+                }
+            }
+            _ => return Err(StdError::generic_err("Migration error")),
+        },
+        _ => return Err(StdError::generic_err("Migration error")),
+    };
+
+    set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+
+    Ok(response)
 }
 
 //----------------------------------------------------------------------------------------
