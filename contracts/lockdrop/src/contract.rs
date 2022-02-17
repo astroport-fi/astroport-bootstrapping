@@ -1051,8 +1051,8 @@ pub fn handle_claim_rewards_and_unlock_for_lockup(
             let pending_rewards: PendingTokenResponse = deps.querier.query_wasm_smart(
                 &generator,
                 &GenQueryMsg::PendingToken {
-                    lp_token: astroport_lp_token.to_string(),
-                    user: env.contract.address.to_string(),
+                    lp_token: astroport_lp_token.clone(),
+                    user: env.contract.address.clone(),
                 },
             )?;
 
@@ -1063,7 +1063,7 @@ pub fn handle_claim_rewards_and_unlock_for_lockup(
                 let rwi: RewardInfoResponse = deps.querier.query_wasm_smart(
                     &generator,
                     &GenQueryMsg::RewardInfo {
-                        lp_token: astroport_lp_token.to_string(),
+                        lp_token: astroport_lp_token.clone(),
                     },
                 )?;
 
@@ -1094,7 +1094,7 @@ pub fn handle_claim_rewards_and_unlock_for_lockup(
                     contract_addr: generator.to_string(),
                     funds: vec![],
                     msg: to_binary(&GenExecuteMsg::Withdraw {
-                        lp_token: astroport_lp_token.to_string(),
+                        lp_token: astroport_lp_token.clone(),
                         amount: Uint128::zero(),
                     })?,
                 }));
@@ -1155,15 +1155,15 @@ pub fn update_pool_on_dual_rewards_claim(
     let rwi: RewardInfoResponse = deps.querier.query_wasm_smart(
         &generator,
         &GenQueryMsg::RewardInfo {
-            lp_token: astroport_lp_token.to_string(),
+            lp_token: astroport_lp_token.clone(),
         },
     )?;
 
     let lp_balance: Uint128 = deps.querier.query_wasm_smart(
         &generator,
         &GenQueryMsg::Deposit {
-            lp_token: astroport_lp_token.to_string(),
-            user: env.contract.address.to_string(),
+            lp_token: astroport_lp_token.clone(),
+            user: env.contract.address.clone(),
         },
     )?;
 
@@ -1262,8 +1262,8 @@ pub fn callback_withdraw_user_rewards_for_lockup_optional_withdraw(
                         .expect("Should be set!")
                         .to_string(),
                     &GenQueryMsg::Deposit {
-                        lp_token: astroport_lp_token.to_string(),
-                        user: env.contract.address.to_string(),
+                        lp_token: astroport_lp_token.clone(),
+                        user: env.contract.address,
                     },
                 )?
             } else {
@@ -1287,7 +1287,7 @@ pub fn callback_withdraw_user_rewards_for_lockup_optional_withdraw(
             let rwi: RewardInfoResponse = deps.querier.query_wasm_smart(
                 &generator,
                 &GenQueryMsg::RewardInfo {
-                    lp_token: astroport_lp_token.to_string(),
+                    lp_token: astroport_lp_token.clone(),
                 },
             )?;
 
@@ -1360,7 +1360,7 @@ pub fn callback_withdraw_user_rewards_for_lockup_optional_withdraw(
                     contract_addr: generator.to_string(),
                     funds: vec![],
                     msg: to_binary(&GenExecuteMsg::Withdraw {
-                        lp_token: astroport_lp_token.to_string(),
+                        lp_token: astroport_lp_token.clone(),
                         amount: astroport_lp_amount,
                     })?,
                 }));
@@ -1681,8 +1681,8 @@ pub fn query_lockup_info(
                         .expect("Should be set!")
                         .to_string(),
                     &GenQueryMsg::Deposit {
-                        lp_token: astroport_lp_token.to_string(),
-                        user: env.contract.address.to_string(),
+                        lp_token: astroport_lp_token.clone(),
+                        user: env.contract.address.clone(),
                     },
                 )?
             } else {
@@ -1714,8 +1714,8 @@ pub fn query_lockup_info(
             let pending_rewards: PendingTokenResponse = deps.querier.query_wasm_smart(
                 &generator,
                 &GenQueryMsg::PendingToken {
-                    lp_token: astroport_lp_token.to_string(),
-                    user: env.contract.address.to_string(),
+                    lp_token: astroport_lp_token,
+                    user: env.contract.address.clone(),
                 },
             )?;
 
