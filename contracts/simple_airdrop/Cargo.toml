@@ -7,9 +7,9 @@ description = "Contract to facilitate ASTRO Token airdrop to unaccounted bLUNA c
 
 
 exclude = [
-  # Those files are rust-optimizer artifacts. You might want to commit them for convenience but they should not be part of the source code publication.
-  "contract.wasm",
-  "hash.txt",
+    # Those files are rust-optimizer artifacts. You might want to commit them for convenience but they should not be part of the source code publication.
+    "contract.wasm",
+    "hash.txt",
 ]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -24,9 +24,9 @@ backtraces = ["cosmwasm-std/backtraces"]
 library = []
 
 [dependencies]
-cw2 = { version = "0.8" } 
+cw2 = { version = "0.8" }
 cw20 = "0.8"
-astroport-periphery =  { path = "../../packages/astroport_periphery" }
+astroport-periphery = { path = "../../packages/astroport_periphery" }
 cosmwasm-std = { version = "0.16.0" }
 cw-storage-plus = { version = "0.8.0" }
 serde = { version = "1.0.127", default-features = false, features = ["derive"] }
@@ -38,6 +38,6 @@ sha3 = "0.9.1"
 
 [dev-dependencies]
 cosmwasm-schema = { version = "0.16.0" }
-terra-multi-test = {git = "https://github.com/astroport-fi/terra-plus.git", tag="v0.8.0-terra1" }
-astroport-token = {git = "https://github.com/astroport-fi/astroport.git", branch = "master", package = "astroport-token"}
-astroport = {git = "https://github.com/astroport-fi/astroport.git", branch = "master"}
+terra-multi-test = { git = "https://github.com/astroport-fi/terra-plus.git", tag = "v0.8.0-terra1" }
+astroport-token = { git = "https://github.com/astroport-fi/astroport-core.git", tag = "v1.1.0" }
+astroport = { git = "https://github.com/astroport-fi/astroport-core.git", tag = "v1.1.0" }
