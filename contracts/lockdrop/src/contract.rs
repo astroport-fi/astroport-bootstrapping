@@ -1677,7 +1677,7 @@ fn callback_distribute_asset_reward(
         // initialization
         previous_balance.into()
     };
-    TOTAL_BLUNA_REWARD.save(deps.storage, &Uint256::from(total_bluna_reward))?;
+    TOTAL_BLUNA_REWARD.save(deps.storage, &total_bluna_reward)?;
 
     let lockup_key = (
         &terraswap_lp_token,
