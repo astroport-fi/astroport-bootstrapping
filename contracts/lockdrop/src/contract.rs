@@ -1200,6 +1200,9 @@ pub fn handle_claim_rewards_and_unlock_for_lockup(
     Ok(Response::new().add_messages(cosmos_msgs))
 }
 
+/// ## Description
+/// Collects assets reward from LP and distribute reward to user if all requirements are met.
+/// Otherwise returns [`StdError`].
 fn handle_claim_asset_reward(
     deps: Deps,
     env: Env,
@@ -1239,6 +1242,8 @@ fn handle_claim_asset_reward(
     Ok(Response::default().add_messages(vec![pool_claim_msg, distribute_callback_msg]))
 }
 
+/// ## Description
+/// Sets `enable` flag for liquidity pool
 fn handle_toggle_rewards(
     deps: DepsMut,
     info: MessageInfo,
@@ -2050,6 +2055,8 @@ fn calculate_weight(amount: Uint128, duration: u64, config: &Config) -> Uint256 
     lock_weight * amount.into()
 }
 
+/// ## Description
+/// Calculates bLuna user reward according to his share in LP  
 fn calc_user_reward(
     deps: DepsMut,
     user: &Addr,
