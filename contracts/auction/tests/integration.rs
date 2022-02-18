@@ -226,7 +226,7 @@ fn instantiate_pair(app: &mut App, owner: Addr, astro_token_instance: Addr) -> (
         ],
         token_code_id: lp_token_code_id,
         init_params: None,
-        factory_addr: Addr::unchecked("factory"),
+        factory_addr: Addr::unchecked("factory").to_string(),
     };
 
     let pair_instance = app
@@ -405,6 +405,7 @@ fn instantiate_generator_and_vesting(
     let vesting_code_id = app.store_code(vesting_contract);
 
     let init_msg = astroport::vesting::InstantiateMsg {
+        owner: owner.to_string(),
         token_addr: astro_token_instance.clone().to_string(),
     };
 
@@ -499,7 +500,7 @@ fn instantiate_generator_and_vesting(
                 address: generator_instance.to_string(),
                 schedules: vec![astroport::vesting::VestingSchedule {
                     start_point: astroport::vesting::VestingSchedulePoint {
-                        time: current_block.time,
+                        time: current_block.time.seconds(),
                         amount,
                     },
                     end_point: None,
@@ -515,7 +516,7 @@ fn instantiate_generator_and_vesting(
     let msg = astroport::generator::ExecuteMsg::Add {
         alloc_point: Uint64::from(10u64),
         reward_proxy: None,
-        lp_token: lp_token_instance.clone(),
+        lp_token: lp_token_instance.to_string(),
     };
     app.execute_contract(
         Addr::unchecked(owner.clone()),

@@ -1202,7 +1202,7 @@ fn test_delegate_astro_to_bootstrap_auction() {
                 contract_addr: astro_instance.clone(),
             },
         ],
-        factory_addr: Addr::unchecked("factory_addr"),
+        factory_addr: Addr::unchecked("factory_addr").to_string(),
         init_params: None,
         token_code_id,
     };
