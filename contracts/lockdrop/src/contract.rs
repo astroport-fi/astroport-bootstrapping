@@ -2076,7 +2076,7 @@ fn calc_user_reward(
         {
             total_reward_balance - last_user_bluna_reward_index
         }
-        _ => Uint256::zero(),
+        _ => return Ok(Uint128::zero()),
     };
 
     USERS_BLUNA_REWARD_INDEX.save(deps.storage, user, &total_reward_balance)?;
