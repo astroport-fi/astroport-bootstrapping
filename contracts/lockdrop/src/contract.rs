@@ -289,10 +289,6 @@ pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response
 
     let contract_version = get_contract_version(deps.storage)?;
 
-    let response = Response::new()
-        .add_attribute("previous_contract_name", &contract_version.contract)
-        .add_attribute("previous_contract_version", &contract_version.version);
-
     match contract_version.contract.as_ref() {
         "astroport_lockdrop" => match contract_version.version.as_ref() {
             "1.0.1" => {
@@ -329,7 +325,12 @@ pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response
 
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
-    Ok(response)
+    Ok(Response::new().add_attributes(vec![
+        ("previous_contract_name", &contract_version.contract),
+        ("previous_contract_version", &contract_version.version),
+        ("current_contract_name", &CONTRACT_NAME.to_string()),
+        ("current_contract_version", &CONTRACT_VERSION.to_string()),
+    ]))
 }
 
 //----------------------------------------------------------------------------------------
