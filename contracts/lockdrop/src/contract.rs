@@ -1676,7 +1676,12 @@ fn callback_distribute_asset_reward(
         astroport::querier::query_balance(&deps.querier, env.contract.address, "uusd".to_string())?;
     let latest_reward_amount = reward_balance - previous_balance;
 
-    let total_bluna_reward = if let Some(balance) = TOTAL_BLUNA_REWARD.may_load(deps.storage)? {
+    let mut response = Response::new()
+        .add_attribute("lockdrop_claimed_reward", latest_reward_amount)
+        .add_attribute("user", user_address.clone());
+
+    let total_bluna_reward_opt = TOTAL_BLUNA_REWARD.may_load(deps.storage)?;
+    let total_bluna_reward = if let Some(balance) = total_bluna_reward_opt {
         // update total reward balance with newly arrived rewards
         balance + Uint256::from(latest_reward_amount)
     } else {
@@ -1690,35 +1695,33 @@ fn callback_distribute_asset_reward(
         &user_address,
         U64Key::new(lock_duration),
     );
-    let lockup_info = LOCKUP_INFO.load(deps.storage, lockup_key.clone())?;
-    let pool_info = ASSET_POOLS.load(deps.storage, &terraswap_lp_token)?;
+    let mut user_reward = Uint128::zero();
+    let lockup_info_opt = LOCKUP_INFO.may_load(deps.storage, lockup_key.clone())?;
+    if let Some(lockup_info) = lockup_info_opt {
+        let pool_info = ASSET_POOLS.load(deps.storage, &terraswap_lp_token)?;
 
-    let user_reward = calc_user_reward(
-        deps.branch(),
-        &user_address,
-        lockup_info.lp_units_locked,
-        pool_info.terraswap_amount_in_lockups,
-        total_bluna_reward,
-    )?;
+        user_reward = calc_user_reward(
+            deps.branch(),
+            &user_address,
+            lockup_info.lp_units_locked,
+            pool_info.terraswap_amount_in_lockups,
+            total_bluna_reward,
+        )?;
 
-    let mut response =
-        Response::new().add_attribute("lockdrop_claimed_reward", latest_reward_amount);
-
-    if !user_reward.is_zero() {
-        response.messages.push(SubMsg::new(
-            Asset {
-                info: AssetInfo::NativeToken {
-                    denom: "uusd".to_string(),
-                },
-                amount: user_reward,
-            }
-            .into_msg(&deps.querier, user_address.clone())?,
-        ));
+        if !user_reward.is_zero() {
+            response.messages.push(SubMsg::new(
+                Asset {
+                    info: AssetInfo::NativeToken {
+                        denom: "uusd".to_string(),
+                    },
+                    amount: user_reward,
+                }
+                .into_msg(&deps.querier, user_address.clone())?,
+            ));
+        }
     }
 
-    Ok(response
-        .add_attribute("user", user_address)
-        .add_attribute("sent_bluna_reward", user_reward))
+    Ok(response.add_attribute("sent_bluna_reward", user_reward))
 }
 
 // //----------------------------------------------------------------------------------------
@@ -2432,6 +2435,33 @@ mod unit_tests {
         LOCKUP_INFO
             .save(deps.as_mut().storage, lockup_key, &lockup)
             .unwrap();
+
+        // let's try to receive reward for non-existent lockup
+        let resp = callback_distribute_asset_reward(
+            deps.as_mut(),
+            env.clone(),
+            uusd_balance,
+            terraswap_lp_addr.clone(),
+            user_addr.clone(),
+            100,
+        )
+        .unwrap();
+        assert_eq!(resp.messages.len(), 0);
+        assert_eq!(
+            &resp.attributes[0],
+            Attribute {
+                key: "lockdrop_claimed_reward".to_string(),
+                value: "0".to_string()
+            }
+        );
+        assert_eq!(
+            &resp.attributes[1],
+            Attribute {
+                key: "user".to_string(),
+                value: "user".to_string()
+            }
+        );
+
         let resp = callback_distribute_asset_reward(
             deps.as_mut(),
             env.clone(),
@@ -2481,21 +2511,6 @@ mod unit_tests {
                 key: "sent_bluna_reward".to_string(),
                 value: "0".to_string()
             }
-        );
-
-        // let's try to receive reward for non-existent lockup
-        let err = callback_distribute_asset_reward(
-            deps.as_mut(),
-            env.clone(),
-            uusd_balance,
-            terraswap_lp_addr.clone(),
-            user_addr.clone(),
-            100,
-        )
-        .unwrap_err();
-        assert_eq!(
-            err.to_string(),
-            "astroport_lockdrop::state::LockupInfo not found"
         );
 
         uusd_balance -= Uint128::from(10u128);
