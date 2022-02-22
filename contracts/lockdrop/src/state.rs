@@ -14,10 +14,10 @@ pub const ASSET_POOLS: Map<&Addr, PoolInfo> = Map::new("LiquidityPools");
 pub const USER_INFO: Map<&Addr, UserInfo> = Map::new("users");
 /// Key consists of an Terraswap LP token address, an user address, and a duration
 pub const LOCKUP_INFO: Map<(&Addr, &Addr, U64Key), LockupInfo> = Map::new("lockup_position");
-/// Total received bluna reward by lockdrop contract
-pub const TOTAL_BLUNA_REWARD: Item<Uint256> = Item::new("total_bluna_reward");
-/// Latest used total bluna reward for user claim
-pub const USERS_BLUNA_REWARD_INDEX: Map<&Addr, Uint256> = Map::new("users_bluna_reward_index");
+/// Total received asset reward by lockdrop contract
+pub const TOTAL_ASSET_REWARD: Item<Uint256> = Item::new("total_asset_reward");
+/// Latest used total asset reward for user claim
+pub const USERS_ASSET_REWARD_INDEX: Map<&Addr, Uint256> = Map::new("users_asset_reward_index");
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Config {

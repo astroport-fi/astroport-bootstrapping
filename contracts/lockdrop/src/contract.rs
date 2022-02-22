@@ -23,7 +23,7 @@ use astroport_periphery::lockdrop::{
 
 use crate::state::{
     Config, LockupInfo, PoolInfo, State, ASSET_POOLS, CONFIG, LOCKUP_INFO, STATE,
-    TOTAL_BLUNA_REWARD, USERS_BLUNA_REWARD_INDEX, USER_INFO,
+    TOTAL_ASSET_REWARD, USERS_ASSET_REWARD_INDEX, USER_INFO,
 };
 
 const SECONDS_PER_WEEK: u64 = 86400 * 7;
@@ -1680,15 +1680,19 @@ fn callback_distribute_asset_reward(
         .add_attribute("lockdrop_claimed_reward", latest_reward_amount)
         .add_attribute("user", user_address.clone());
 
-    let total_bluna_reward_opt = TOTAL_BLUNA_REWARD.may_load(deps.storage)?;
-    let total_bluna_reward = if let Some(balance) = total_bluna_reward_opt {
-        // update total reward balance with newly arrived rewards
-        balance + Uint256::from(latest_reward_amount)
-    } else {
-        // initialization
-        previous_balance.into()
+    let total_bluna_reward = match TOTAL_ASSET_REWARD.may_load(deps.storage)? {
+        Some(balance) if !latest_reward_amount.is_zero() => {
+            let val = balance + Uint256::from(latest_reward_amount);
+            TOTAL_ASSET_REWARD.save(deps.storage, &val)?;
+            val
+        }
+        None => {
+            let val = reward_balance.into();
+            TOTAL_ASSET_REWARD.save(deps.storage, &val)?;
+            val
+        }
+        Some(balance) => balance,
     };
-    TOTAL_BLUNA_REWARD.save(deps.storage, &total_bluna_reward)?;
 
     let lockup_key = (
         &terraswap_lp_token,
@@ -2072,7 +2076,7 @@ fn calc_user_reward(
         return Ok(Uint128::zero());
     }
 
-    let to_distribute = match USERS_BLUNA_REWARD_INDEX.may_load(deps.storage, user)? {
+    let to_distribute = match USERS_ASSET_REWARD_INDEX.may_load(deps.storage, user)? {
         None => total_reward_balance,
         Some(last_user_bluna_reward_index)
             if last_user_bluna_reward_index < total_reward_balance =>
@@ -2082,7 +2086,7 @@ fn calc_user_reward(
         _ => return Ok(Uint128::zero()),
     };
 
-    USERS_BLUNA_REWARD_INDEX.save(deps.storage, user, &total_reward_balance)?;
+    USERS_ASSET_REWARD_INDEX.save(deps.storage, user, &total_reward_balance)?;
 
     to_distribute
         .multiply_ratio(user_lp_amount, total_lp_amount)
