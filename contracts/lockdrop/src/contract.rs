@@ -300,9 +300,9 @@ pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response
                                 .map_err(|_| StdError::generic_err("Deserialization error"))?;
                             let addr = addr_validate_to_lower(deps.as_ref().api, addr_str)?;
                             Ok((addr, pool_info))
-                        })
+                        })?
                     })
-                    .collect::<StdResult<StdResult<Vec<_>>>>()??;
+                    .collect::<StdResult<Vec<_>>>()?;
                 for (key, pool) in pools {
                     let new_pool_info = PoolInfo {
                         terraswap_pool: pool.terraswap_pool,
