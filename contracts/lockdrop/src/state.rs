@@ -1,5 +1,5 @@
 use astroport_periphery::lockdrop::MigrationInfo;
-use cosmwasm_std::{Addr, Decimal, Uint128, Uint256};
+use cosmwasm_std::{Addr, Decimal, Decimal256, Uint128, Uint256};
 use cw_storage_plus::{Item, Map, U64Key};
 
 use schemars::JsonSchema;
@@ -14,10 +14,10 @@ pub const ASSET_POOLS: Map<&Addr, PoolInfo> = Map::new("LiquidityPools");
 pub const USER_INFO: Map<&Addr, UserInfo> = Map::new("users");
 /// Key consists of an Terraswap LP token address, an user address, and a duration
 pub const LOCKUP_INFO: Map<(&Addr, &Addr, U64Key), LockupInfo> = Map::new("lockup_position");
-/// Total received asset reward by lockdrop contract
-pub const TOTAL_ASSET_REWARD: Map<&Addr, Uint256> = Map::new("total_asset_reward");
-/// Last used total asset reward for user claim ( user -> lp_addr )
-pub const USERS_ASSET_REWARD_INDEX: Map<(&Addr, &Addr), Uint256> =
+/// Total received asset reward by lockdrop contract per lp token share
+pub const TOTAL_ASSET_REWARD_INDEX: Map<&Addr, Decimal256> = Map::new("total_asset_reward_index");
+/// Last used total asset reward index for user claim ( user -> lp_addr )
+pub const USERS_ASSET_REWARD_INDEX: Map<(&Addr, &Addr), Decimal256> =
     Map::new("users_asset_reward_index");
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
