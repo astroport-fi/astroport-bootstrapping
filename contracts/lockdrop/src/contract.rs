@@ -11,7 +11,7 @@ use cosmwasm_std::{
 };
 use cw2::{get_contract_version, set_contract_version};
 use cw20::{BalanceResponse, Cw20ExecuteMsg, Cw20QueryMsg, Cw20ReceiveMsg};
-use cw_storage_plus::U64Key;
+use cw_storage_plus::{Path, U64Key};
 
 use crate::migration::ASSET_POOLS_V101;
 use astroport_periphery::auction::Cw20HookMsg::DelegateAstroTokens;
@@ -1680,15 +1680,16 @@ fn callback_distribute_asset_reward(
         .add_attribute("lockdrop_claimed_reward", latest_reward_amount)
         .add_attribute("user", user_address.clone());
 
-    let total_bluna_reward = match TOTAL_ASSET_REWARD.may_load(deps.storage)? {
+    let total_asset_reward_path = TOTAL_ASSET_REWARD.key(&terraswap_lp_token);
+    let total_bluna_reward = match total_asset_reward_path.may_load(deps.storage)? {
         Some(balance) if !latest_reward_amount.is_zero() => {
             let val = balance + Uint256::from(latest_reward_amount);
-            TOTAL_ASSET_REWARD.save(deps.storage, &val)?;
+            total_asset_reward_path.save(deps.storage, &val)?;
             val
         }
         None => {
-            let val = reward_balance.into();
-            TOTAL_ASSET_REWARD.save(deps.storage, &val)?;
+            let val = latest_reward_amount.into();
+            total_asset_reward_path.save(deps.storage, &val)?;
             val
         }
         Some(balance) => balance,
@@ -1700,13 +1701,17 @@ fn callback_distribute_asset_reward(
         U64Key::new(lock_duration),
     );
     let mut user_reward = Uint128::zero();
-    let lockup_info_opt = LOCKUP_INFO.may_load(deps.storage, lockup_key.clone())?;
+    // get only lockups that have not yet been withdrawn
+    let lockup_info_opt = LOCKUP_INFO
+        .may_load(deps.storage, lockup_key.clone())?
+        .filter(|lock_info| lock_info.astroport_lp_transferred.is_none());
     if let Some(lockup_info) = lockup_info_opt {
         let pool_info = ASSET_POOLS.load(deps.storage, &terraswap_lp_token)?;
 
+        let user_index_lp_path = USERS_ASSET_REWARD_INDEX.key((&user_address, &terraswap_lp_token));
         user_reward = calc_user_reward(
             deps.branch(),
-            &user_address,
+            &user_index_lp_path,
             lockup_info.lp_units_locked,
             pool_info.terraswap_amount_in_lockups,
             total_bluna_reward,
@@ -2067,7 +2072,7 @@ fn calculate_weight(amount: Uint128, duration: u64, config: &Config) -> Uint256 
 /// Calculates bLuna user reward according to his share in LP  
 fn calc_user_reward(
     deps: DepsMut,
-    user: &Addr,
+    user_index_lp_path: &Path<Uint256>,
     user_lp_amount: Uint128,
     total_lp_amount: Uint128,
     total_reward_balance: Uint256,
@@ -2076,7 +2081,7 @@ fn calc_user_reward(
         return Ok(Uint128::zero());
     }
 
-    let to_distribute = match USERS_ASSET_REWARD_INDEX.may_load(deps.storage, user)? {
+    let to_distribute = match user_index_lp_path.may_load(deps.storage)? {
         None => total_reward_balance,
         Some(last_user_bluna_reward_index)
             if last_user_bluna_reward_index < total_reward_balance =>
@@ -2086,7 +2091,7 @@ fn calc_user_reward(
         _ => return Ok(Uint128::zero()),
     };
 
-    USERS_ASSET_REWARD_INDEX.save(deps.storage, user, &total_reward_balance)?;
+    user_index_lp_path.save(deps.storage, &total_reward_balance)?;
 
     to_distribute
         .multiply_ratio(user_lp_amount, total_lp_amount)
@@ -2282,21 +2287,25 @@ mod unit_tests {
     #[test]
     fn check_calc_user_reward() {
         let mut deps = mock_dependencies(&[]);
+        let terraswap_lp_token = Addr::unchecked("lp_token_addr");
         let total_lp_amount = Uint128::from(1000u128);
         // user1 with 10% share
         let user1 = Addr::unchecked("user1");
+        let user1_path = USERS_ASSET_REWARD_INDEX.key((&user1, &terraswap_lp_token));
         let user1_lp_amount = Uint128::from(100u128);
         // user2 with 66% share
         let user2 = Addr::unchecked("user2");
+        let user2_path = USERS_ASSET_REWARD_INDEX.key((&user2, &terraswap_lp_token));
         let user2_lp_amount = Uint128::from(660u128);
         // user3 with 20% share
         let user3 = Addr::unchecked("user3");
+        let user3_path = USERS_ASSET_REWARD_INDEX.key((&user3, &terraswap_lp_token));
         let user3_lp_amount = Uint128::from(200u128);
         let mut total_reward_balance = Uint256::from(1000u128);
 
         let res = calc_user_reward(
             deps.as_mut(),
-            &user1,
+            &USERS_ASSET_REWARD_INDEX.key((&user1, &terraswap_lp_token)),
             user1_lp_amount,
             total_lp_amount,
             total_reward_balance,
@@ -2308,7 +2317,7 @@ mod unit_tests {
         // the user already received whole reward thus we get 0 here
         let res = calc_user_reward(
             deps.as_mut(),
-            &user1,
+            &user1_path,
             user1_lp_amount,
             total_lp_amount,
             total_reward_balance,
@@ -2318,7 +2327,7 @@ mod unit_tests {
 
         let res = calc_user_reward(
             deps.as_mut(),
-            &user2,
+            &user2_path,
             user2_lp_amount,
             total_lp_amount,
             total_reward_balance,
@@ -2331,7 +2340,7 @@ mod unit_tests {
 
         let res = calc_user_reward(
             deps.as_mut(),
-            &user1,
+            &user1_path,
             user1_lp_amount,
             total_lp_amount,
             total_reward_balance,
@@ -2343,7 +2352,7 @@ mod unit_tests {
         // the user already received whole reward thus we get 0 here
         let res = calc_user_reward(
             deps.as_mut(),
-            &user1,
+            &user1_path,
             user1_lp_amount,
             total_lp_amount,
             total_reward_balance,
@@ -2353,7 +2362,7 @@ mod unit_tests {
 
         let res = calc_user_reward(
             deps.as_mut(),
-            &user2,
+            &user2_path,
             user2_lp_amount,
             total_lp_amount,
             total_reward_balance,
@@ -2364,7 +2373,7 @@ mod unit_tests {
         // this is the first time user3 receives reward
         let res = calc_user_reward(
             deps.as_mut(),
-            &user3,
+            &user3_path,
             user3_lp_amount,
             total_lp_amount,
             total_reward_balance,
@@ -2466,6 +2475,15 @@ mod unit_tests {
             }
         );
 
+        // emulating newly arrived rewards
+        deps.querier.with_balance(&[(
+            &env.contract.address.to_string(),
+            &[Coin {
+                denom: "uusd".to_string(),
+                amount: uusd_balance + Uint128::from(100u128),
+            }],
+        )]);
+
         let resp = callback_distribute_asset_reward(
             deps.as_mut(),
             env.clone(),
@@ -2480,7 +2498,7 @@ mod unit_tests {
             &resp.attributes[0],
             Attribute {
                 key: "lockdrop_claimed_reward".to_string(),
-                value: "0".to_string()
+                value: "100".to_string()
             }
         );
         assert_eq!(
@@ -2497,6 +2515,17 @@ mod unit_tests {
                 value: "10".to_string()
             }
         );
+
+        uusd_balance += Uint128::from(90u128);
+
+        // 90 ASTRO stays on the balance
+        deps.querier.with_balance(&[(
+            &env.contract.address.to_string(),
+            &[Coin {
+                denom: "uusd".to_string(),
+                amount: uusd_balance,
+            }],
+        )]);
 
         // the user already received reward
         let resp = callback_distribute_asset_reward(

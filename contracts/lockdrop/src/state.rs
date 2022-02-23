@@ -15,9 +15,10 @@ pub const USER_INFO: Map<&Addr, UserInfo> = Map::new("users");
 /// Key consists of an Terraswap LP token address, an user address, and a duration
 pub const LOCKUP_INFO: Map<(&Addr, &Addr, U64Key), LockupInfo> = Map::new("lockup_position");
 /// Total received asset reward by lockdrop contract
-pub const TOTAL_ASSET_REWARD: Item<Uint256> = Item::new("total_asset_reward");
-/// Latest used total asset reward for user claim
-pub const USERS_ASSET_REWARD_INDEX: Map<&Addr, Uint256> = Map::new("users_asset_reward_index");
+pub const TOTAL_ASSET_REWARD: Map<&Addr, Uint256> = Map::new("total_asset_reward");
+/// Last used total asset reward for user claim ( user -> lp_addr )
+pub const USERS_ASSET_REWARD_INDEX: Map<(&Addr, &Addr), Uint256> =
+    Map::new("users_asset_reward_index");
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Config {
