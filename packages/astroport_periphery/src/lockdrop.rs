@@ -91,6 +91,7 @@ pub enum ExecuteMsg {
         withdraw_lp_stake: bool,
     },
     ClaimAssetReward {
+        recipient: Option<String>,
         terraswap_lp_token: String,
         duration: u64,
     },
