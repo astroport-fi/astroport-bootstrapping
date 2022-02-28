@@ -1734,7 +1734,7 @@ fn callback_distribute_asset_reward(
         .may_load(deps.storage, lockup_key.clone())?
         .filter(|lock_info| lock_info.astroport_lp_transferred.is_none());
     if let Some(lockup_info) = lockup_info_opt {
-        let user_index_lp_path = USERS_ASSET_REWARD_INDEX.key((&user_address, &terraswap_lp_token));
+        let user_index_lp_path = USERS_ASSET_REWARD_INDEX.key(lockup_key);
         user_reward = calc_user_reward(
             deps.branch(),
             &user_index_lp_path,
@@ -2314,21 +2314,24 @@ mod unit_tests {
         let total_lp_amount = Uint128::from(1000u128);
         // user1 with 10% share
         let user1 = Addr::unchecked("user1");
-        let user1_path = USERS_ASSET_REWARD_INDEX.key((&user1, &terraswap_lp_token));
+        let user1_path =
+            USERS_ASSET_REWARD_INDEX.key((&terraswap_lp_token, &user1, U64Key::new(10)));
         let user1_lp_amount = Uint128::from(100u128);
         // user2 with 70% share
         let user2 = Addr::unchecked("user2");
-        let user2_path = USERS_ASSET_REWARD_INDEX.key((&user2, &terraswap_lp_token));
+        let user2_path =
+            USERS_ASSET_REWARD_INDEX.key((&terraswap_lp_token, &user2, U64Key::new(10)));
         let user2_lp_amount = Uint128::from(700u128);
         // user3 with 20% share
         let user3 = Addr::unchecked("user3");
-        let user3_path = USERS_ASSET_REWARD_INDEX.key((&user3, &terraswap_lp_token));
+        let user3_path =
+            USERS_ASSET_REWARD_INDEX.key((&terraswap_lp_token, &user3, U64Key::new(10)));
         let user3_lp_amount = Uint128::from(200u128);
         let mut total_reward_index = Decimal256::one();
 
         let res = calc_user_reward(
             deps.as_mut(),
-            &USERS_ASSET_REWARD_INDEX.key((&user1, &terraswap_lp_token)),
+            &user1_path,
             user1_lp_amount,
             total_lp_amount,
             total_reward_index,
