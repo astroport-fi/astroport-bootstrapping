@@ -138,6 +138,7 @@ pub enum CallbackMsg {
         previous_balance: Uint128,
         terraswap_lp_token: Addr,
         user_address: Addr,
+        recipient: Addr,
         lock_duration: u64,
     },
 }

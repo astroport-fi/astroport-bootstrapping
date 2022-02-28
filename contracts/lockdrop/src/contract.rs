@@ -154,14 +154,15 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
             terraswap_lp_token,
             duration,
         } => {
-            let user_address = recipient.map_or_else(
-                || Ok(info.sender),
+            let recipient = recipient.map_or_else(
+                || Ok(info.sender.clone()),
                 |recip_addr| addr_validate_to_lower(deps.api, &recip_addr),
             )?;
             handle_claim_asset_reward(
                 deps.as_ref(),
                 env,
-                user_address,
+                info.sender,
+                recipient,
                 terraswap_lp_token,
                 duration,
             )
@@ -254,12 +255,14 @@ fn _handle_callback(
             previous_balance,
             terraswap_lp_token,
             user_address,
+            recipient,
             lock_duration,
         } => callback_distribute_asset_reward(
             deps,
             env,
             previous_balance,
             terraswap_lp_token,
+            recipient,
             user_address,
             lock_duration,
         ),
@@ -1228,6 +1231,7 @@ fn handle_claim_asset_reward(
     deps: Deps,
     env: Env,
     user_address: Addr,
+    recipient: Addr,
     terraswap_lp_token: String,
     lock_duration: u64,
 ) -> StdResult<Response> {
@@ -1256,6 +1260,7 @@ fn handle_claim_asset_reward(
         previous_balance,
         terraswap_lp_token,
         user_address,
+        recipient,
         lock_duration,
     }
     .to_cosmos_msg(&env)?;
@@ -1688,6 +1693,7 @@ fn callback_distribute_asset_reward(
     mut deps: DepsMut,
     env: Env,
     previous_balance: Uint128,
+    recipient: Addr,
     terraswap_lp_token: Addr,
     user_address: Addr,
     lock_duration: u64,
@@ -1751,7 +1757,7 @@ fn callback_distribute_asset_reward(
                     },
                     amount: user_reward,
                 }
-                .into_msg(&deps.querier, user_address.clone())?,
+                .into_msg(&deps.querier, recipient)?,
             ));
         }
     }
@@ -2249,6 +2255,7 @@ mod unit_tests {
             deps.as_ref(),
             env.clone(),
             user_addr.clone(),
+            user_addr.clone(),
             terraswap_lp_addr.to_string(),
             lock_duration,
         )
@@ -2270,6 +2277,7 @@ mod unit_tests {
         let res = handle_claim_asset_reward(
             deps.as_ref(),
             env.clone(),
+            user_addr.clone(),
             user_addr.clone(),
             terraswap_lp_addr.to_string(),
             lock_duration,
@@ -2297,7 +2305,8 @@ mod unit_tests {
             assert_eq!(contract_addr.to_owned(), env.contract.address.to_string());
             let real_message = ExecuteMsg::Callback(CallbackMsg::DistributeAssetReward {
                 terraswap_lp_token: terraswap_lp_addr,
-                user_address: user_addr,
+                user_address: user_addr.clone(),
+                recipient: user_addr,
                 lock_duration: 10,
                 previous_balance: init_uusd_balance,
             });
@@ -2480,6 +2489,7 @@ mod unit_tests {
             deps.as_mut(),
             env.clone(),
             uusd_balance,
+            user_addr.clone(),
             terraswap_lp_addr.clone(),
             user_addr.clone(),
             100,
@@ -2514,6 +2524,7 @@ mod unit_tests {
             deps.as_mut(),
             env.clone(),
             uusd_balance,
+            user_addr.clone(),
             terraswap_lp_addr.clone(),
             user_addr.clone(),
             lock_duration,
@@ -2558,6 +2569,7 @@ mod unit_tests {
             deps.as_mut(),
             env.clone(),
             uusd_balance,
+            user_addr.clone(),
             terraswap_lp_addr.clone(),
             user_addr.clone(),
             lock_duration,
@@ -2587,6 +2599,7 @@ mod unit_tests {
             deps.as_mut(),
             env.clone(),
             uusd_balance,
+            user_addr.clone(),
             terraswap_lp_addr.clone(),
             user_addr.clone(),
             lock_duration,
