@@ -1172,19 +1172,6 @@ pub fn handle_claim_rewards_and_unlock_for_lockup(
                     None => None,
                 };
 
-                // claim asset rewards if they support it
-                if pool_info.has_asset_rewards {
-                    cosmos_msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
-                        contract_addr: env.contract.address.to_string(),
-                        funds: vec![],
-                        msg: to_binary(&ExecuteMsg::ClaimAssetReward {
-                            recipient: Some(user_address.to_string()),
-                            terraswap_lp_token: terraswap_lp_token.to_string(),
-                            duration,
-                        })?,
-                    }));
-                };
-
                 cosmos_msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
                     contract_addr: generator.to_string(),
                     funds: vec![],
@@ -1207,6 +1194,19 @@ pub fn handle_claim_rewards_and_unlock_for_lockup(
             return Err(StdError::generic_err("No rewards available to claim!"));
         }
     }
+
+    // claim asset rewards if they support it
+    if withdraw_lp_stake && pool_info.has_asset_rewards {
+        cosmos_msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr: env.contract.address.to_string(),
+            funds: vec![],
+            msg: to_binary(&ExecuteMsg::ClaimAssetReward {
+                recipient: Some(user_address.to_string()),
+                terraswap_lp_token: terraswap_lp_token.to_string(),
+                duration,
+            })?,
+        }));
+    };
 
     cosmos_msgs.push(
         CallbackMsg::WithdrawUserLockupRewardsCallback {
