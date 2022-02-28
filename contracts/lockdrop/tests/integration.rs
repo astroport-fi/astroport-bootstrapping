@@ -12,14 +12,20 @@ use cosmwasm_std::{
 
 use astroport::token::InstantiateMsg as TokenInstantiateMsg;
 use cw20::{Cw20ExecuteMsg, Cw20QueryMsg};
-use terra_multi_test::{AppBuilder, BankKeeper, ContractWrapper, Executor, TerraApp, TerraMock};
+use terra_multi_test::{
+    AppBuilder, BankKeeper, ContractWrapper, Executor, SwapQuerier, TerraApp, TerraMock,
+    TreasuryQuerier,
+};
 
 fn mock_app() -> TerraApp {
     let env = mock_env();
     let api = MockApi::default();
     let bank = BankKeeper::new();
     let storage = MockStorage::new();
-    let custom = TerraMock::luna_ust_case();
+    let custom = TerraMock {
+        swap: SwapQuerier::new(&[]),
+        treasury: TreasuryQuerier::new(Decimal::zero(), &[]),
+    };
 
     AppBuilder::new()
         .with_api(api)
@@ -2132,7 +2138,6 @@ fn test_withdraw_from_lockup() {
 }
 
 #[test]
-#[ignore]
 fn test_migrate_liquidity() {
     let mut app = mock_app();
     let owner = Addr::unchecked("contract_owner");
@@ -2488,7 +2493,6 @@ fn test_migrate_liquidity() {
 }
 
 #[test]
-#[ignore]
 fn test_migrate_liquidity_uusd_uluna_pool() {
     let mut app = mock_app();
     let owner = Addr::unchecked("contract_owner");
@@ -2605,8 +2609,8 @@ fn test_migrate_liquidity_uusd_uluna_pool() {
             receiver: None,
         },
         &[
-            Coin::new(1000_000000, "uusd"),
             Coin::new(1000_000000, "uluna"),
+            Coin::new(1000_000000, "uusd"),
         ],
     )
     .unwrap();
@@ -2918,7 +2922,6 @@ fn test_stake_lp_tokens() {
 }
 
 #[test]
-#[ignore]
 fn test_claim_rewards() {
     let mut app = mock_app();
     let owner = Addr::unchecked("contract_owner");
@@ -3346,7 +3349,6 @@ fn test_claim_rewards() {
 }
 
 #[test]
-#[ignore]
 fn test_claim_rewards_and_unlock() {
     let mut app = mock_app();
     let owner = Addr::unchecked("contract_owner");
@@ -3756,7 +3758,6 @@ fn test_claim_rewards_and_unlock() {
 }
 
 #[test]
-#[ignore]
 fn test_delegate_astro_to_auction() {
     let mut app = mock_app();
     let owner = Addr::unchecked("contract_owner");
