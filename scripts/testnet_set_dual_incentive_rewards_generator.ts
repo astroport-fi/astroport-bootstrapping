@@ -63,7 +63,7 @@ async function add_proxy_as_allowed_generator(
       },
     },
     [],
-    `Generator :: Setting the ${pair_name} proxy contract as allowed in generator... `
+    `Generator :: Setting the ${pair_name} proxy contract as allowed in the generator... `
   );
   return tx;
 }
@@ -110,7 +110,7 @@ async function main() {
   //   !network.anc_proxy_rewards_set_in_generator &&
   //   network.anc_generator_proxy_contract_address
   // ) {
-  //   // Query config ==> add proxy to the list of allowed proxies ==> set proxies as allowed in generator
+  //   // Query config ==> add proxy to the list of allowed proxies ==> set proxies as allowed in the generator
   //   if (!network.anc_generator_proxy_set_in_generator) {
   //     let config = await query_generator_config(
   //       terra,
@@ -121,7 +121,7 @@ async function main() {
   //       network.anc_generator_proxy_contract_address as String
   //     );
   //     console.log(
-  //       `Set the ANC proxy as allowed in generator... Allowed proxies with new one: ${new_allowed_proxies}`
+  //       `Set the ANC proxy as allowed in the generator... Allowed proxies with new one: ${new_allowed_proxies}`
   //     );
   //     let tx_set_proxy = await add_proxy_as_allowed_generator(
   //       terra,
@@ -132,12 +132,12 @@ async function main() {
   //     );
   //     network.anc_generator_proxy_set_in_generator = true;
   //     console.log(
-  //       `ANC proxy set successfully as allowed in generator... ${tx_set_proxy.txhash}`
+  //       `ANC proxy set successfully as allowed in the generator... ${tx_set_proxy.txhash}`
   //     );
   //     writeArtifact(network, terra.config.chainID);
   //     await delay(900);
   //   }
-  //   // Register ANC-UST LP token with the astroport generator
+  //   // Register ANC-UST LP token with the Astroport generator
   //   let tx_set_reward = await register_lp_tokens_in_generator(
   //     terra,
   //     wallet,
@@ -148,7 +148,7 @@ async function main() {
   //     "ANC-UST"
   //   );
   //   console.log(
-  //     `Adding ANC-UST LP rewards with the proxy contract to the astroport generator = ${tx_set_reward.txhash}`
+  //     `Adding ANC-UST LP rewards with the proxy contract to the Astroport generator = ${tx_set_reward.txhash}`
   //   );
 
   //   network.anc_proxy_rewards_set_in_generator = true;
@@ -165,7 +165,7 @@ async function main() {
     !network.mir_proxy_rewards_set_in_generator &&
     network.mir_generator_proxy_contract_address
   ) {
-    // Query config ==> add proxy to the list of allowed proxies ==> set proxies as allowed in generator
+    // Query config ==> add proxy to the list of allowed proxies ==> set proxies as allowed in the generator
     if (!network.mir_generator_proxy_set_in_generator) {
       let config = await query_generator_config(
         terra,
@@ -176,7 +176,7 @@ async function main() {
         network.mir_generator_proxy_contract_address as String
       );
       console.log(
-        `Set the MIR proxy as allowed in generator... Allowed proxies with new one: ${new_allowed_proxies}`
+        `Set the MIR proxy as allowed in the generator... Allowed proxies with new one: ${new_allowed_proxies}`
       );
       let tx_set_proxy = await add_proxy_as_allowed_generator(
         terra,
@@ -187,12 +187,12 @@ async function main() {
       );
       network.mir_generator_proxy_set_in_generator = true;
       console.log(
-        `MIR proxy set successfully as allowed in generator... ${tx_set_proxy.txhash}`
+        `MIR proxy set successfully as allowed in the generator... ${tx_set_proxy.txhash}`
       );
       writeArtifact(network, terra.config.chainID);
       await delay(900);
     }
-    // Register MIR-UST LP token with the astroport generator
+    // Register MIR-UST LP token with the Astroport generator
     let tx_set_reward = await register_lp_tokens_in_generator(
       terra,
       wallet,
@@ -203,7 +203,7 @@ async function main() {
       "MIR-UST"
     );
     console.log(
-      `Adding MIR-UST LP rewards with the proxy contract to the astroport generator = ${tx_set_reward.txhash}`
+      `Adding MIR-UST LP rewards with the proxy contract to the Astroport generator = ${tx_set_reward.txhash}`
     );
 
     network.mir_proxy_rewards_set_in_generator = true;
@@ -220,7 +220,7 @@ async function main() {
     !network.orion_proxy_rewards_set_in_generator &&
     network.orion_generator_proxy_contract_address
   ) {
-    // Query config ==> add proxy to the list of allowed proxies ==> set proxies as allowed in generator
+    // Query config ==> add proxy to the list of allowed proxies ==> set proxies as allowed in the generator
     if (!network.orion_generator_proxy_set_in_generator) {
       let config = await query_generator_config(
         terra,
@@ -231,7 +231,7 @@ async function main() {
         network.orion_generator_proxy_contract_address as String
       );
       console.log(
-        `Set the ORION proxy as allowed in generator... Allowed proxies with new one: ${new_allowed_proxies}`
+        `Set the ORION proxy as allowed in the generator... Allowed proxies with new one: ${new_allowed_proxies}`
       );
       let tx_set_proxy = await add_proxy_as_allowed_generator(
         terra,
@@ -242,12 +242,12 @@ async function main() {
       );
       network.orion_generator_proxy_set_in_generator = true;
       console.log(
-        `ORION proxy set successfully as allowed in generator... ${tx_set_proxy.txhash}`
+        `ORION proxy set successfully as allowed in the generator... ${tx_set_proxy.txhash}`
       );
       writeArtifact(network, terra.config.chainID);
       await delay(900);
     }
-    // Register ORION-UST LP token with the astroport generator
+    // Register ORION-UST LP token with the Astroport generator
     let tx_set_reward = await register_lp_tokens_in_generator(
       terra,
       wallet,
@@ -258,7 +258,7 @@ async function main() {
       "ORION-UST"
     );
     console.log(
-      `Adding ORION-UST LP rewards with the proxy contract to the astroport generator = ${tx_set_reward.txhash}`
+      `Adding ORION-UST LP rewards with the proxy contract to the Astroport generator = ${tx_set_reward.txhash}`
     );
 
     network.orion_proxy_rewards_set_in_generator = true;
@@ -275,7 +275,7 @@ async function main() {
     !network.stt_proxy_rewards_set_in_generator &&
     network.stt_generator_proxy_contract_address
   ) {
-    // Query config ==> add proxy to the list of allowed proxies ==> set proxies as allowed in generator
+    // Query config ==> add proxy to the list of allowed proxies ==> set proxies as allowed in the generator
     if (!network.stt_generator_proxy_set_in_generator) {
       let config = await query_generator_config(
         terra,
@@ -287,7 +287,7 @@ async function main() {
       );
 
       console.log(
-        `Set the STT proxy as allowed in generator... Allowed proxies with new one: ${new_allowed_proxies}`
+        `Set the STT proxy as allowed in the generator... Allowed proxies with new one: ${new_allowed_proxies}`
       );
       let tx_set_proxy = await add_proxy_as_allowed_generator(
         terra,
@@ -298,12 +298,12 @@ async function main() {
       );
       network.stt_generator_proxy_set_in_generator = true;
       console.log(
-        `STT proxy set successfully as allowed in generator... ${tx_set_proxy.txhash}`
+        `STT proxy set successfully as allowed in the generator... ${tx_set_proxy.txhash}`
       );
       writeArtifact(network, terra.config.chainID);
       await delay(900);
     }
-    // Register STT-UST LP token with the astroport generator
+    // Register STT-UST LP token with the Astroport generator
     let tx_set_reward = await register_lp_tokens_in_generator(
       terra,
       wallet,
@@ -314,7 +314,7 @@ async function main() {
       "STT-UST"
     );
     console.log(
-      `Adding STT-UST LP rewards with the proxy contract to the astroport generator = ${tx_set_reward.txhash}`
+      `Adding STT-UST LP rewards with the proxy contract to the Astroport generator = ${tx_set_reward.txhash}`
     );
 
     network.stt_proxy_rewards_set_in_generator = true;
@@ -331,7 +331,7 @@ async function main() {
     !network.vkr_proxy_rewards_set_in_generator &&
     network.vkr_generator_proxy_contract_address
   ) {
-    // Query config ==> add proxy to the list of allowed proxies ==> set proxies as allowed in generator
+    // Query config ==> add proxy to the list of allowed proxies ==> set proxies as allowed in the generator
     if (!network.vkr_generator_proxy_set_in_generator) {
       let config = await query_generator_config(
         terra,
@@ -343,7 +343,7 @@ async function main() {
       );
 
       console.log(
-        `Set the VKR proxy as allowed in generator... Allowed proxies with new one: ${new_allowed_proxies}`
+        `Set the VKR proxy as allowed in the generator... Allowed proxies with new one: ${new_allowed_proxies}`
       );
       let tx_set_proxy = await add_proxy_as_allowed_generator(
         terra,
@@ -354,12 +354,12 @@ async function main() {
       );
       network.vkr_generator_proxy_set_in_generator = true;
       console.log(
-        `VKR proxy set successfully as allowed in generator... ${tx_set_proxy.txhash}`
+        `VKR proxy set successfully as allowed in the generator... ${tx_set_proxy.txhash}`
       );
       writeArtifact(network, terra.config.chainID);
       await delay(900);
     }
-    // Register VKR-UST LP token with the astroport generator
+    // Register VKR-UST LP token with the Astroport generator
     let tx_set_reward = await register_lp_tokens_in_generator(
       terra,
       wallet,
@@ -370,7 +370,7 @@ async function main() {
       "VKR-UST"
     );
     console.log(
-      `Adding VKR-UST LP rewards with the proxy contract to the astroport generator = ${tx_set_reward.txhash}`
+      `Adding VKR-UST LP rewards with the proxy contract to the Astroport generator = ${tx_set_reward.txhash}`
     );
 
     network.vkr_proxy_rewards_set_in_generator = true;
@@ -387,7 +387,7 @@ async function main() {
     !network.mine_proxy_rewards_set_in_generator &&
     network.mine_generator_proxy_contract_address
   ) {
-    // Query config ==> add proxy to the list of allowed proxies ==> set proxies as allowed in generator
+    // Query config ==> add proxy to the list of allowed proxies ==> set proxies as allowed in the generator
     if (!network.mine_generator_proxy_set_in_generator) {
       let config = await query_generator_config(
         terra,
@@ -399,7 +399,7 @@ async function main() {
       );
 
       console.log(
-        `Set the MINE proxy as allowed in generator... Allowed proxies with new one: ${new_allowed_proxies}`
+        `Set the MINE proxy as allowed in the generator... Allowed proxies with new one: ${new_allowed_proxies}`
       );
       let tx_set_proxy = await add_proxy_as_allowed_generator(
         terra,
@@ -410,12 +410,12 @@ async function main() {
       );
       network.mine_generator_proxy_set_in_generator = true;
       console.log(
-        `MINE proxy set successfully as allowed in generator... ${tx_set_proxy.txhash}`
+        `MINE proxy set successfully as allowed in the generator... ${tx_set_proxy.txhash}`
       );
       writeArtifact(network, terra.config.chainID);
       await delay(900);
     }
-    // Register MINE-UST LP token with the astroport generator
+    // Register MINE-UST LP token with the Astroport generator
     let tx_set_reward = await register_lp_tokens_in_generator(
       terra,
       wallet,
@@ -426,7 +426,7 @@ async function main() {
       "MINE-UST"
     );
     console.log(
-      `Adding MINE-UST LP rewards with the proxy contract to the astroport generator = ${tx_set_reward.txhash}`
+      `Adding MINE-UST LP rewards with the proxy contract to the Astroport generator = ${tx_set_reward.txhash}`
     );
 
     network.mine_proxy_rewards_set_in_generator = true;
@@ -443,7 +443,7 @@ async function main() {
     !network.psi_proxy_rewards_set_in_generator &&
     network.psi_generator_proxy_contract_address
   ) {
-    // Query config ==> add proxy to the list of allowed proxies ==> set proxies as allowed in generator
+    // Query config ==> add proxy to the list of allowed proxies ==> set proxies as allowed in the generator
     if (!network.psi_generator_proxy_set_in_generator) {
       let config = await query_generator_config(
         terra,
@@ -455,7 +455,7 @@ async function main() {
       );
 
       console.log(
-        `Set the PSI proxy as allowed in generator... Allowed proxies with new one: ${new_allowed_proxies}`
+        `Set the PSI proxy as allowed in the generator... Allowed proxies with new one: ${new_allowed_proxies}`
       );
       let tx_set_proxy = await add_proxy_as_allowed_generator(
         terra,
@@ -466,12 +466,12 @@ async function main() {
       );
       network.psi_generator_proxy_set_in_generator = true;
       console.log(
-        `PSI proxy set successfully as allowed in generator... ${tx_set_proxy.txhash}`
+        `PSI proxy set successfully as allowed in the generator... ${tx_set_proxy.txhash}`
       );
       writeArtifact(network, terra.config.chainID);
       await delay(900);
     }
-    // Register PSI-UST LP token with the astroport generator
+    // Register PSI-UST LP token with the Astroport generator
     let tx_set_reward = await register_lp_tokens_in_generator(
       terra,
       wallet,
@@ -482,7 +482,7 @@ async function main() {
       "PSI-UST"
     );
     console.log(
-      `Adding PSI-UST LP rewards with the proxy contract to the astroport generator = ${tx_set_reward.txhash}`
+      `Adding PSI-UST LP rewards with the proxy contract to the Astroport generator = ${tx_set_reward.txhash}`
     );
 
     network.psi_proxy_rewards_set_in_generator = true;

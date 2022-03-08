@@ -9,9 +9,9 @@ export async function create_json_with_proofs() {
   let n = MERKLE_ROOTS;
   let final_list_of_users_eligible_for_airdrop = [];
 
-  // For each Merkle Tree, evaluate proofs for each user and enter it in the JSON
+  // For each Merkle tree, evaluate proofs for each user and enter it in the JSON
   for (let i = 0; i < n; i++) {
-    // create merkle tree
+    // Create Merkle tree
     let terra_data = prepareDataForMerkleTree(
       airdropdataTerra.data,
       i * Math.round(airdropdataTerra.data.length / n),
@@ -19,10 +19,10 @@ export async function create_json_with_proofs() {
     );
     let terra_merkle_tree = new Merkle_Tree(terra_data);
 
-    // PRINT MERKLE ROOT
+    // Print merkle root
     console.log(`Merkle Root : ${terra_merkle_tree.getMerkleRoot()}`);
 
-    // calculate proof for each user
+    // Calculate proof for each user
     for (let j = 0; j < terra_data.length; j++) {
       let user = { address: "", amount: "", merkle_proof: [""], index: 0 };
       user.address = terra_data[j]["address"];

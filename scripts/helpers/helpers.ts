@@ -20,7 +20,7 @@ import path from "path";
 
 export const ARTIFACTS_PATH = "../artifacts";
 
-// Reads json containing contract addresses located in /artifacts folder. Naming convention : bombay-12 / columbus-5
+// Reads JSON containing contract addresses located in /artifacts folder. Naming convention : bombay-12 / columbus-5
 export function readArtifact(name: string = "artifact") {
   try {
     const data = readFileSync(
@@ -39,7 +39,7 @@ export interface Client {
   MULTI_SIG_TO_USE: String;
 }
 
-// Creates `Client` instance with `terra` and `wallet` to be used for interacting with terra
+// Creates `Client` instance with `terra` and `wallet` to be used for interacting with Terra
 export function newClient(): Client {
   const client = <Client>{};
 
@@ -181,7 +181,7 @@ export async function executeContract(
   return await performTransaction(terra, wallet, executeMsg, memo);
 }
 
-// returns a created Tx object
+// Returns a created Tx object
 export async function executeContractJsonForMultiSig(
   terra: LocalTerra | LCDClient,
   multisigAddress: string,
@@ -286,7 +286,7 @@ export function toEncodedBinary(object: any) {
   return Buffer.from(JSON.stringify(object)).toString("base64");
 }
 
-// Returns `pool_address`, `lp_token_address` of the terraswap pool that's created
+// Returns `pool_address` and `lp_token_address` of the Terraswap pool that's created
 export function extract_terraswap_pool_info(response: any) {
   let pool_address = "";
   let lp_token_address = "";
@@ -307,7 +307,7 @@ export function extract_terraswap_pool_info(response: any) {
   return { pool_address: pool_address, lp_token_address: lp_token_address };
 }
 
-// Returns `pool_address`, `lp_token_address` of the Astroport pool that's created
+// Returns `pool_address` and `lp_token_address` of the Astroport pool that's created
 export function extract_astroport_pool_info(response: any) {
   let pool_address = "";
   let lp_token_address = "";

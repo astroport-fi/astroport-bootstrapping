@@ -30,10 +30,10 @@ async function main() {
   console.log("network:", network);
 
   let ADDRESSES = [
-    "terra17mpuq65hw5kt7d44kpw4nk7x339xhznaa0duzv", // Ramon
-    "terra1lv845g7szf9m3082qn3eehv9ewkjjr2kdyz0t6", // Arthur
-    "terra1mthww38ea56sjmwtswlvy0g4zzjspjwaw3e6t8", // Sage
-    "terra1jdd392vxlx5u23yvekvvjzuna0gszttgtngfnt", // Stefan
+    "terra17mpuq65hw5kt7d44kpw4nk7x339xhznaa0duzv",
+    "terra1lv845g7szf9m3082qn3eehv9ewkjjr2kdyz0t6",
+    "terra1mthww38ea56sjmwtswlvy0g4zzjspjwaw3e6t8",
+    "terra1jdd392vxlx5u23yvekvvjzuna0gszttgtngfnt"
   ];
 
   for (let i = 0; i < ADDRESSES.length; i++) {

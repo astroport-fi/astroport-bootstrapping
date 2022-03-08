@@ -38,11 +38,9 @@ async function main() {
   const network = readArtifact(terra.config.chainID);
   console.log("network:", network);
 
-  // ##################### DEPLOYMENT === ANC-UST PROXY CONTRACT #####################
-  // ##################### DEPLOYMENT === ANC-UST PROXY CONTRACT #####################
-  // ##################### DEPLOYMENT === ANC-UST PROXY CONTRACT #####################
+  // ##################### DEPLOYMENT === ANC-UST proxy contract #####################
 
-  // ANC-UST PROXY CONTRACT ID
+  // ANC-UST proxy contract ID
   if (!network.anc_generator_proxy_contract_code_id) {
     network.anc_generator_proxy_contract_code_id = await uploadContract(
       terra,
@@ -55,7 +53,7 @@ async function main() {
     writeArtifact(network, terra.config.chainID);
   }
 
-  // Deploy :: ANC-UST PROXY CONTRACT
+  // Deploy :: ANC-UST proxy contract
   if (!network.anc_generator_proxy_contract_address) {
     network.anc_generator_proxy_contract_address = await instantiateContract(
       terra,
@@ -65,23 +63,21 @@ async function main() {
         generator_contract_addr: network.astroport_generator_address,
         pair_addr: network.anc_token,
         lp_token_addr: network.anc_ust_astroport_lp_token_address,
-        reward_contract_addr: network.anc_lp_staking_contract_address, // ANC-UST LP Staking contract which gives ANC emissions
+        reward_contract_addr: network.anc_lp_staking_contract_address, // ANC-UST LP staking contract which gives ANC emissions
         reward_token_addr: network.anc_token,
       }
     );
     console.log(
-      `ANC-UST PROXY CONTRACT deployed successfully, address : ${network.anc_generator_proxy_contract_address}`
+      `ANC-UST proxy contract deployed successfully, address : ${network.anc_generator_proxy_contract_address}`
     );
     writeArtifact(network, terra.config.chainID);
   } else {
-    console.log(`ANC-UST PROXY CONTRACT already deployed on bombay-12`);
+    console.log(`ANC-UST proxy contract already deployed on bombay-12`);
   }
 
-  // ##################### DEPLOYMENT === MIR-UST PROXY CONTRACT #####################
-  // ##################### DEPLOYMENT === MIR-UST PROXY CONTRACT #####################
-  // ##################### DEPLOYMENT === MIR-UST PROXY CONTRACT #####################
+  // ##################### DEPLOYMENT === MIR-UST proxy contract #####################
 
-  // MIR-UST PROXY CONTRACT ID
+  // MIR-UST proxy contract ID
   if (!network.mir_generator_proxy_contract_code_id) {
     network.mir_generator_proxy_contract_code_id = await uploadContract(
       terra,
@@ -94,7 +90,7 @@ async function main() {
     writeArtifact(network, terra.config.chainID);
   }
 
-  // Deploy :: MIR-UST PROXY CONTRACT
+  // Deploy :: MIR-UST proxy contract
   if (!network.mir_generator_proxy_contract_address) {
     network.mir_generator_proxy_contract_address = await instantiateContract(
       terra,
@@ -104,23 +100,21 @@ async function main() {
         generator_contract_addr: network.astroport_generator_address,
         pair_addr: network.mir_token,
         lp_token_addr: network.mir_ust_astroport_lp_token_address,
-        reward_contract_addr: network.mir_lp_staking_contract_address, // MIR-UST LP Staking contract which gives MIR emissions
+        reward_contract_addr: network.mir_lp_staking_contract_address, // MIR-UST LP staking contract which gives MIR emissions
         reward_token_addr: network.mir_token,
       }
     );
     console.log(
-      `MIR-UST PROXY CONTRACT deployed successfully, address : ${network.mir_generator_proxy_contract_address}`
+      `MIR-UST proxy contract deployed successfully, address : ${network.mir_generator_proxy_contract_address}`
     );
     writeArtifact(network, terra.config.chainID);
   } else {
-    console.log(`MIR-UST PROXY CONTRACT already deployed on bombay-12`);
+    console.log(`MIR-UST proxy contract already deployed on bombay-12`);
   }
 
-  // // ##################### DEPLOYMENT === ORION-UST PROXY CONTRACT #####################
-  // // ##################### DEPLOYMENT === ORION-UST PROXY CONTRACT #####################
-  // // ##################### DEPLOYMENT === ORION-UST PROXY CONTRACT #####################
+  // ##################### DEPLOYMENT === ORION-UST proxy contract #####################
 
-  // ORION-UST PROXY CONTRACT ID
+  // ORION-UST proxy contract ID
   if (!network.orion_generator_proxy_contract_code_id) {
     network.orion_generator_proxy_contract_code_id = await uploadContract(
       terra,
@@ -133,7 +127,7 @@ async function main() {
     writeArtifact(network, terra.config.chainID);
   }
 
-  // Deploy :: ORION-UST PROXY CONTRACT
+  // Deploy :: ORION-UST proxy contract
   if (!network.orion_generator_proxy_contract_address) {
     network.orion_generator_proxy_contract_address = await instantiateContract(
       terra,
@@ -143,23 +137,21 @@ async function main() {
         generator_contract_addr: network.astroport_generator_address,
         pair_addr: network.orion_token,
         lp_token_addr: network.orion_ust_astroport_lp_token_address,
-        reward_contract_addr: network.orion_lp_staking_contract_address, // ORION-UST LP Staking contract which gives ORION emissions
+        reward_contract_addr: network.orion_lp_staking_contract_address, // ORION-UST LP staking contract which gives ORION emissions
         reward_token_addr: network.orion_token,
       }
     );
     console.log(
-      `ORION-UST PROXY CONTRACT deployed successfully, address : ${network.orion_generator_proxy_contract_address}`
+      `ORION-UST proxy contract deployed successfully, address : ${network.orion_generator_proxy_contract_address}`
     );
     writeArtifact(network, terra.config.chainID);
   } else {
-    console.log(`ORION-UST PROXY CONTRACT already deployed on bombay-12`);
+    console.log(`ORION-UST proxy contract already deployed on bombay-12`);
   }
 
-  // // ##################### DEPLOYMENT === STT-UST PROXY CONTRACT #####################
-  // // ##################### DEPLOYMENT === STT-UST PROXY CONTRACT #####################
-  // // ##################### DEPLOYMENT === STT-UST PROXY CONTRACT #####################
+  // ##################### DEPLOYMENT === STT-UST proxy contract #####################
 
-  // STT-UST PROXY CONTRACT ID
+  // STT-UST proxy contract ID
   if (!network.stt_generator_proxy_contract_code_id) {
     network.stt_generator_proxy_contract_code_id = await uploadContract(
       terra,
@@ -172,7 +164,7 @@ async function main() {
     writeArtifact(network, terra.config.chainID);
   }
 
-  // Deploy :: STT-UST PROXY CONTRACT
+  // Deploy :: STT-UST proxy contract
   if (!network.stt_generator_proxy_contract_address) {
     network.stt_generator_proxy_contract_address = await instantiateContract(
       terra,
@@ -182,23 +174,21 @@ async function main() {
         generator_contract_addr: network.astroport_generator_address,
         pair_addr: network.stt_token,
         lp_token_addr: network.stt_ust_astroport_lp_token_address,
-        reward_contract_addr: network.stt_lp_staking_contract_address, // STT-UST LP Staking contract which gives STT emissions
+        reward_contract_addr: network.stt_lp_staking_contract_address, // STT-UST LP staking contract which gives STT emissions
         reward_token_addr: network.stt_token,
       }
     );
     console.log(
-      `STT-UST PROXY CONTRACT deployed successfully, address : ${network.stt_generator_proxy_contract_address}`
+      `STT-UST proxy contract deployed successfully, address : ${network.stt_generator_proxy_contract_address}`
     );
     writeArtifact(network, terra.config.chainID);
   } else {
-    console.log(`STT-UST PROXY CONTRACT already deployed on bombay-12`);
+    console.log(`STT-UST proxy contract already deployed on bombay-12`);
   }
 
-  // // ##################### DEPLOYMENT === VKR-UST PROXY CONTRACT #####################
-  // // ##################### DEPLOYMENT === VKR-UST PROXY CONTRACT #####################
-  // // ##################### DEPLOYMENT === VKR-UST PROXY CONTRACT #####################
+  // ##################### DEPLOYMENT === VKR-UST proxy contract #####################
 
-  // VKR-UST PROXY CONTRACT ID
+  // VKR-UST proxy contract ID
   if (!network.vkr_generator_proxy_contract_code_id) {
     network.vkr_generator_proxy_contract_code_id = await uploadContract(
       terra,
@@ -211,7 +201,7 @@ async function main() {
     writeArtifact(network, terra.config.chainID);
   }
 
-  // Deploy :: VKR-UST PROXY CONTRACT
+  // Deploy :: VKR-UST proxy contract
   if (!network.vkr_generator_proxy_contract_address) {
     network.vkr_generator_proxy_contract_address = await instantiateContract(
       terra,
@@ -221,23 +211,21 @@ async function main() {
         generator_contract_addr: network.astroport_generator_address,
         pair_addr: network.vkr_token,
         lp_token_addr: network.vkr_ust_astroport_lp_token_address,
-        reward_contract_addr: network.vkr_lp_staking_contract_address, // VKR-UST LP Staking contract which gives VKR emissions
+        reward_contract_addr: network.vkr_lp_staking_contract_address, // VKR-UST LP staking contract which gives VKR emissions
         reward_token_addr: network.vkr_token,
       }
     );
     console.log(
-      `VKR-UST PROXY CONTRACT deployed successfully, address : ${network.vkr_generator_proxy_contract_address}`
+      `VKR-UST proxy contract deployed successfully, address : ${network.vkr_generator_proxy_contract_address}`
     );
     writeArtifact(network, terra.config.chainID);
   } else {
-    console.log(`VKR-UST PROXY CONTRACT already deployed on bombay-12`);
+    console.log(`VKR-UST proxy contract already deployed on bombay-12`);
   }
 
-  // ##################### DEPLOYMENT === MINE-UST PROXY CONTRACT #####################
-  // ##################### DEPLOYMENT === MINE-UST PROXY CONTRACT #####################
-  // ##################### DEPLOYMENT === MINE-UST PROXY CONTRACT #####################
+  // ##################### DEPLOYMENT === MINE-UST proxy contract #####################
 
-  // MINE-UST PROXY CONTRACT ID
+  // MINE-UST proxy contract ID
   if (!network.mine_generator_proxy_contract_code_id) {
     network.mine_generator_proxy_contract_code_id = await uploadContract(
       terra,
@@ -250,7 +238,7 @@ async function main() {
     writeArtifact(network, terra.config.chainID);
   }
 
-  // Deploy :: MINE-UST PROXY CONTRACT
+  // Deploy :: MINE-UST proxy contract
   if (!network.mine_generator_proxy_contract_address) {
     network.mine_generator_proxy_contract_address = await instantiateContract(
       terra,
@@ -260,23 +248,21 @@ async function main() {
         generator_contract_addr: network.astroport_generator_address,
         pair_addr: network.mine_token,
         lp_token_addr: network.mine_ust_astroport_lp_token_address,
-        reward_contract_addr: network.mine_lp_staking_contract_address, // MINE-UST LP Staking contract which gives MINE emissions
+        reward_contract_addr: network.mine_lp_staking_contract_address, // MINE-UST LP staking contract which gives MINE emissions
         reward_token_addr: network.mine_token,
       }
     );
     console.log(
-      `MINE-UST PROXY CONTRACT deployed successfully, address : ${network.mine_generator_proxy_contract_address}`
+      `MINE-UST proxy contract deployed successfully, address : ${network.mine_generator_proxy_contract_address}`
     );
     writeArtifact(network, terra.config.chainID);
   } else {
-    console.log(`MINE-UST PROXY CONTRACT already deployed on bombay-12`);
+    console.log(`MINE-UST proxy contract already deployed on bombay-12`);
   }
 
-  // ##################### DEPLOYMENT === PSI-UST PROXY CONTRACT #####################
-  // ##################### DEPLOYMENT === PSI-UST PROXY CONTRACT #####################
-  // ##################### DEPLOYMENT === PSI-UST PROXY CONTRACT #####################
+  // ##################### DEPLOYMENT === PSI-UST proxy contract #####################
 
-  // PSI-UST PROXY CONTRACT ID
+  // PSI-UST proxy contract ID
   if (!network.psi_generator_proxy_contract_code_id) {
     network.psi_generator_proxy_contract_code_id = await uploadContract(
       terra,
@@ -289,7 +275,7 @@ async function main() {
     writeArtifact(network, terra.config.chainID);
   }
 
-  // Deploy :: PSI-UST PROXY CONTRACT
+  // Deploy :: PSI-UST proxy contract
   if (!network.psi_generator_proxy_contract_address) {
     network.psi_generator_proxy_contract_address = await instantiateContract(
       terra,
@@ -299,23 +285,21 @@ async function main() {
         generator_contract_addr: network.astroport_generator_address,
         pair_addr: network.psi_token,
         lp_token_addr: network.psi_ust_astroport_lp_token_address,
-        reward_contract_addr: network.psi_lp_staking_contract_address, // PSI-UST LP Staking contract which gives PSI emissions
+        reward_contract_addr: network.psi_lp_staking_contract_address, // PSI-UST LP staking contract which gives PSI emissions
         reward_token_addr: network.psi_token,
       }
     );
     console.log(
-      `PSI-UST PROXY CONTRACT deployed successfully, address : ${network.psi_generator_proxy_contract_address}`
+      `PSI-UST proxy contract deployed successfully, address : ${network.psi_generator_proxy_contract_address}`
     );
     writeArtifact(network, terra.config.chainID);
   } else {
-    console.log(`PSI-UST PROXY CONTRACT already deployed on bombay-12`);
+    console.log(`PSI-UST proxy contract already deployed on bombay-12`);
   }
 
-  // // ##################### DEPLOYMENT === APOLLO-UST PROXY CONTRACT #####################
-  // // ##################### DEPLOYMENT === APOLLO-UST PROXY CONTRACT #####################
-  // // ##################### DEPLOYMENT === APOLLO-UST PROXY CONTRACT #####################
+  // ##################### DEPLOYMENT === APOLLO-UST proxy contract #####################
 
-  // // APOLLO-UST PROXY CONTRACT ID
+  // APOLLO-UST proxy contract ID
   // if (!network.apollo_generator_proxy_contract_code_id) {
   //   network.apollo_generator_proxy_contract_code_id = await uploadContract(
   //     terra,
@@ -328,7 +312,7 @@ async function main() {
   //   writeArtifact(network, terra.config.chainID);
   // }
 
-  // // Deploy :: APOLLO-UST PROXY CONTRACT
+  // Deploy :: APOLLO-UST proxy contract
   // if (!network.apollo_generator_proxy_contract_address) {
   //   network.apollo_generator_proxy_contract_address = await instantiateContract(
   //     terra,
@@ -338,17 +322,17 @@ async function main() {
   //       generator_contract_addr: network.astroport_generator_address,
   //       pair_addr: network.apollo_token,
   //       lp_token_addr: network.apollo_ust_astroport_lp_token_address,
-  //       reward_contract_addr: network.apollo_lp_staking_contract_address, // APOLLO-UST LP Staking contract which gives APOLLO emissions
+  //       reward_contract_addr: network.apollo_lp_staking_contract_address, // APOLLO-UST LP staking contract which gives APOLLO emissions
   //       reward_token_addr: network.apollo_token,
   //       strategy_id: network.apollo_staking_strategy_id,
   //     }
   //   );
   //   console.log(
-  //     `APOLLO-UST PROXY CONTRACT deployed successfully, address : ${network.apollo_generator_proxy_contract_address}`
+  //     `APOLLO-UST proxy contract deployed successfully, address : ${network.apollo_generator_proxy_contract_address}`
   //   );
   //   writeArtifact(network, terra.config.chainID);
   // } else {
-  //   console.log(`APOLLO-UST PROXY CONTRACT already deployed on bombay-12`);
+  //   console.log(`APOLLO-UST proxy contract already deployed on bombay-12`);
   // }
 }
 

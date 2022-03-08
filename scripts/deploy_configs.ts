@@ -43,7 +43,7 @@ export const mainnet: Config = {
 
   memos: {
     lockdrop:
-      "ASTROPORT Launch : Phase 1  -::- Lockdrop -::- Liquidity Migration",
+      "ASTROPORT Launch : Phase 1 -::- Lockdrop -::- Liquidity Migration",
     airdrop: "ASTROPORT Launch : ASTRO Airdrop",
     auction:
       "ASTROPORT Launch -::- Auction -::- ASTRO-UST LP Pool Bootstrapping",

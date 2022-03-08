@@ -39,7 +39,7 @@ async function main() {
     CONFIGURATION = mainnet;
   }
 
-  // ASTRO Token addresss should be set
+  // ASTRO token addresss should be set
   if (!network.lockdrop_address) {
     console.log(
       `Please deploy the Lockdrop Contract in the deploy config before running this script...`

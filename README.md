@@ -1,6 +1,6 @@
-# Astroport Periphery
+# Astroport Bootstrapping
 
-This repo contains the contracts which facilitates ASTRO tokens airdrop, lockdrop and LP Bootstrapping via auction during the intital protocol launch.
+This repo contains contracts which facilitate the ASTRO token airdrop, lockdrop and ASTRO-UST LP bootstrapping.
 
 ## Development
 
@@ -23,7 +23,7 @@ rustup default stable
 rustup target add wasm32-unknown-unknown
 ```
 
-3. Install Node libraries required:
+3. Install required Node libraries:
 
 ```bash
 cd scripts
@@ -41,7 +41,7 @@ node --experimental-json-modules --loader ts-node/esm deploy_script.ts
 
 ### Compile
 
-Make sure the current working directory is set to the root directory of this repository, then
+Make sure the current working directory is set to the root directory of this repository, then run:
 
 ```bash
 cargo build

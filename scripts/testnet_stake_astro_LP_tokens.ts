@@ -62,7 +62,7 @@ async function main() {
     CONFIGURATION = mainnet;
   }
 
-  // ASTRO Token addresss should be set
+  // ASTRO token addresss should be set
   if (!network.lockdrop_address) {
     console.log(
       `Please deploy the Lockdrop Contract in the deploy config before running this script...`
@@ -71,19 +71,15 @@ async function main() {
   }
 
   /*************************************** LOCKDROP :: IF NETWORK IS BOMBAY-12  *****************************************/
-  /*************************************** LOCKDROP :: IF NETWORK IS BOMBAY-12  *****************************************/
-  /*************************************** LOCKDROP :: IF NETWORK IS BOMBAY-12  *****************************************/
-  /*************************************** LOCKDROP :: IF NETWORK IS BOMBAY-12  *****************************************/
-
   if (terra.config.chainID == "bombay-12") {
-    // Staking LP tokens with astroport generator :: ANC/UST
+    // Staking LP tokens with the Astroport Generator :: ANC/UST
     // if (
     //   !network.anc_lp_tokens_staked_with_generator &&
     //   // network.anc_proxy_rewards_set_in_generator &&
     //   network.anc_ust_liquidity_migrated
     // ) {
     //   console.log(
-    //     `${terra.config.chainID} :: Lockdrop :: Staking LP tokens with astroport generator :: ANC/UST`
+    //     `${terra.config.chainID} :: Lockdrop :: Staking LP tokens with the Astroport Generator :: ANC/UST`
     //   );
     //   let tx = await stake_astro_lp_tokens_lockdrop(
     //     terra,
@@ -93,20 +89,20 @@ async function main() {
     //     "ANC-UST"
     //   );
     //   console.log(
-    //     `Lockdrop :: LP Tokens successfully staked:: ANC/UST :: ${tx.txhash}\n`
+    //     `Lockdrop :: LP tokens successfully staked:: ANC/UST :: ${tx.txhash}\n`
     //   );
     //   network.anc_lp_tokens_staked_with_generator = true;
     //   writeArtifact(network, terra.config.chainID);
     // }
 
-    // Staking LP tokens with astroport generator :: MIR/UST
+    // Staking LP tokens with the Astroport Generator :: MIR/UST
     if (
       !network.mir_lp_tokens_staked_with_generator &&
       network.mir_proxy_rewards_set_in_generator &&
       network.mir_ust_liquidity_migrated
     ) {
       console.log(
-        `${terra.config.chainID} :: Lockdrop :: Staking LP tokens with astroport generator :: MIR/UST`
+        `${terra.config.chainID} :: Lockdrop :: Staking LP tokens with the Astroport Generator :: MIR/UST`
       );
       let tx = await stake_astro_lp_tokens_lockdrop(
         terra,
@@ -116,20 +112,20 @@ async function main() {
         "MIR-UST"
       );
       console.log(
-        `Lockdrop :: LP Tokens successfully staked:: MIR/UST :: ${tx.txhash}\n`
+        `Lockdrop :: LP tokens successfully staked:: MIR/UST :: ${tx.txhash}\n`
       );
       network.mir_lp_tokens_staked_with_generator = true;
       writeArtifact(network, terra.config.chainID);
     }
 
-    // Staking LP tokens with astroport generator :: ORION/UST
+    // Staking LP tokens with the Astroport Generator :: ORION/UST
     if (
       !network.orion_lp_tokens_staked_with_generator &&
       network.orion_proxy_rewards_set_in_generator &&
       network.orion_ust_liquidity_migrated
     ) {
       console.log(
-        `${terra.config.chainID} :: Lockdrop :: Staking LP tokens with astroport generator :: ORION/UST`
+        `${terra.config.chainID} :: Lockdrop :: Staking LP tokens with the Astroport Generator :: ORION/UST`
       );
       let tx = await stake_astro_lp_tokens_lockdrop(
         terra,
@@ -139,20 +135,20 @@ async function main() {
         "ORION-UST"
       );
       console.log(
-        `Lockdrop :: LP Tokens successfully staked:: ORION/UST :: ${tx.txhash}\n`
+        `Lockdrop :: LP tokens successfully staked:: ORION/UST :: ${tx.txhash}\n`
       );
       network.orion_lp_tokens_staked_with_generator = true;
       writeArtifact(network, terra.config.chainID);
     }
 
-    // Staking LP tokens with astroport generator :: STT/UST
+    // Staking LP tokens with the Astroport Generator :: STT/UST
     if (
       !network.stt_lp_tokens_staked_with_generator &&
       network.stt_proxy_rewards_set_in_generator &&
       network.stt_ust_liquidity_migrated
     ) {
       console.log(
-        `${terra.config.chainID} :: Lockdrop :: Staking LP tokens with astroport generator :: STT/UST`
+        `${terra.config.chainID} :: Lockdrop :: Staking LP tokens with the Astroport Generator :: STT/UST`
       );
       let tx = await stake_astro_lp_tokens_lockdrop(
         terra,
@@ -162,20 +158,20 @@ async function main() {
         "STT-UST"
       );
       console.log(
-        `Lockdrop :: LP Tokens successfully staked:: STT/UST :: ${tx.txhash}\n`
+        `Lockdrop :: LP tokens successfully staked:: STT/UST :: ${tx.txhash}\n`
       );
       network.stt_lp_tokens_staked_with_generator = true;
       writeArtifact(network, terra.config.chainID);
     }
 
-    // Staking LP tokens with astroport generator :: VKR/UST
+    // Staking LP tokens with the Astroport Generator :: VKR/UST
     if (
       !network.vkr_lp_tokens_staked_with_generator &&
       network.vkr_proxy_rewards_set_in_generator &&
       network.vkr_ust_liquidity_migrated
     ) {
       console.log(
-        `${terra.config.chainID} :: Lockdrop :: Staking LP tokens with astroport generator :: VKR/UST`
+        `${terra.config.chainID} :: Lockdrop :: Staking LP tokens with the Astroport Generator :: VKR/UST`
       );
       let tx = await stake_astro_lp_tokens_lockdrop(
         terra,
@@ -185,20 +181,20 @@ async function main() {
         "VKR-UST"
       );
       console.log(
-        `Lockdrop :: LP Tokens successfully staked:: VKR/UST :: ${tx.txhash}\n`
+        `Lockdrop :: LP tokens successfully staked:: VKR/UST :: ${tx.txhash}\n`
       );
       network.vkr_lp_tokens_staked_with_generator = true;
       writeArtifact(network, terra.config.chainID);
     }
 
-    // Staking LP tokens with astroport generator :: MINE/UST
+    // Staking LP tokens with the Astroport Generator :: MINE/UST
     if (
       !network.mine_lp_tokens_staked_with_generator &&
       network.mine_proxy_rewards_set_in_generator &&
       network.mine_ust_liquidity_migrated
     ) {
       console.log(
-        `${terra.config.chainID} :: Lockdrop :: Staking LP tokens with astroport generator :: MINE/UST`
+        `${terra.config.chainID} :: Lockdrop :: Staking LP tokens with the Astroport Generator :: MINE/UST`
       );
       let tx = await stake_astro_lp_tokens_lockdrop(
         terra,
@@ -208,20 +204,20 @@ async function main() {
         "MINE-UST"
       );
       console.log(
-        `Lockdrop :: LP Tokens successfully staked:: MINE/UST :: ${tx.txhash}\n`
+        `Lockdrop :: LP tokens successfully staked:: MINE/UST :: ${tx.txhash}\n`
       );
       network.mine_lp_tokens_staked_with_generator = true;
       writeArtifact(network, terra.config.chainID);
     }
 
-    // Staking LP tokens with astroport generator :: PSI/UST
+    // Staking LP tokens with the Astroport Generator :: PSI/UST
     if (
       !network.psi_lp_tokens_staked_with_generator &&
       network.psi_proxy_rewards_set_in_generator &&
       network.psi_ust_liquidity_migrated
     ) {
       console.log(
-        `${terra.config.chainID} :: Lockdrop :: Staking LP tokens with astroport generator :: PSI/UST`
+        `${terra.config.chainID} :: Lockdrop :: Staking LP tokens with the Astroport Generator :: PSI/UST`
       );
       let tx = await stake_astro_lp_tokens_lockdrop(
         terra,
@@ -231,7 +227,7 @@ async function main() {
         "PSI-UST"
       );
       console.log(
-        `Lockdrop :: LP Tokens successfully staked:: PSI/UST :: ${tx.txhash}\n`
+        `Lockdrop :: LP tokens successfully staked:: PSI/UST :: ${tx.txhash}\n`
       );
       network.psi_lp_tokens_staked_with_generator = true;
       writeArtifact(network, terra.config.chainID);

@@ -56,8 +56,8 @@ async function main() {
     console.log(`Cw20 Code id = ${network.cw20_token_code_id}`);
     writeArtifact(network, terra.config.chainID);
   }
-  /*************************************** DEPLOYMENT :: ASTRO TOKEN ON BOMBAY TESTNET  *****************************************/
 
+  /*************************************** DEPLOYMENT :: ASTRO TOKEN ON BOMBAY TESTNET  *****************************************/
   // Deploy ASTRO (dummy) Token
   if (!network.astro_token_address) {
     network.astro_token_address = await instantiateContract(
@@ -89,7 +89,7 @@ async function main() {
     console.log(`ASTRO Token already deployed on bombay-12`);
   }
 
-  // // Mint luna-ust LP Tokens
+  // Mint LUNA-UST LP tokens
   await executeContract(
     terra,
     wallet,
@@ -114,11 +114,11 @@ async function main() {
       new Coin("uusd", inital_ust_liquidity_for_each),
     ]
   );
-  console.log(`LUNA-UST LP Tokens successfully minted on bombay-12`);
+  console.log(`LUNA-UST LP tokens successfully minted on bombay-12`);
 
-  // Mint luna-Bluna LP Tokens : Deploy BLuna, create Luna-BLuna Pair on terraswap : Mint LP Tokens
+  // Mint LUNA-bLUNA LP tokens : Deploy bLUNA, create bLUNA-LUNA pair on Terraswap : Mint LP tokens
   if (!network.bluna_token_address) {
-    // deploy token
+    // Deploy token
     network.bluna_token_address = await instantiateContract(
       terra,
       wallet,
@@ -143,7 +143,7 @@ async function main() {
     console.log(
       `BLuna Token deployed successfully, address : ${network.bluna_token_address}`
     );
-    // Initialize terraswap pool
+    // Initialize Terraswap pool
     let bluna_init_pool_tx = await executeContract(
       terra,
       wallet,
@@ -162,7 +162,7 @@ async function main() {
     network.bluna_luna_terraswap_pool = bluna_init_pool_tx_resp.pool_address;
     network.bluna_luna_terraswap_lp_token_address =
       bluna_init_pool_tx_resp.lp_token_address;
-    // Mint LP Tokens : increase_allowance and provide_liquidity
+    // Mint LP tokens : increase_allowance and provide_liquidity
     await executeContract(terra, wallet, network.bluna_token_address, {
       increase_allowance: {
         spender: network.bluna_luna_terraswap_pool,
@@ -191,15 +191,13 @@ async function main() {
       },
       [new Coin("uluna", inital_ust_liquidity_for_each)]
     );
-    console.log(`LUNA-BLUNA LP Tokens successfully minted on bombay-12 \n`);
+    console.log(`LUNA-BLUNA LP tokens successfully minted on bombay-12 \n`);
     writeArtifact(network, terra.config.chainID);
   }
 
-  // Mint ANC-UST LP Tokens : Deploy ANC, create ANC-UST Pair on terraswap : Mint LP Tokens
-  // Mint ANC-UST LP Tokens : Deploy ANC, create ANC-UST Pair on terraswap : Mint LP Tokens
-  // Mint ANC-UST LP Tokens : Deploy ANC, create ANC-UST Pair on terraswap : Mint LP Tokens
+  // Mint ANC-UST LP tokens : Deploy ANC, create ANC-UST pair on Terraswap : Mint LP tokens
   if (!network.anc_token) {
-    // deploy token
+    // Deploy token
     network.anc_token = await instantiateContract(
       terra,
       wallet,
@@ -224,7 +222,7 @@ async function main() {
     console.log(
       `ANC Token deployed successfully, address : ${network.anc_token}`
     );
-    // Initialize terraswap pool
+    // Initialize Terraswap pool
     let anc_init_pool_tx = await executeContract(
       terra,
       wallet,
@@ -242,7 +240,7 @@ async function main() {
     network.anc_ust_terraswap_pool = anc_init_pool_tx_resp.pool_address;
     network.anc_ust_terraswap_lp_token_address =
       anc_init_pool_tx_resp.lp_token_address;
-    // Mint LP Tokens : increase_allowance and provide_liquidity
+    // Mint LP tokens : increase_allowance and provide_liquidity
     await executeContract(terra, wallet, network.anc_token, {
       increase_allowance: {
         spender: network.anc_ust_terraswap_pool,
@@ -272,16 +270,13 @@ async function main() {
       [new Coin("uusd", inital_ust_liquidity_for_each)]
     );
     await delay(300);
-    console.log(`ANC-UST LP Tokens successfully minted on bombay-12 \n`);
+    console.log(`ANC-UST LP tokens successfully minted on bombay-12 \n`);
     writeArtifact(network, terra.config.chainID);
   }
 
-  // Mint MIR-UST LP Tokens : Deploy MIR, create MIR-UST Pair on terraswap : Mint LP Tokens
-  // Mint MIR-UST LP Tokens : Deploy MIR, create MIR-UST Pair on terraswap : Mint LP Tokens
-  // Mint MIR-UST LP Tokens : Deploy MIR, create MIR-UST Pair on terraswap : Mint LP Tokens
-  // Mint MIR-UST LP Tokens : Deploy MIR, create MIR-UST Pair on terraswap : Mint LP Tokens
+  // Mint MIR-UST LP tokens : Deploy MIR, create MIR-UST pair on Terraswap : Mint LP tokens
   if (!network.mir_token) {
-    // deploy token
+    // Deploy token
     network.mir_token = await instantiateContract(
       terra,
       wallet,
@@ -306,7 +301,7 @@ async function main() {
     console.log(
       `MIR Token deployed successfully, address : ${network.mir_token}`
     );
-    // Initialize terraswap pool
+    // Initialize Terraswap pool
     let mir_init_pool_tx = await executeContract(
       terra,
       wallet,
@@ -324,7 +319,7 @@ async function main() {
     network.mir_ust_terraswap_pool = mir_init_pool_tx_resp.pool_address;
     network.mir_ust_terraswap_lp_token_address =
       mir_init_pool_tx_resp.lp_token_address;
-    // Mint LP Tokens : increase_allowance and provide_liquidity
+    // Mint LP tokens : increase_allowance and provide_liquidity
     await executeContract(terra, wallet, network.mir_token, {
       increase_allowance: {
         spender: network.mir_ust_terraswap_pool,
@@ -354,16 +349,13 @@ async function main() {
       [new Coin("uusd", inital_ust_liquidity_for_each)]
     );
     await delay(300);
-    console.log(`MIR-UST LP Tokens successfully minted on bombay-12 \n`);
+    console.log(`MIR-UST LP tokens successfully minted on bombay-12 \n`);
     writeArtifact(network, terra.config.chainID);
   }
 
-  // Mint ORION-UST LP Tokens : Deploy ORION, create ORION-UST Pair on terraswap : Mint LP Tokens
-  // Mint ORION-UST LP Tokens : Deploy ORION, create ORION-UST Pair on terraswap : Mint LP Tokens
-  // Mint ORION-UST LP Tokens : Deploy ORION, create ORION-UST Pair on terraswap : Mint LP Tokens
-  // Mint ORION-UST LP Tokens : Deploy ORION, create ORION-UST Pair on terraswap : Mint LP Tokens
+  // Mint ORION-UST LP tokens : Deploy ORION, create ORION-UST pair on Terraswap : Mint LP tokens
   if (!network.orion_token) {
-    // deploy token
+    // Deploy token
     network.orion_token = await instantiateContract(
       terra,
       wallet,
@@ -388,7 +380,7 @@ async function main() {
     console.log(
       `ORION Token deployed successfully, address : ${network.orion_token}`
     );
-    // Initialize terraswap pool
+    // Initialize Terraswap pool
     let orion_init_pool_tx = await executeContract(
       terra,
       wallet,
@@ -407,7 +399,7 @@ async function main() {
     network.orion_ust_terraswap_pool = orion_init_pool_tx_resp.pool_address;
     network.orion_ust_terraswap_lp_token_address =
       orion_init_pool_tx_resp.lp_token_address;
-    // Mint LP Tokens : increase_allowance and provide_liquidity
+    // Mint LP tokens : increase_allowance and provide_liquidity
     await executeContract(terra, wallet, network.orion_token, {
       increase_allowance: {
         spender: network.orion_ust_terraswap_pool,
@@ -437,16 +429,13 @@ async function main() {
       [new Coin("uusd", inital_ust_liquidity_for_each)]
     );
     await delay(300);
-    console.log(`ORION-UST LP Tokens successfully minted on bombay-12 \n`);
+    console.log(`ORION-UST LP tokens successfully minted on bombay-12 \n`);
     writeArtifact(network, terra.config.chainID);
   }
 
-  // Mint STT-UST LP Tokens : Deploy STT, create STT-UST Pair on terraswap : Mint LP Tokens
-  // Mint STT-UST LP Tokens : Deploy STT, create STT-UST Pair on terraswap : Mint LP Tokens
-  // Mint STT-UST LP Tokens : Deploy STT, create STT-UST Pair on terraswap : Mint LP Tokens
-  // Mint STT-UST LP Tokens : Deploy STT, create STT-UST Pair on terraswap : Mint LP Tokens
+  // Mint STT-UST LP tokens : Deploy STT, create STT-UST pair on Terraswap : Mint LP tokens
   if (!network.stt_token) {
-    // deploy token
+    // Deploy token
     network.stt_token = await instantiateContract(
       terra,
       wallet,
@@ -471,7 +460,7 @@ async function main() {
     console.log(
       `STT Token deployed successfully, address : ${network.stt_token}`
     );
-    // Initialize terraswap pool
+    // Initialize Terraswap pool
     let stt_init_pool_tx = await executeContract(
       terra,
       wallet,
@@ -489,7 +478,7 @@ async function main() {
     network.stt_ust_terraswap_pool = stt_init_pool_tx_resp.pool_address;
     network.stt_ust_terraswap_lp_token_address =
       stt_init_pool_tx_resp.lp_token_address;
-    // Mint LP Tokens : increase_allowance and provide_liquidity
+    // Mint LP tokens : increase_allowance and provide_liquidity
     await executeContract(terra, wallet, network.stt_token, {
       increase_allowance: {
         spender: network.stt_ust_terraswap_pool,
@@ -519,16 +508,13 @@ async function main() {
       [new Coin("uusd", inital_ust_liquidity_for_each)]
     );
     await delay(300);
-    console.log(`STT-UST LP Tokens successfully minted on bombay-12 \n`);
+    console.log(`STT-UST LP tokens successfully minted on bombay-12 \n`);
     writeArtifact(network, terra.config.chainID);
   }
 
-  // Mint VKR-UST LP Tokens : Deploy VKR, create VKR-UST Pair on terraswap : Mint LP Tokens
-  // Mint VKR-UST LP Tokens : Deploy VKR, create VKR-UST Pair on terraswap : Mint LP Tokens
-  // Mint VKR-UST LP Tokens : Deploy VKR, create VKR-UST Pair on terraswap : Mint LP Tokens
-  // Mint VKR-UST LP Tokens : Deploy VKR, create VKR-UST Pair on terraswap : Mint LP Tokens
+  // Mint VKR-UST LP tokens : Deploy VKR, create VKR-UST pair on Terraswap : Mint LP tokens
   if (!network.vkr_token) {
-    // deploy token
+    // Deploy token
     network.vkr_token = await instantiateContract(
       terra,
       wallet,
@@ -553,7 +539,7 @@ async function main() {
     console.log(
       `VKR Token deployed successfully, address : ${network.vkr_token}`
     );
-    // Initialize terraswap pool
+    // Initialize Terraswap pool
     let vkr_init_pool_tx = await executeContract(
       terra,
       wallet,
@@ -571,7 +557,7 @@ async function main() {
     network.vkr_ust_terraswap_pool = vkr_init_pool_tx_resp.pool_address;
     network.vkr_ust_terraswap_lp_token_address =
       vkr_init_pool_tx_resp.lp_token_address;
-    // Mint LP Tokens : increase_allowance and provide_liquidity
+    // Mint LP tokens : increase_allowance and provide_liquidity
     await executeContract(terra, wallet, network.vkr_token, {
       increase_allowance: {
         spender: network.vkr_ust_terraswap_pool,
@@ -600,16 +586,13 @@ async function main() {
       },
       [new Coin("uusd", inital_ust_liquidity_for_each)]
     );
-    console.log(`VKR-UST LP Tokens successfully minted on bombay-12 \n`);
+    console.log(`VKR-UST LP tokens successfully minted on bombay-12 \n`);
     writeArtifact(network, terra.config.chainID);
   }
 
-  // Mint MINE-UST LP Tokens : Deploy MINE, create MINE-UST Pair on terraswap : Mint LP Tokens
-  // Mint MINE-UST LP Tokens : Deploy MINE, create MINE-UST Pair on terraswap : Mint LP Tokens
-  // Mint MINE-UST LP Tokens : Deploy MINE, create MINE-UST Pair on terraswap : Mint LP Tokens
-  // Mint MINE-UST LP Tokens : Deploy MINE, create MINE-UST Pair on terraswap : Mint LP Tokens
+  // Mint MINE-UST LP tokens : Deploy MINE, create MINE-UST pair on Terraswap : Mint LP tokens
   if (!network.mine_token) {
-    // deploy token
+    // Deploy token
     network.mine_token = await instantiateContract(
       terra,
       wallet,
@@ -634,7 +617,7 @@ async function main() {
     console.log(
       `MINE Token deployed successfully, address : ${network.mine_token}`
     );
-    // Initialize terraswap pool
+    // Initialize Terraswap pool
     let mine_init_pool_tx = await executeContract(
       terra,
       wallet,
@@ -653,7 +636,7 @@ async function main() {
     network.mine_ust_terraswap_pool = mine_init_pool_tx_resp.pool_address;
     network.mine_ust_terraswap_lp_token_address =
       mine_init_pool_tx_resp.lp_token_address;
-    // Mint LP Tokens : increase_allowance and provide_liquidity
+    // Mint LP tokens : increase_allowance and provide_liquidity
     await executeContract(terra, wallet, network.mine_token, {
       increase_allowance: {
         spender: network.mine_ust_terraswap_pool,
@@ -683,16 +666,13 @@ async function main() {
       [new Coin("uusd", inital_ust_liquidity_for_each)]
     );
     await delay(300);
-    console.log(`MINE-UST LP Tokens successfully minted on bombay-12 \n`);
+    console.log(`MINE-UST LP tokens successfully minted on bombay-12 \n`);
     writeArtifact(network, terra.config.chainID);
   }
 
-  // Mint PSI-UST LP Tokens : Deploy PSI, create PSI-UST Pair on terraswap : Mint LP Tokens
-  // Mint PSI-UST LP Tokens : Deploy PSI, create PSI-UST Pair on terraswap : Mint LP Tokens
-  // Mint PSI-UST LP Tokens : Deploy PSI, create PSI-UST Pair on terraswap : Mint LP Tokens
-  // Mint PSI-UST LP Tokens : Deploy PSI, create PSI-UST Pair on terraswap : Mint LP Tokens
+  // Mint PSI-UST LP tokens : Deploy PSI, create PSI-UST pair on Terraswap : Mint LP tokens
   if (!network.psi_token) {
-    // deploy token
+    // Deploy token
     network.psi_token = await instantiateContract(
       terra,
       wallet,
@@ -717,7 +697,7 @@ async function main() {
     console.log(
       `PSI Token deployed successfully, address : ${network.psi_token}`
     );
-    // Initialize terraswap pool
+    // Initialize Terraswap pool
     let psi_init_pool_tx = await executeContract(
       terra,
       wallet,
@@ -735,7 +715,7 @@ async function main() {
     network.psi_ust_terraswap_pool = psi_init_pool_tx_resp.pool_address;
     network.psi_ust_terraswap_lp_token_address =
       psi_init_pool_tx_resp.lp_token_address;
-    // Mint LP Tokens : increase_allowance and provide_liquidity
+    // Mint LP tokens : increase_allowance and provide_liquidity
     await executeContract(terra, wallet, network.psi_token, {
       increase_allowance: {
         spender: network.psi_ust_terraswap_pool,
@@ -765,16 +745,13 @@ async function main() {
       [new Coin("uusd", inital_ust_liquidity_for_each)]
     );
     await delay(300);
-    console.log(`PSI-UST LP Tokens successfully minted on bombay-12 \n`);
+    console.log(`PSI-UST LP tokens successfully minted on bombay-12 \n`);
     writeArtifact(network, terra.config.chainID);
   }
 
-  // Mint APOLLO-UST LP Tokens : Deploy APOLLO, create APOLLO-UST Pair on terraswap : Mint LP Tokens
-  // Mint APOLLO-UST LP Tokens : Deploy APOLLO, create APOLLO-UST Pair on terraswap : Mint LP Tokens
-  // Mint APOLLO-UST LP Tokens : Deploy APOLLO, create APOLLO-UST Pair on terraswap : Mint LP Tokens
-  // Mint APOLLO-UST LP Tokens : Deploy APOLLO, create APOLLO-UST Pair on terraswap : Mint LP Tokens
+  // Mint APOLLO-UST LP tokens : Deploy APOLLO, create APOLLO-UST pair on Terraswap : Mint LP tokens
   if (!network.apollo_token) {
-    // deploy token
+    // Deploy token
     network.apollo_token = await instantiateContract(
       terra,
       wallet,
@@ -799,7 +776,7 @@ async function main() {
     console.log(
       `APOLLO Token deployed successfully, address : ${network.apollo_token}`
     );
-    // Initialize terraswap pool
+    // Initialize Terraswap pool
     let apollo_init_pool_tx = await executeContract(
       terra,
       wallet,
@@ -819,7 +796,7 @@ async function main() {
     network.apollo_ust_terraswap_pool = apollo_init_pool_tx_resp.pool_address;
     network.apollo_ust_terraswap_lp_token_address =
       apollo_init_pool_tx_resp.lp_token_address;
-    // Mint LP Tokens : increase_allowance and provide_liquidity
+    // Mint LP tokens : increase_allowance and provide_liquidity
     await executeContract(terra, wallet, network.apollo_token, {
       increase_allowance: {
         spender: network.apollo_ust_terraswap_pool,
@@ -849,7 +826,7 @@ async function main() {
       [new Coin("uusd", inital_ust_liquidity_for_each)]
     );
 
-    console.log(`APOLLO-UST LP Tokens successfully minted on bombay-12 \n`);
+    console.log(`APOLLO-UST LP tokens successfully minted on bombay-12 \n`);
     writeArtifact(network, terra.config.chainID);
   }
 

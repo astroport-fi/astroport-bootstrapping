@@ -10,7 +10,7 @@ import { join } from "path";
 
 const ARTIFACTS_PATH = "../artifacts";
 
-// ########### ASTROPORT DEX :: INITIALIZES POOLS ###########
+// ########### ASTROPORT DEX :: INITIALIZE POOLS ###########
 
 // - LUNA/UST
 // - LUNA/BLUNA
@@ -47,7 +47,7 @@ async function main() {
     console.log(
       `${terra.config.chainID} :: Creating LUNA/UST pool on Astroport`
     );
-    // create pair tx
+    // Create pair tx
     let tx = await executeContract(
       terra,
       wallet,
@@ -75,16 +75,16 @@ async function main() {
     await delay(300);
   } else {
     console.log(
-      `LUNA/UST pool on already exists on Astroport :: ${terra.config.chainID}`
+      `LUNA/UST pool already exists on Astroport :: ${terra.config.chainID}`
     );
   }
 
-  // // ASTROPORT :: CREATE PAIR :: LUNA/BLUNA
+  // ASTROPORT :: CREATE PAIR :: LUNA/BLUNA
   if (!network.bluna_luna_astroport_pool) {
     console.log(
       `${terra.config.chainID} :: Creating LUNA/BLUNA pool on Astroport`
     );
-    // create pair tx
+    // Create pair tx
     let tx = await executeContract(
       terra,
       wallet,
@@ -114,7 +114,7 @@ async function main() {
     await delay(300);
   } else {
     console.log(
-      `LUNA/BLUNA pool on already exists on Astroport :: ${terra.config.chainID}`
+      `LUNA/BLUNA pool already exists on Astroport :: ${terra.config.chainID}`
     );
   }
 
@@ -123,7 +123,7 @@ async function main() {
     console.log(
       `${terra.config.chainID} :: Creating ANC/UST pool on Astroport`
     );
-    // create pair tx
+    // Create pair tx
     let tx = await executeContract(
       terra,
       wallet,
@@ -151,7 +151,7 @@ async function main() {
     await delay(300);
   } else {
     console.log(
-      `ANC/UST pool on already exists on Astroport :: ${terra.config.chainID}`
+      `ANC/UST pool already exists on Astroport :: ${terra.config.chainID}`
     );
   }
 
@@ -160,7 +160,7 @@ async function main() {
     console.log(
       `${terra.config.chainID} :: Creating MIR/UST pool on Astroport`
     );
-    // create pair tx
+    // Create pair tx
     let tx = await executeContract(
       terra,
       wallet,
@@ -188,7 +188,7 @@ async function main() {
     await delay(300);
   } else {
     console.log(
-      `MIR/UST pool on already exists on Astroport :: ${terra.config.chainID}`
+      `MIR/UST pool already exists on Astroport :: ${terra.config.chainID}`
     );
   }
 
@@ -197,7 +197,7 @@ async function main() {
     console.log(
       `${terra.config.chainID} :: Creating ORION/UST pool on Astroport`
     );
-    // create pair tx
+    // Create pair tx
     let tx = await executeContract(
       terra,
       wallet,
@@ -229,7 +229,7 @@ async function main() {
     await delay(300);
   } else {
     console.log(
-      `ORION/UST pool on already exists on Astroport :: ${terra.config.chainID}`
+      `ORION/UST pool already exists on Astroport :: ${terra.config.chainID}`
     );
   }
 
@@ -238,7 +238,7 @@ async function main() {
     console.log(
       `${terra.config.chainID} :: Creating STT/UST pool on Astroport`
     );
-    // create pair tx
+    // Create pair tx
     let tx = await executeContract(
       terra,
       wallet,
@@ -266,7 +266,7 @@ async function main() {
     await delay(300);
   } else {
     console.log(
-      `STT/UST pool on already exists on Astroport :: ${terra.config.chainID}`
+      `STT/UST pool already exists on Astroport :: ${terra.config.chainID}`
     );
   }
 
@@ -275,7 +275,7 @@ async function main() {
     console.log(
       `${terra.config.chainID} :: Creating VKR/UST pool on Astroport`
     );
-    // create pair tx
+    // Create pair tx
     let tx = await executeContract(
       terra,
       wallet,
@@ -303,7 +303,7 @@ async function main() {
     await delay(300);
   } else {
     console.log(
-      `VKR/UST pool on already exists on Astroport :: ${terra.config.chainID}`
+      `VKR/UST pool already exists on Astroport :: ${terra.config.chainID}`
     );
   }
 
@@ -312,7 +312,7 @@ async function main() {
     console.log(
       `${terra.config.chainID} :: Creating MINE/UST pool on Astroport`
     );
-    // create pair tx
+    // Create pair tx
     let tx = await executeContract(
       terra,
       wallet,
@@ -340,7 +340,7 @@ async function main() {
     await delay(300);
   } else {
     console.log(
-      `MINE/UST pool on already exists on Astroport :: ${terra.config.chainID}`
+      `MINE/UST pool already exists on Astroport :: ${terra.config.chainID}`
     );
   }
 
@@ -349,7 +349,7 @@ async function main() {
     console.log(
       `${terra.config.chainID} :: Creating PSI/UST pool on Astroport`
     );
-    // create pair tx
+    // Create pair tx
     let tx = await executeContract(
       terra,
       wallet,
@@ -377,7 +377,7 @@ async function main() {
     await delay(300);
   } else {
     console.log(
-      `PSI/UST pool on already exists on Astroport :: ${terra.config.chainID}`
+      `PSI/UST pool already exists on Astroport :: ${terra.config.chainID}`
     );
   }
 
@@ -386,7 +386,7 @@ async function main() {
     console.log(
       `${terra.config.chainID} :: Creating APOLLO/UST pool on Astroport`
     );
-    // create pair tx
+    // Create pair tx
     let tx = await executeContract(
       terra,
       wallet,
@@ -414,7 +414,7 @@ async function main() {
     await delay(300);
   } else {
     console.log(
-      `APOLLO/UST pool on already exists on Astroport :: ${terra.config.chainID}`
+      `APOLLO/UST pool already exists on Astroport :: ${terra.config.chainID}`
     );
   }
 }

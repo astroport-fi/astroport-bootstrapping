@@ -10,7 +10,7 @@ import { join } from "path";
 
 const ARTIFACTS_PATH = "../artifacts";
 
-// ########### ASTROPORT DEX :: INITIALIZES ASTRO-UST POOL ###########
+// ########### ASTROPORT DEX :: INITIALIZE ASTRO-UST POOL ###########
 
 async function main() {
   const { terra, wallet } = newClient();

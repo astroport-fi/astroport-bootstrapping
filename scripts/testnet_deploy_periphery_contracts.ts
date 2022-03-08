@@ -19,8 +19,9 @@ import { join } from "path";
 import { writeFileSync } from "fs";
 
 const LOCKDROP_INCENTIVES = 75_000_000_000000; // 7.5 Million = 7.5%
-const AIRDROP_INCENTIVES = 25_000_000_000000; // 2.5 Million = 2.5%
-const AUCTION_INCENTIVES = 10_000_000_000000; // 1.0 Million = 1%
+const AIRDROP_INCENTIVES = 25_000_000_000000;  // 2.5 Million = 2.5%
+const AUCTION_INCENTIVES = 10_000_000_000000;  // 1.0 Million = 1%
+
 // LOCKDROP INCENTIVES
 const LUNA_UST_ASTRO_INCENTIVES = 21_750_000_000000;
 const LUNA_BLUNA_ASTRO_INCENTIVES = 17_250_000_000000;
@@ -53,7 +54,7 @@ async function main() {
     return;
   }
 
-  // ASTRO Token addresss should be set
+  // ASTRO token addresss should be set
   if (!network.astro_token_address) {
     console.log(
       `Please deploy the CW20-base ASTRO token, and then set this address in the deploy config before running this script...`
@@ -98,8 +99,6 @@ async function main() {
   CONFIGURATION.auction_InitMsg.config.lp_tokens_vesting_duration = 86400;
 
   /*************************************** DEPLOYMENT :: LOCKDROP CONTRACT  *****************************************/
-  /*************************************** DEPLOYMENT :: LOCKDROP CONTRACT  *****************************************/
-  /*************************************** DEPLOYMENT :: LOCKDROP CONTRACT  *****************************************/
 
   if (!network.lockdrop_address) {
     console.log(`${terra.config.chainID} :: Deploying Lockdrop Contract`);
@@ -118,8 +117,6 @@ async function main() {
     );
   }
 
-  /*************************************** DEPLOYMENT :: AIRDROP CONTRACT  *****************************************/
-  /*************************************** DEPLOYMENT :: AIRDROP CONTRACT  *****************************************/
   /*************************************** DEPLOYMENT :: AIRDROP CONTRACT  *****************************************/
 
   if (!network.airdrop_address) {
@@ -144,8 +141,6 @@ async function main() {
     writeArtifact(network, terra.config.chainID);
   }
 
-  /*************************************** DEPLOYMENT :: AUCTION CONTRACT  *****************************************/
-  /*************************************** DEPLOYMENT :: AUCTION CONTRACT  *****************************************/
   /*************************************** DEPLOYMENT :: AUCTION CONTRACT  *****************************************/
 
   if (!network.auction_address) {
@@ -173,11 +168,10 @@ async function main() {
     writeArtifact(network, terra.config.chainID);
   }
 
-  //  UpdateConfig :: SET ASTRO Token and Auction Contract in Lockdrop
-  //  UpdateConfig :: SET ASTRO Token and Auction Contract in Lockdrop
+  //  UpdateConfig :: SET ASTRO token and Auction Contract in Lockdrop
   if (!network.lockdrop_astro_token_set && !network.auction_set_in_lockdrop) {
     console.log(
-      `${terra.config.chainID} :: Setting ASTRO Token for Lockdrop...`
+      `${terra.config.chainID} :: Setting ASTRO token for Lockdrop...`
     );
     let tx = await executeContract(
       terra,
@@ -197,14 +191,13 @@ async function main() {
       CONFIGURATION.memos.lockdrop_set_astro
     );
     console.log(
-      `Lockdrop :: ASTRO Token & Auction contract set successfully set ${tx.txhash}\n`
+      `Lockdrop :: ASTRO token & Auction contract set successfully: ${tx.txhash}\n`
     );
     network.lockdrop_astro_token_set = true;
     network.auction_set_in_lockdrop = true;
     writeArtifact(network, terra.config.chainID);
   }
 
-  // UpdateConfig :: Set Auction address in airdrop
   // UpdateConfig :: Set Auction address in airdrop
   if (!network.auction_set_in_airdrop) {
     // update Config Tx
@@ -232,7 +225,6 @@ async function main() {
   }
 
   // ASTRO::Send::Lockdrop::IncreaseAstroIncentives:: Transfer ASTRO to Lockdrop and set total incentives
-  // ASTRO::Send::Lockdrop::IncreaseAstroIncentives:: Transfer ASTRO to Lockdrop and set total incentives
   if (!network.lockdrop_astro_token_transferred) {
     let transfer_msg = {
       send: {
@@ -252,16 +244,15 @@ async function main() {
       "Transfer ASTRO to Lockdrop for Incentives"
     );
     console.log(
-      `${terra.config.chainID} :: Transferring ASTRO Token and setting incentives in Lockdrop... ${increase_astro_incentives.txhash}`
+      `${terra.config.chainID} :: Transferring ASTRO token and setting incentives in Lockdrop... ${increase_astro_incentives.txhash}`
     );
     network.lockdrop_astro_token_transferred = true;
     writeArtifact(network, terra.config.chainID);
   }
 
   // ASTRO::Send::Airdrop::IncreaseAstroIncentives:: Transfer ASTRO to Airdrop
-  // ASTRO::Send::Airdrop::IncreaseAstroIncentives:: Transfer ASTRO to Airdrop
   if (!network.airdrop_astro_token_transferred) {
-    // transfer ASTRO Tx
+    // Transfer ASTRO Tx
     let tx = await executeContract(
       terra,
       wallet,
@@ -279,16 +270,15 @@ async function main() {
       " Airdrop : Transferring ASTRO "
     );
     console.log(
-      `${terra.config.chainID} :: Transferring ASTRO Token and setting incentives in Airdrop... ${tx.txhash}`
+      `${terra.config.chainID} :: Transferring ASTRO token and setting tokens in Airdrop... ${tx.txhash}`
     );
     network.airdrop_astro_token_transferred = true;
     writeArtifact(network, terra.config.chainID);
   }
 
   // Set Auction incentives
-  // Set Auction incentives
   if (!network.auction_astro_token_transferred) {
-    // transfer ASTRO Tx
+    // Transfer ASTRO Tx
     let msg = {
       send: {
         contract: network.auction_address,
@@ -304,16 +294,15 @@ async function main() {
       network.astro_token_address,
       msg,
       [],
-      " Transferring ASTRO Token to Auction for auction participation incentives"
+      " Transferring ASTRO token to Auction for auction participation incentives"
     );
     console.log(
-      `${terra.config.chainID} :: Transferring ASTRO Token and setting incentives in Auction... ${out.txhash}`
+      `${terra.config.chainID} :: Transferring ASTRO token and setting incentives in Auction... ${out.txhash}`
     );
     network.auction_astro_token_transferred = true;
     writeArtifact(network, terra.config.chainID);
   }
 
-  // Lockdrop -::- Initialize LUNA-UST Pool
   // Lockdrop -::- Initialize LUNA-UST Pool
   if (!network.luna_ust_lockdrop_pool_initialized) {
     let luna_ust_init_msg = {
@@ -342,7 +331,6 @@ async function main() {
   }
 
   // Initialize LUNA-BLUNA Pool in Lockdrop
-  // Initialize LUNA-BLUNA Pool in Lockdrop
   if (!network.bluna_luna_lockdrop_pool_initialized) {
     let bluna_luna_init_msg = {
       initialize_pool: {
@@ -370,7 +358,6 @@ async function main() {
     writeArtifact(network, terra.config.chainID);
   }
 
-  // Initialize ANC-UST Pool in Lockdrop
   // Initialize ANC-UST Pool in Lockdrop
   if (!network.anc_ust_lockdrop_pool_initialized) {
     let anc_ust_init_msg = {
@@ -427,7 +414,6 @@ async function main() {
   }
 
   // Initialize ORION-UST Pool in Lockdrop
-  // Initialize ORION-UST Pool in Lockdrop
   if (!network.orion_ust_lockdrop_pool_initialized) {
     let orion_ust_init_msg = {
       initialize_pool: {
@@ -455,7 +441,6 @@ async function main() {
   }
 
   // Initialize STT-UST Pool in Lockdrop
-  // Initialize STT-UST Pool in Lockdrop
   if (!network.stt_ust_lockdrop_pool_initialized) {
     let stt_ust_init_msg = {
       initialize_pool: {
@@ -482,7 +467,6 @@ async function main() {
     writeArtifact(network, terra.config.chainID);
   }
 
-  // Initialize VKR-UST Pool in Lockdrop
   // Initialize VKR-UST Pool in Lockdrop
   if (!network.vkr_ust_lockdrop_pool_initialized) {
     let vkr_ust_init_msg = {
@@ -512,7 +496,6 @@ async function main() {
   }
 
   // Initialize MINE-UST Pool in Lockdrop
-  // Initialize MINE-UST Pool in Lockdrop
   if (!network.mine_ust_lockdrop_pool_initialized) {
     let mine_ust_init_msg = {
       initialize_pool: {
@@ -541,7 +524,6 @@ async function main() {
   }
 
   // Initialize PSI-UST Pool in Lockdrop
-  // Initialize PSI-UST Pool in Lockdrop
   if (!network.psi_ust_lockdrop_pool_initialized) {
     let psi_ust_init_msg = {
       initialize_pool: {
@@ -569,7 +551,6 @@ async function main() {
     writeArtifact(network, terra.config.chainID);
   }
 
-  // Initialize APOLLO-UST Pool with incentive
   // Initialize APOLLO-UST Pool with incentive
   if (!network.apollo_ust_lockdrop_pool_initialized) {
     let apollo_ust_init_msg = {
