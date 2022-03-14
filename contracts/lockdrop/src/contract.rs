@@ -17,8 +17,8 @@ use crate::migration::ASSET_POOLS_V101;
 use astroport_periphery::auction::Cw20HookMsg::DelegateAstroTokens;
 use astroport_periphery::lockdrop::{
     CallbackMsg, ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, LockUpInfoResponse,
-    LockUpInfoSummary, MigrateMsg, MigrationInfo, PoolResponse, QueryMsg, StateResponse,
-    UpdateConfigMsg, UserInfoResponse, UserInfoWithListResponse,
+    LockUpInfoSummary, MigrateMsg, MigrationInfo, PendingAssetRewardResponse, PoolResponse,
+    QueryMsg, StateResponse, UpdateConfigMsg, UserInfoResponse, UserInfoWithListResponse,
 };
 
 use crate::state::{
@@ -287,6 +287,17 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
             deps,
             &env,
             &user_address,
+            terraswap_lp_token,
+            duration,
+        )?),
+        QueryMsg::PendingAssetReward {
+            recipient,
+            terraswap_lp_token,
+            duration,
+        } => to_binary(&query_pending_asset_reward(
+            deps,
+            env,
+            recipient,
             terraswap_lp_token,
             duration,
         )?),
@@ -2021,6 +2032,57 @@ pub fn query_lockup_info(
         astroport_lp_token: astroport_lp_token_opt,
         astroport_lp_transferred: lockup_info.astroport_lp_transferred,
         duration,
+    })
+}
+
+/// @dev Returns pending asset rewards regarding the user with
+pub fn query_pending_asset_reward(
+    deps: Deps,
+    env: Env,
+    recipient: String,
+    terraswap_lp_token: String,
+    duration: u64,
+) -> StdResult<PendingAssetRewardResponse> {
+    let recipient = addr_validate_to_lower(deps.api, &recipient)?;
+    let terraswap_lp_token = addr_validate_to_lower(deps.api, &terraswap_lp_token)?;
+
+    let lockup_key = (&terraswap_lp_token, &recipient, U64Key::new(duration));
+
+    let lockup_info_opt = LOCKUP_INFO
+        .may_load(deps.storage, lockup_key.clone())?
+        .filter(|lock_info| lock_info.astroport_lp_transferred.is_none());
+
+    let mut user_reward = Uint128::zero();
+    if let Some(lockup_info) = lockup_info_opt {
+        let pool_info = ASSET_POOLS.load(deps.storage, &terraswap_lp_token)?;
+        if !pool_info.has_asset_rewards {
+            return Err(StdError::generic_err("This pool does not have rewards"));
+        }
+
+        let MigrationInfo {
+            astroport_lp_token, ..
+        } = pool_info
+            .migration_info
+            .as_ref()
+            .expect("Terraswap liquidity hasn't migrated yet!");
+
+        let pending_rewards: Asset = deps.querier.query_wasm_smart(
+            astroport_lp_token,
+            &astroport::pair_stable_bluna::QueryMsg::PendingReward {
+                user: env.contract.address.to_string(),
+            },
+        )?;
+
+        let reward_index = Decimal256::from_ratio(
+            Uint256::from(pending_rewards.amount),
+            pool_info.terraswap_amount_in_lockups,
+        );
+
+        user_reward = (reward_index * Uint256::from(lockup_info.lp_units_locked)).try_into()?;
+    }
+
+    Ok(PendingAssetRewardResponse {
+        amount: user_reward,
     })
 }
 
