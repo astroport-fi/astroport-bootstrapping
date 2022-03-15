@@ -4,9 +4,9 @@ version = 3
 
 [[package]]
 name = "anyhow"
-version = "1.0.53"
+version = "1.0.56"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "94a45b455c14666b85fc40a019e8ab9eb75e3a124e05494f5397122bc9eb06e0"
+checksum = "4361135be9122e0870de935d7c439aef945b9f9ddd4199a553b5270b49c82a27"
 
 [[package]]
 name = "astroport"
@@ -25,7 +25,7 @@ dependencies = [
 [[package]]
 name = "astroport"
 version = "1.2.0"
-source = "git+https://github.com/astroport-fi/astroport-core.git?branch=main#0c4c450526912c585f3be3a561ee5b424dcbaeef"
+source = "git+https://github.com/astroport-fi/astroport-core.git?branch=main#c2bf672a699520eea0d8100e169946f0d901208c"
 dependencies = [
  "cosmwasm-std",
  "cw-storage-plus 0.8.1",
@@ -85,7 +85,7 @@ dependencies = [
 [[package]]
 name = "astroport-factory"
 version = "1.2.0"
-source = "git+https://github.com/astroport-fi/astroport-core.git?branch=main#0c4c450526912c585f3be3a561ee5b424dcbaeef"
+source = "git+https://github.com/astroport-fi/astroport-core.git?branch=main#c2bf672a699520eea0d8100e169946f0d901208c"
 dependencies = [
  "astroport 1.2.0",
  "cosmwasm-std",
@@ -114,8 +114,8 @@ dependencies = [
 
 [[package]]
 name = "astroport-generator"
-version = "1.1.0"
-source = "git+https://github.com/astroport-fi/astroport-core.git?branch=main#0c4c450526912c585f3be3a561ee5b424dcbaeef"
+version = "1.2.0"
+source = "git+https://github.com/astroport-fi/astroport-core.git?branch=main#c2bf672a699520eea0d8100e169946f0d901208c"
 dependencies = [
  "astroport 1.2.0",
  "cosmwasm-std",
@@ -135,7 +135,7 @@ dependencies = [
  "astroport-airdrop",
  "astroport-auction",
  "astroport-factory",
- "astroport-generator 1.1.0",
+ "astroport-generator 1.2.0",
  "astroport-pair 1.0.0 (git+https://github.com/astroport-fi/astroport-core.git?branch=main)",
  "astroport-pair-stable",
  "astroport-periphery",
@@ -179,7 +179,7 @@ dependencies = [
 [[package]]
 name = "astroport-pair"
 version = "1.0.0"
-source = "git+https://github.com/astroport-fi/astroport-core.git?branch=main#0c4c450526912c585f3be3a561ee5b424dcbaeef"
+source = "git+https://github.com/astroport-fi/astroport-core.git?branch=main#c2bf672a699520eea0d8100e169946f0d901208c"
 dependencies = [
  "astroport 1.2.0",
  "cosmwasm-bignumber",
@@ -197,7 +197,7 @@ dependencies = [
 [[package]]
 name = "astroport-pair-stable"
 version = "1.0.0"
-source = "git+https://github.com/astroport-fi/astroport-core.git?branch=main#0c4c450526912c585f3be3a561ee5b424dcbaeef"
+source = "git+https://github.com/astroport-fi/astroport-core.git?branch=main#c2bf672a699520eea0d8100e169946f0d901208c"
 dependencies = [
  "astroport 1.2.0",
  "cosmwasm-bignumber",
@@ -244,7 +244,7 @@ dependencies = [
 [[package]]
 name = "astroport-token"
 version = "1.0.0"
-source = "git+https://github.com/astroport-fi/astroport-core.git?branch=main#0c4c450526912c585f3be3a561ee5b424dcbaeef"
+source = "git+https://github.com/astroport-fi/astroport-core.git?branch=main#c2bf672a699520eea0d8100e169946f0d901208c"
 dependencies = [
  "astroport 1.2.0",
  "cosmwasm-std",
@@ -274,7 +274,7 @@ dependencies = [
 [[package]]
 name = "astroport-vesting"
 version = "1.0.0"
-source = "git+https://github.com/astroport-fi/astroport-core.git?branch=main#0c4c450526912c585f3be3a561ee5b424dcbaeef"
+source = "git+https://github.com/astroport-fi/astroport-core.git?branch=main#c2bf672a699520eea0d8100e169946f0d901208c"
 dependencies = [
  "astroport 1.2.0",
  "cosmwasm-std",
@@ -289,7 +289,7 @@ dependencies = [
 [[package]]
 name = "astroport-whitelist"
 version = "1.0.0"
-source = "git+https://github.com/astroport-fi/astroport-core.git?branch=main#0c4c450526912c585f3be3a561ee5b424dcbaeef"
+source = "git+https://github.com/astroport-fi/astroport-core.git?branch=main#c2bf672a699520eea0d8100e169946f0d901208c"
 dependencies = [
  "astroport 1.2.0",
  "cosmwasm-std",
@@ -378,9 +378,9 @@ dependencies = [
 
 [[package]]
 name = "cosmwasm-crypto"
-version = "0.16.3"
+version = "0.16.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3703ca1b98c8d890b82c3978f3c5bd47116f8767340dfaa4fd9bdcaa15ebcc64"
+checksum = "7cfd597c4b0ed23ea499841d25169f44ada11e7f10642582d1b1a5a4ebbdebcf"
 dependencies = [
  "digest",
  "ed25519-zebra",
@@ -391,18 +391,18 @@ dependencies = [
 
 [[package]]
 name = "cosmwasm-derive"
-version = "0.16.3"
+version = "0.16.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c04f4923c080df70b04ff3e0680c92e3b8357f3b125ed65ce4bd4aa1f522c06f"
+checksum = "3a42e9f5fdb98c1e832fa5f976c14f8fd78063c745da7f62087dccbed46a5610"
 dependencies = [
  "syn",
 ]
 
 [[package]]
 name = "cosmwasm-schema"
-version = "0.16.3"
+version = "0.16.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "be11bdd8a6e7c0f7d4d8b9fc00850b5a2a2ef5f059e4bda2841224ea78d13677"
+checksum = "757733ce15e344e1c2a883bceee06c428944b1c89b062697f6f1dc7a1568be44"
 dependencies = [
  "schemars",
  "serde_json",
@@ -746,9 +746,9 @@ dependencies = [
 
 [[package]]
 name = "getrandom"
-version = "0.2.4"
+version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "418d37c8b1d42553c93648be529cb70f920d3baf8ef469b74b9638df426e0b4c"
+checksum = "d39cd93900197114fa1fcb7ae84ca742095eed9442088988ae74fa744e930e77"
 dependencies = [
  "cfg-if",
  "libc",
@@ -826,9 +826,9 @@ checksum = "67c21572b4949434e4fc1e1978b99c5f77064153c59d998bf13ecd96fb5ecba7"
 
 [[package]]
 name = "libc"
-version = "0.2.118"
+version = "0.2.120"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "06e509672465a0504304aa87f9f176f2b2b716ed8fb105ebe5c02dc6dce96a94"
+checksum = "ad5c14e80759d0939d013e6ca49930e59fc53dd8e5009132f76240c179380c09"
 
 [[package]]
 name = "num-traits"
@@ -920,7 +920,7 @@ version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d34f1408f55294453790c48b2f1ebbb1c5b4b7563eb1f418bcfcfdbb06ebb4e7"
 dependencies = [
- "getrandom 0.2.4",
+ "getrandom 0.2.5",
 ]
 
 [[package]]
@@ -1103,9 +1103,9 @@ checksum = "6bdef32e8150c2a081110b42772ffe7d7c9032b606bc226c8260fd97e0976601"
 
 [[package]]
 name = "syn"
-version = "1.0.86"
+version = "1.0.88"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8a65b3f4ffa0092e9887669db0eae07941f023991ab58ea44da8fe8e2d511c6b"
+checksum = "ebd69e719f31e88618baa1eaa6ee2de5c9a1c004f1e9ecdb58e8352a13f20a01"
 dependencies = [
  "proc-macro2",
  "quote",

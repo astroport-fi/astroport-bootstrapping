@@ -44,7 +44,7 @@ Note - Users can open muliple lockup positions with different lockup duration fo
 | `QueryMsg::Pool`                | Returns info regarding a certain supported LP token pool                                                         |
 | `QueryMsg::UserInfo`            | Returns info regarding a user (total ASTRO rewards, list of lockup positions)                                    |
 | `QueryMsg::LockUpInfo`          | Returns info regarding a particular lockup position with a given duration and identifer for the LP tokens locked |
-| `QueryMsg::PendingAssetReward`  | Returns the amount of pending asset rewards for the specified recipient                                          |
+| `QueryMsg::PendingAssetReward`  | Returns the amount of pending asset rewards for the specified recipient and for a specific lockup position       |
 
 ## Build schema and run unit-tests
 

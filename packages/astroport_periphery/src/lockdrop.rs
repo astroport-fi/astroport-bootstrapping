@@ -175,7 +175,7 @@ pub enum QueryMsg {
         duration: u64,
     },
     PendingAssetReward {
-        recipient: String,
+        user_address: String,
         terraswap_lp_token: String,
         duration: u64,
     },

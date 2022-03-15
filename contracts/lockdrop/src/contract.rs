@@ -1,6 +1,6 @@
 use std::convert::TryInto;
 
-use astroport::asset::{addr_validate_to_lower, Asset, AssetInfo};
+use astroport::asset::{addr_validate_to_lower, pair_info_by_pool, Asset, AssetInfo};
 use astroport::generator::{
     ExecuteMsg as GenExecuteMsg, PendingTokenResponse, QueryMsg as GenQueryMsg, RewardInfoResponse,
 };
@@ -291,13 +291,13 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
             duration,
         )?),
         QueryMsg::PendingAssetReward {
-            recipient,
+            user_address,
             terraswap_lp_token,
             duration,
         } => to_binary(&query_pending_asset_reward(
             deps,
             env,
-            recipient,
+            user_address,
             terraswap_lp_token,
             duration,
         )?),
@@ -1255,8 +1255,9 @@ fn handle_claim_asset_reward(
     let migration_info = pool_info
         .migration_info
         .ok_or_else(|| StdError::generic_err("The pool was not migrated to astroport"))?;
+    let pair_info = pair_info_by_pool(deps, migration_info.astroport_lp_token)?;
     let pool_claim_msg = CosmosMsg::Wasm(WasmMsg::Execute {
-        contract_addr: migration_info.astroport_lp_token.to_string(),
+        contract_addr: pair_info.contract_addr.to_string(),
         msg: to_binary(&astroport::pair_stable_bluna::ExecuteMsg::ClaimReward { receiver: None })?,
         funds: vec![],
     });
@@ -2036,17 +2037,20 @@ pub fn query_lockup_info(
 }
 
 /// @dev Returns pending asset rewards regarding the user with
+/// @param user_address : User address
+/// @param terraswap_lp_token : Pool identifier to identify the LP pool
+/// @param duration : Duration of the lockup
 pub fn query_pending_asset_reward(
     deps: Deps,
     env: Env,
-    recipient: String,
+    user_address: String,
     terraswap_lp_token: String,
     duration: u64,
 ) -> StdResult<PendingAssetRewardResponse> {
-    let recipient = addr_validate_to_lower(deps.api, &recipient)?;
+    let user_address = addr_validate_to_lower(deps.api, &user_address)?;
     let terraswap_lp_token = addr_validate_to_lower(deps.api, &terraswap_lp_token)?;
 
-    let lockup_key = (&terraswap_lp_token, &recipient, U64Key::new(duration));
+    let lockup_key = (&terraswap_lp_token, &user_address, U64Key::new(duration));
 
     let lockup_info_opt = LOCKUP_INFO
         .may_load(deps.storage, lockup_key.clone())?
@@ -2064,10 +2068,10 @@ pub fn query_pending_asset_reward(
         } = pool_info
             .migration_info
             .as_ref()
-            .expect("Terraswap liquidity hasn't migrated yet!");
-
+            .ok_or_else(|| StdError::generic_err("The pool was not migrated to astroport"))?;
+        let pair_info = pair_info_by_pool(deps, astroport_lp_token.clone())?;
         let pending_rewards: Asset = deps.querier.query_wasm_smart(
-            astroport_lp_token,
+            pair_info.contract_addr,
             &astroport::pair_stable_bluna::QueryMsg::PendingReward {
                 user: env.contract.address.to_string(),
             },
@@ -2078,7 +2082,11 @@ pub fn query_pending_asset_reward(
             pool_info.terraswap_amount_in_lockups,
         );
 
-        user_reward = (reward_index * Uint256::from(lockup_info.lp_units_locked)).try_into()?;
+        let last_user_reward_index = USERS_ASSET_REWARD_INDEX.may_load(deps.storage, lockup_key)?;
+
+        user_reward = ((reward_index - last_user_reward_index.unwrap_or_else(Decimal256::zero))
+            * Uint256::from(lockup_info.lp_units_locked))
+        .try_into()?;
     }
 
     Ok(PendingAssetRewardResponse {
@@ -2351,7 +2359,7 @@ mod unit_tests {
             contract_addr, msg, ..
         }) = &res.messages[0].msg
         {
-            assert_eq!(contract_addr.to_owned(), astroport_lp_token.to_string());
+            assert_eq!(contract_addr.to_owned(), "minter_address".to_string());
             assert_eq!(
                 from_binary::<astroport::pair_stable_bluna::ExecuteMsg>(&msg).unwrap(),
                 astroport::pair_stable_bluna::ExecuteMsg::ClaimReward { receiver: None }
