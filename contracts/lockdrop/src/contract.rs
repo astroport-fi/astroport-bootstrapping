@@ -2082,9 +2082,13 @@ pub fn query_pending_asset_reward(
             pool_info.terraswap_amount_in_lockups,
         );
 
+        let total_asset_reward_index =
+            TOTAL_ASSET_REWARD_INDEX.may_load(deps.storage, &terraswap_lp_token)?;
         let last_user_reward_index = USERS_ASSET_REWARD_INDEX.may_load(deps.storage, lockup_key)?;
 
-        user_reward = ((reward_index - last_user_reward_index.unwrap_or_else(Decimal256::zero))
+        user_reward = (((total_asset_reward_index.unwrap_or_else(Decimal256::zero)
+            - last_user_reward_index.unwrap_or_else(Decimal256::zero))
+            + reward_index)
             * Uint256::from(lockup_info.lp_units_locked))
         .try_into()?;
     }
