@@ -2083,7 +2083,7 @@ pub fn query_pending_asset_reward(
             pool_info.terraswap_amount_in_lockups,
         );
 
-        let user_asset_reward_index = USERS_ASSET_REWARD_INDEX.key(lockup_key);
+        let user_asset_reward_path = USERS_ASSET_REWARD_INDEX.key(lockup_key);
         let total_asset_reward_path = TOTAL_ASSET_REWARD_INDEX.key(&terraswap_lp_token);
         let total_asset_reward_index = match total_asset_reward_path.may_load(deps.storage)? {
             Some(current_index) => reward_index + current_index,
@@ -2092,7 +2092,7 @@ pub fn query_pending_asset_reward(
 
         user_reward = calc_user_reward(
             deps.storage,
-            &user_asset_reward_index,
+            &user_asset_reward_path,
             lockup_info.lp_units_locked,
             pool_info.terraswap_amount_in_lockups,
             total_asset_reward_index,
