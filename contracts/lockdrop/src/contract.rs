@@ -1,13 +1,13 @@
 use std::convert::TryInto;
 
-use astroport::asset::{addr_validate_to_lower, Asset, AssetInfo};
+use astroport::asset::{addr_validate_to_lower, pair_info_by_pool, Asset, AssetInfo};
 use astroport::generator::{
     ExecuteMsg as GenExecuteMsg, PendingTokenResponse, QueryMsg as GenQueryMsg, RewardInfoResponse,
 };
 use cosmwasm_std::{
     attr, entry_point, from_binary, to_binary, Addr, Binary, Coin, CosmosMsg, Decimal, Decimal256,
-    Deps, DepsMut, Env, MessageInfo, Order, Response, StdError, StdResult, SubMsg, Uint128,
-    Uint256, WasmMsg,
+    Deps, DepsMut, Env, MessageInfo, Order, Response, StdError, StdResult, Storage, SubMsg,
+    Uint128, Uint256, WasmMsg,
 };
 use cw2::{get_contract_version, set_contract_version};
 use cw20::{BalanceResponse, Cw20ExecuteMsg, Cw20QueryMsg, Cw20ReceiveMsg};
@@ -17,8 +17,8 @@ use crate::migration::ASSET_POOLS_V101;
 use astroport_periphery::auction::Cw20HookMsg::DelegateAstroTokens;
 use astroport_periphery::lockdrop::{
     CallbackMsg, ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, LockUpInfoResponse,
-    LockUpInfoSummary, MigrateMsg, MigrationInfo, PoolResponse, QueryMsg, StateResponse,
-    UpdateConfigMsg, UserInfoResponse, UserInfoWithListResponse,
+    LockUpInfoSummary, MigrateMsg, MigrationInfo, PendingAssetRewardResponse, PoolResponse,
+    QueryMsg, StateResponse, UpdateConfigMsg, UserInfoResponse, UserInfoWithListResponse,
 };
 
 use crate::state::{
@@ -287,6 +287,17 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
             deps,
             &env,
             &user_address,
+            terraswap_lp_token,
+            duration,
+        )?),
+        QueryMsg::PendingAssetReward {
+            user_address,
+            terraswap_lp_token,
+            duration,
+        } => to_binary(&query_pending_asset_reward(
+            deps,
+            env,
+            user_address,
             terraswap_lp_token,
             duration,
         )?),
@@ -1244,8 +1255,9 @@ fn handle_claim_asset_reward(
     let migration_info = pool_info
         .migration_info
         .ok_or_else(|| StdError::generic_err("The pool was not migrated to astroport"))?;
+    let pair_info = pair_info_by_pool(deps, migration_info.astroport_lp_token)?;
     let pool_claim_msg = CosmosMsg::Wasm(WasmMsg::Execute {
-        contract_addr: migration_info.astroport_lp_token.to_string(),
+        contract_addr: pair_info.contract_addr.to_string(),
         msg: to_binary(&astroport::pair_stable_bluna::ExecuteMsg::ClaimReward { receiver: None })?,
         funds: vec![],
     });
@@ -1690,7 +1702,7 @@ pub fn callback_deposit_liquidity_in_astroport(
 }
 
 fn callback_distribute_asset_reward(
-    mut deps: DepsMut,
+    deps: DepsMut,
     env: Env,
     previous_balance: Uint128,
     recipient: Addr,
@@ -1742,12 +1754,13 @@ fn callback_distribute_asset_reward(
     if let Some(lockup_info) = lockup_info_opt {
         let user_index_lp_path = USERS_ASSET_REWARD_INDEX.key(lockup_key);
         user_reward = calc_user_reward(
-            deps.branch(),
+            deps.storage,
             &user_index_lp_path,
             lockup_info.lp_units_locked,
             pool_info.terraswap_amount_in_lockups,
             total_asset_reward_index,
         )?;
+        user_index_lp_path.save(deps.storage, &total_asset_reward_index)?;
 
         if !user_reward.is_zero() {
             response.messages.push(SubMsg::new(
@@ -2024,6 +2037,73 @@ pub fn query_lockup_info(
     })
 }
 
+/// @dev Returns pending asset rewards for a specified lockup position
+/// @param user_address : User address
+/// @param terraswap_lp_token : Pool identifier to identify the LP pool
+/// @param duration : Duration of the lockup
+pub fn query_pending_asset_reward(
+    deps: Deps,
+    env: Env,
+    user_address: String,
+    terraswap_lp_token: String,
+    duration: u64,
+) -> StdResult<PendingAssetRewardResponse> {
+    let user_address = addr_validate_to_lower(deps.api, &user_address)?;
+    let terraswap_lp_token = addr_validate_to_lower(deps.api, &terraswap_lp_token)?;
+
+    let lockup_key = (&terraswap_lp_token, &user_address, U64Key::new(duration));
+
+    let lockup_info_opt = LOCKUP_INFO
+        .may_load(deps.storage, lockup_key.clone())?
+        .filter(|lock_info| lock_info.astroport_lp_transferred.is_none());
+
+    let mut user_reward = Uint128::zero();
+    if let Some(lockup_info) = lockup_info_opt {
+        let pool_info = ASSET_POOLS.load(deps.storage, &terraswap_lp_token)?;
+        if !pool_info.has_asset_rewards {
+            return Err(StdError::generic_err("This pool does not have rewards"));
+        }
+
+        let MigrationInfo {
+            astroport_lp_token, ..
+        } = pool_info
+            .migration_info
+            .as_ref()
+            .ok_or_else(|| StdError::generic_err("The pool was not migrated to astroport"))?;
+        let pair_info = pair_info_by_pool(deps, astroport_lp_token.clone())?;
+        let pending_rewards: Asset = deps.querier.query_wasm_smart(
+            pair_info.contract_addr,
+            &astroport::pair_stable_bluna::QueryMsg::PendingReward {
+                user: env.contract.address.to_string(),
+            },
+        )?;
+
+        let reward_index = Decimal256::from_ratio(
+            Uint256::from(pending_rewards.amount),
+            pool_info.terraswap_amount_in_lockups,
+        );
+
+        let user_asset_reward_path = USERS_ASSET_REWARD_INDEX.key(lockup_key);
+        let total_asset_reward_path = TOTAL_ASSET_REWARD_INDEX.key(&terraswap_lp_token);
+        let total_asset_reward_index = match total_asset_reward_path.may_load(deps.storage)? {
+            Some(current_index) => reward_index + current_index,
+            None => reward_index,
+        };
+
+        user_reward = calc_user_reward(
+            deps.storage,
+            &user_asset_reward_path,
+            lockup_info.lp_units_locked,
+            pool_info.terraswap_amount_in_lockups,
+            total_asset_reward_index,
+        )?;
+    }
+
+    Ok(PendingAssetRewardResponse {
+        amount: user_reward,
+    })
+}
+
 //----------------------------------------------------------------------------------------
 // HELPERS :: BOOLEANS & COMPUTATIONS (Rewards, Indexes etc)
 //----------------------------------------------------------------------------------------
@@ -2103,7 +2183,7 @@ fn calculate_weight(amount: Uint128, duration: u64, config: &Config) -> Uint256 
 /// ## Description
 /// Calculates bLuna user reward according to his share in LP  
 fn calc_user_reward(
-    deps: DepsMut,
+    store: &dyn Storage,
     user_index_lp_path: &Path<Decimal256>,
     user_lp_amount: Uint128,
     total_lp_amount: Uint128,
@@ -2113,15 +2193,13 @@ fn calc_user_reward(
         return Ok(Uint128::zero());
     }
 
-    let to_distribute_index = match user_index_lp_path.may_load(deps.storage)? {
+    let to_distribute_index = match user_index_lp_path.may_load(store)? {
         None => total_reward_index,
         Some(last_user_bluna_reward_index) if last_user_bluna_reward_index < total_reward_index => {
             total_reward_index - last_user_bluna_reward_index
         }
         _ => return Ok(Uint128::zero()),
     };
-
-    user_index_lp_path.save(deps.storage, &total_reward_index)?;
 
     (to_distribute_index * Uint256::from(user_lp_amount))
         .try_into()
@@ -2289,7 +2367,7 @@ mod unit_tests {
             contract_addr, msg, ..
         }) = &res.messages[0].msg
         {
-            assert_eq!(contract_addr.to_owned(), astroport_lp_token.to_string());
+            assert_eq!(contract_addr.to_owned(), "minter_address".to_string());
             assert_eq!(
                 from_binary::<astroport::pair_stable_bluna::ExecuteMsg>(&msg).unwrap(),
                 astroport::pair_stable_bluna::ExecuteMsg::ClaimReward { receiver: None }
@@ -2339,81 +2417,86 @@ mod unit_tests {
         let mut total_reward_index = Decimal256::one();
 
         let res = calc_user_reward(
-            deps.as_mut(),
+            &deps.storage,
             &user1_path,
             user1_lp_amount,
             total_lp_amount,
             total_reward_index,
         )
         .unwrap();
-
+        user1_path.save(&mut deps.storage, &total_reward_index);
         assert_eq!(res.u128(), 100u128);
 
         // the user already received whole reward thus we get 0 here
         let res = calc_user_reward(
-            deps.as_mut(),
+            &deps.storage,
             &user1_path,
             user1_lp_amount,
             total_lp_amount,
             total_reward_index,
         )
         .unwrap();
+        user1_path.save(&mut deps.storage, &total_reward_index);
         assert_eq!(res.u128(), 0u128);
 
         let res = calc_user_reward(
-            deps.as_mut(),
+            &deps.storage,
             &user2_path,
             user2_lp_amount,
             total_lp_amount,
             total_reward_index,
         )
         .unwrap();
+        user2_path.save(&mut deps.storage, &total_reward_index);
         assert_eq!(res.u128(), 700u128);
 
         // emulating newly arrived rewards
         total_reward_index = total_reward_index + Decimal256::from_ratio(100u128, 1000u128);
 
         let res = calc_user_reward(
-            deps.as_mut(),
+            &deps.storage,
             &user1_path,
             user1_lp_amount,
             total_lp_amount,
             total_reward_index,
         )
         .unwrap();
-
+        user1_path.save(&mut deps.storage, &total_reward_index);
         assert_eq!(res.u128(), 10u128);
 
         // the user already received whole reward thus we get 0 here
         let res = calc_user_reward(
-            deps.as_mut(),
+            &deps.storage,
             &user1_path,
             user1_lp_amount,
             total_lp_amount,
             total_reward_index,
         )
         .unwrap();
+        user1_path.save(&mut deps.storage, &total_reward_index);
         assert_eq!(res.u128(), 0u128);
 
         let res = calc_user_reward(
-            deps.as_mut(),
+            &deps.storage,
             &user2_path,
             user2_lp_amount,
             total_lp_amount,
             total_reward_index,
         )
         .unwrap();
+        user2_path.save(&mut deps.storage, &total_reward_index);
         assert_eq!(res.u128(), 70u128);
 
         // this is the first time user3 receives reward
         let res = calc_user_reward(
-            deps.as_mut(),
+            &deps.storage,
             &user3_path,
             user3_lp_amount,
             total_lp_amount,
             total_reward_index,
         )
         .unwrap();
+        user3_path.save(&mut deps.storage, &total_reward_index);
         // 200 from the first distribution and 20 from the second one
         assert_eq!(res.u128(), 220u128);
     }

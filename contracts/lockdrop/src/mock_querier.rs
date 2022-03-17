@@ -5,9 +5,11 @@ use cosmwasm_std::{
 };
 use std::collections::HashMap;
 
+use astroport::asset::{AssetInfo, PairInfo};
 use astroport::factory::QueryMsg::{Config, FeeInfo};
-use astroport::factory::{ConfigResponse, FeeInfoResponse};
-use cw20::{BalanceResponse, Cw20QueryMsg, TokenInfoResponse};
+use astroport::factory::{ConfigResponse, FeeInfoResponse, PairType};
+use astroport::pair::QueryMsg::Pair;
+use cw20::{BalanceResponse, Cw20QueryMsg, MinterResponse, TokenInfoResponse};
 use terra_cosmwasm::{TaxCapResponse, TaxRateResponse, TerraQuery, TerraQueryWrapper, TerraRoute};
 
 /// mock_dependencies is a drop-in replacement for cosmwasm_std::testing::mock_dependencies
@@ -129,8 +131,8 @@ impl WasmMockQuerier {
                 }
             }
             QueryRequest::Wasm(WasmQuery::Smart { contract_addr, msg }) => {
-                if contract_addr == "factory" {
-                    match from_binary(&msg).unwrap() {
+                match contract_addr.as_str() {
+                    "factory" => match from_binary(&msg).unwrap() {
                         FeeInfo { .. } => SystemResult::Ok(
                             to_binary(&FeeInfoResponse {
                                 fee_address: Some(Addr::unchecked("fee_address")),
@@ -151,9 +153,27 @@ impl WasmMockQuerier {
                             .into(),
                         ),
                         _ => panic!("DO NOT ENTER HERE"),
-                    }
-                } else {
-                    match from_binary(&msg).unwrap() {
+                    },
+                    "minter_address" => match from_binary(&msg).unwrap() {
+                        Pair {} => SystemResult::Ok(
+                            to_binary(&PairInfo {
+                                asset_infos: [
+                                    AssetInfo::Token {
+                                        contract_addr: Addr::unchecked("token1"),
+                                    },
+                                    AssetInfo::Token {
+                                        contract_addr: Addr::unchecked("token2"),
+                                    },
+                                ],
+                                contract_addr: Addr::unchecked(contract_addr.as_str()),
+                                liquidity_token: Addr::unchecked("liquidity_token"),
+                                pair_type: PairType::Stable {},
+                            })
+                            .into(),
+                        ),
+                        _ => panic!("DO NOT ENTER HERE"),
+                    },
+                    _ => match from_binary(&msg).unwrap() {
                         Cw20QueryMsg::TokenInfo {} => {
                             let balances: &HashMap<String, Uint128> =
                                 match self.token_querier.balances.get(contract_addr) {
@@ -199,8 +219,15 @@ impl WasmMockQuerier {
                                 to_binary(&BalanceResponse { balance: *balance }).into(),
                             )
                         }
+                        Cw20QueryMsg::Minter {} => SystemResult::Ok(
+                            to_binary(&MinterResponse {
+                                minter: "minter_address".to_string(),
+                                cap: None,
+                            })
+                            .into(),
+                        ),
                         _ => panic!("DO NOT ENTER HERE"),
-                    }
+                    },
                 }
             }
             _ => self.base.handle_query(request),

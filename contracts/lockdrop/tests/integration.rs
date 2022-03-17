@@ -212,6 +212,7 @@ fn instantiate_generator_and_vesting(
     app: &mut TerraApp,
     owner: Addr,
     astro_token_instance: Addr,
+    astro_factory_instance: Addr,
 ) -> (Addr, Addr) {
     // Vesting
     let vesting_contract = Box::new(ContractWrapper::new_with_empty(
@@ -275,6 +276,9 @@ fn instantiate_generator_and_vesting(
         tokens_per_block: Uint128::from(0u128),
         vesting_contract: vesting_instance.clone().to_string(),
         owner: owner.to_string(),
+        factory: astro_factory_instance.to_string(),
+        generator_controller: None,
+        guardian: None,
     };
 
     let generator_instance = app
@@ -510,8 +514,12 @@ fn instantiate_all_contracts(
         .unwrap();
     let pool_address = pair_resp.contract_addr;
 
-    let (generator_address, _) =
-        instantiate_generator_and_vesting(app, owner.clone(), astro_token.clone());
+    let (generator_address, _) = instantiate_generator_and_vesting(
+        app,
+        owner.clone(),
+        astro_token.clone(),
+        astroport_factory_instance.clone(),
+    );
 
     // Airdrop Contract
     let airdrop_contract = Box::new(ContractWrapper::new_with_empty(
@@ -1025,8 +1033,12 @@ fn test_update_config() {
         .unwrap();
     let pool_address = pair_resp.contract_addr;
 
-    let (generator_address, _) =
-        instantiate_generator_and_vesting(&mut app, owner.clone(), astro_token.clone());
+    let (generator_address, _) = instantiate_generator_and_vesting(
+        &mut app,
+        owner.clone(),
+        astro_token.clone(),
+        astroport_factory_instance.clone(),
+    );
 
     // Initiate Auction contract
     let (auction_contract, _) = instantiate_auction_contract(
@@ -2843,11 +2855,8 @@ fn test_stake_lp_tokens() {
     app.execute_contract(
         Addr::unchecked(owner.clone()),
         Addr::unchecked(update_msg.clone().generator_address.unwrap()),
-        &astroport::generator::ExecuteMsg::Add {
-            alloc_point: Uint64::from(10u64),
-            has_asset_rewards: false,
-            reward_proxy: None,
-            lp_token: astro_lp_address.to_string(),
+        &astroport::generator::ExecuteMsg::SetupPools {
+            pools: vec![(astro_lp_address.to_string(), Uint64::from(10u64))],
         },
         &[],
     )
@@ -2970,11 +2979,8 @@ fn test_claim_rewards() {
     app.execute_contract(
         Addr::unchecked(owner.clone()),
         Addr::unchecked(update_msg.clone().generator_address.unwrap()),
-        &astroport::generator::ExecuteMsg::Add {
-            alloc_point: Uint64::from(10u64),
-            has_asset_rewards: false,
-            reward_proxy: None,
-            lp_token: astro_lp_address.to_string(),
+        &astroport::generator::ExecuteMsg::SetupPools {
+            pools: vec![(astro_lp_address.to_string(), Uint64::from(10u64))],
         },
         &[],
     )
@@ -3397,11 +3403,8 @@ fn test_claim_rewards_and_unlock() {
     app.execute_contract(
         Addr::unchecked(owner.clone()),
         Addr::unchecked(update_msg.clone().generator_address.unwrap()),
-        &astroport::generator::ExecuteMsg::Add {
-            alloc_point: Uint64::from(10u64),
-            has_asset_rewards: false,
-            reward_proxy: None,
-            lp_token: astro_lp_address.to_string(),
+        &astroport::generator::ExecuteMsg::SetupPools {
+            pools: vec![(astro_lp_address.to_string(), Uint64::from(10u64))],
         },
         &[],
     )
@@ -3806,11 +3809,8 @@ fn test_delegate_astro_to_auction() {
     app.execute_contract(
         Addr::unchecked(owner.clone()),
         Addr::unchecked(update_msg.clone().generator_address.unwrap()),
-        &astroport::generator::ExecuteMsg::Add {
-            alloc_point: Uint64::from(10u64),
-            has_asset_rewards: false,
-            reward_proxy: None,
-            lp_token: astro_lp_address.to_string(),
+        &astroport::generator::ExecuteMsg::SetupPools {
+            pools: vec![(astro_lp_address.to_string(), Uint64::from(10u64))],
         },
         &[],
     )

@@ -174,6 +174,11 @@ pub enum QueryMsg {
         terraswap_lp_token: String,
         duration: u64,
     },
+    PendingAssetReward {
+        user_address: String,
+        terraswap_lp_token: String,
+        duration: u64,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -302,6 +307,11 @@ pub struct LockUpInfoResponse {
     pub astroport_lp_units: Option<Uint128>,
     pub astroport_lp_token: Option<Addr>,
     pub astroport_lp_transferred: Option<Uint128>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct PendingAssetRewardResponse {
+    pub amount: Uint128,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
