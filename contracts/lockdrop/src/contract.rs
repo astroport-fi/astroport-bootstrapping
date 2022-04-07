@@ -4,6 +4,7 @@ use astroport::asset::{addr_validate_to_lower, pair_info_by_pool, Asset, AssetIn
 use astroport::generator::{
     ExecuteMsg as GenExecuteMsg, PendingTokenResponse, QueryMsg as GenQueryMsg, RewardInfoResponse,
 };
+use astroport::DecimalCheckedOps;
 use cosmwasm_std::{
     attr, entry_point, from_binary, to_binary, Addr, Binary, Coin, CosmosMsg, Decimal, Decimal256,
     Deps, DepsMut, Env, MessageInfo, Order, Response, StdError, StdResult, Storage, SubMsg,
@@ -31,6 +32,8 @@ const SECONDS_PER_WEEK: u64 = 86400 * 7;
 // version info for migration info
 const CONTRACT_NAME: &str = "astroport_lockdrop";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+const MIN_POSITIONS_PER_USER: u32 = 1;
 
 //----------------------------------------------------------------------------------------
 // Entry Points
@@ -61,6 +64,12 @@ pub fn instantiate(
     if msg.weekly_divider == 0u64 || msg.weekly_multiplier == 0u64 {
         return Err(StdError::generic_err(
             "weekly divider/multiplier cannot be 0",
+        ));
+    }
+
+    if msg.max_positions_per_user < MIN_POSITIONS_PER_USER {
+        return Err(StdError::generic_err(
+            "The maximum number of locked positions per user cannot be lower than a minimum acceptable value."
         ));
     }
 
@@ -262,8 +271,8 @@ fn _handle_callback(
             env,
             previous_balance,
             terraswap_lp_token,
-            recipient,
             user_address,
+            recipient,
             lock_duration,
         ),
     }
@@ -411,7 +420,7 @@ pub fn handle_update_config(
                 if pool_info.is_staked {
                     return Err(StdError::generic_err(format!(
                         "{} astro LP tokens already staked. Unstake them before updating generator",
-                        pool.to_string()
+                        pool
                     )));
                 }
             }
@@ -451,7 +460,7 @@ pub fn handle_increasing_astro_incentives(
     };
 
     // Anyone can increase astro incentives
-    config.lockdrop_incentives += amount;
+    config.lockdrop_incentives = config.lockdrop_incentives.checked_add(amount)?;
 
     CONFIG.save(deps.storage, &config)?;
     Ok(Response::new()
@@ -484,7 +493,7 @@ pub fn handle_initialize_pool(
         ));
     }
 
-    let terraswap_lp_token = deps.api.addr_validate(&terraswap_lp_token)?;
+    let terraswap_lp_token = addr_validate_to_lower(deps.api, &terraswap_lp_token)?;
 
     // CHECK ::: Is LP Token Pool already initialized
     if ASSET_POOLS
@@ -552,7 +561,7 @@ pub fn handle_update_pool(
         ));
     }
 
-    let terraswap_lp_token = deps.api.addr_validate(&terraswap_lp_token)?;
+    let terraswap_lp_token = addr_validate_to_lower(deps.api, &terraswap_lp_token)?;
 
     // CHECK ::: Is LP Token Pool initialized
     let mut pool_info = ASSET_POOLS.load(deps.storage, &terraswap_lp_token)?;
@@ -642,9 +651,8 @@ pub fn handle_migrate_liquidity(
             "Deposit / Withdrawal windows not closed",
         ));
     }
-
-    let terraswap_lp_token = deps.api.addr_validate(&terraswap_lp_token)?;
-    let astroport_pool = deps.api.addr_validate(&astroport_pool_addr)?;
+    let terraswap_lp_token = addr_validate_to_lower(deps.api, &terraswap_lp_token)?;
+    let astroport_pool = addr_validate_to_lower(deps.api, &astroport_pool_addr)?;
 
     let mut pool_info = ASSET_POOLS.load(deps.storage, &terraswap_lp_token)?;
 
@@ -907,7 +915,7 @@ pub fn handle_withdraw_from_lockup(
         return Err(StdError::generic_err("Invalid withdrawal request"));
     }
 
-    let terraswap_lp_token = deps.api.addr_validate(&terraswap_lp_token)?;
+    let terraswap_lp_token = addr_validate_to_lower(deps.api, &terraswap_lp_token)?;
 
     // CHECK ::: LP Token supported or not ?
     let mut pool_info = ASSET_POOLS.load(deps.storage, &terraswap_lp_token)?;
@@ -1090,10 +1098,9 @@ pub fn handle_claim_rewards_and_unlock_for_lockup(
         ));
     }
 
-    let config = CONFIG.load(deps.storage)?;
     let user_address = info.sender;
 
-    let terraswap_lp_token = deps.api.addr_validate(&terraswap_lp_token)?;
+    let terraswap_lp_token = addr_validate_to_lower(deps.api, &terraswap_lp_token)?;
 
     // CHECK ::: Is LP Token Pool supported or not ?
     let pool_info = ASSET_POOLS.load(deps.storage, &terraswap_lp_token)?;
@@ -1246,7 +1253,8 @@ fn handle_claim_asset_reward(
     terraswap_lp_token: String,
     lock_duration: u64,
 ) -> StdResult<Response> {
-    let terraswap_lp_token = deps.api.addr_validate(&terraswap_lp_token)?;
+    let terraswap_lp_token = addr_validate_to_lower(deps.api, &terraswap_lp_token)?;
+
     let pool_info = ASSET_POOLS.load(deps.storage, &terraswap_lp_token)?;
     if !pool_info.has_asset_rewards {
         return Err(StdError::generic_err("This pool does not have rewards"));
@@ -1294,7 +1302,7 @@ fn handle_toggle_rewards(
         return Err(StdError::generic_err("Unauthorized"));
     }
 
-    let terraswap_lp_token = deps.api.addr_validate(&terraswap_lp_token)?;
+    let terraswap_lp_token = addr_validate_to_lower(deps.api, &terraswap_lp_token)?;
     ASSET_POOLS
         .update(deps.storage, &terraswap_lp_token, |pool_info_opt| {
             let mut pool_info =
@@ -1705,9 +1713,9 @@ fn callback_distribute_asset_reward(
     deps: DepsMut,
     env: Env,
     previous_balance: Uint128,
-    recipient: Addr,
     terraswap_lp_token: Addr,
     user_address: Addr,
+    recipient: Addr,
     lock_duration: u64,
 ) -> StdResult<Response> {
     let reward_balance =
@@ -1819,7 +1827,7 @@ pub fn query_state(deps: Deps) -> StdResult<StateResponse> {
 
 /// @dev Returns the pool's State
 pub fn query_pool(deps: Deps, terraswap_lp_token: String) -> StdResult<PoolResponse> {
-    let terraswap_lp_token = deps.api.addr_validate(&terraswap_lp_token)?;
+    let terraswap_lp_token = addr_validate_to_lower(deps.api, &terraswap_lp_token)?;
     let pool_info: PoolInfo = ASSET_POOLS.load(deps.storage, &terraswap_lp_token)?;
     Ok(PoolResponse {
         terraswap_pool: pool_info.terraswap_pool,
@@ -1876,7 +1884,7 @@ pub fn query_user_info_with_lockups_list(
     _env: Env,
     user: String,
 ) -> StdResult<UserInfoWithListResponse> {
-    let user_address = deps.api.addr_validate(&user)?;
+    let user_address = addr_validate_to_lower(deps.api, &user)?;
     let user_info = USER_INFO
         .may_load(deps.storage, &user_address)?
         .unwrap_or_default();
@@ -1918,8 +1926,10 @@ pub fn query_lockup_info(
 ) -> StdResult<LockUpInfoResponse> {
     let config = CONFIG.load(deps.storage)?;
     let state = STATE.load(deps.storage)?;
-    let terraswap_lp_token = deps.api.addr_validate(&terraswap_lp_token)?;
-    let user_address = deps.api.addr_validate(user_address)?;
+
+    let terraswap_lp_token = addr_validate_to_lower(deps.api, &terraswap_lp_token)?;
+    let user_address = addr_validate_to_lower(deps.api, user_address)?;
+
     let lockup_key = (&terraswap_lp_token, &user_address, U64Key::new(duration));
     let mut pool_info = ASSET_POOLS.load(deps.storage, &terraswap_lp_token)?;
     let mut lockup_info = LOCKUP_INFO.load(deps.storage, lockup_key)?;
@@ -2000,10 +2010,11 @@ pub fn query_lockup_info(
                         pending_rewards.pending_on_proxy.unwrap(),
                         pool_astroport_lp_units,
                     );
-                let total_lockup_proxy_rewards =
-                    pool_info.generator_proxy_per_share * lockup_astroport_lp_units;
+                let total_lockup_proxy_rewards = pool_info
+                    .generator_proxy_per_share
+                    .checked_mul(lockup_astroport_lp_units)?;
                 claimable_generator_proxy_debt =
-                    total_lockup_proxy_rewards - lockup_info.generator_proxy_debt;
+                    total_lockup_proxy_rewards.checked_sub(lockup_info.generator_proxy_debt)?;
             }
         }
     }
@@ -2572,8 +2583,8 @@ mod unit_tests {
             deps.as_mut(),
             env.clone(),
             uusd_balance,
-            user_addr.clone(),
             terraswap_lp_addr.clone(),
+            user_addr.clone(),
             user_addr.clone(),
             100,
         )
@@ -2607,8 +2618,8 @@ mod unit_tests {
             deps.as_mut(),
             env.clone(),
             uusd_balance,
-            user_addr.clone(),
             terraswap_lp_addr.clone(),
+            user_addr.clone(),
             user_addr.clone(),
             lock_duration,
         )
@@ -2652,8 +2663,8 @@ mod unit_tests {
             deps.as_mut(),
             env.clone(),
             uusd_balance,
-            user_addr.clone(),
             terraswap_lp_addr.clone(),
+            user_addr.clone(),
             user_addr.clone(),
             lock_duration,
         )
@@ -2682,8 +2693,8 @@ mod unit_tests {
             deps.as_mut(),
             env.clone(),
             uusd_balance,
-            user_addr.clone(),
             terraswap_lp_addr.clone(),
+            user_addr.clone(),
             user_addr.clone(),
             lock_duration,
         )

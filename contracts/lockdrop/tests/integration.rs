@@ -455,6 +455,32 @@ fn instantiate_lockdrop_contract(app: &mut TerraApp, owner: Addr) -> (Addr, Inst
         b.time = Timestamp::from_seconds(900_00)
     });
 
+    // check for minimum acceptable value of lock positions per user
+    let lockdrop_instantiate_msg_failed = InstantiateMsg {
+        owner: Some(owner.clone().to_string()),
+        init_timestamp: 100_000,
+        deposit_window: 10_000_000,
+        withdrawal_window: 500_000,
+        min_lock_duration: 1u64,
+        max_lock_duration: 52u64,
+        weekly_multiplier: 1u64,
+        weekly_divider: 12u64,
+        max_positions_per_user: 0,
+    };
+
+    // Init contract
+    let err = app
+        .instantiate_contract(
+            lockdrop_code_id,
+            owner.clone(),
+            &lockdrop_instantiate_msg_failed,
+            &[],
+            "lockdrop",
+            None,
+        )
+        .unwrap_err();
+    assert_eq!("Generic error: The maximum number of locked positions per user cannot be lower than a minimum acceptable value.", err.to_string());
+
     // Init contract
     let lockdrop_instance = app
         .instantiate_contract(
