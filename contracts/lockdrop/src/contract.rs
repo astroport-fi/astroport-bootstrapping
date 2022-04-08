@@ -5,6 +5,7 @@ use astroport::generator::{
     ExecuteMsg as GenExecuteMsg, PendingTokenResponse, QueryMsg as GenQueryMsg, RewardInfoResponse,
 };
 use astroport::DecimalCheckedOps;
+use astroport_periphery::utils::Decimal256CheckedOps;
 use cosmwasm_std::{
     attr, entry_point, from_binary, to_binary, Addr, Binary, Coin, CosmosMsg, Decimal, Decimal256,
     Deps, DepsMut, Env, MessageInfo, Order, Response, StdError, StdResult, Storage, SubMsg,
@@ -2212,9 +2213,7 @@ fn calc_user_reward(
         _ => return Ok(Uint128::zero()),
     };
 
-    (to_distribute_index * Uint256::from(user_lp_amount))
-        .try_into()
-        .map_err(Into::into)
+    Ok(to_distribute_index.checked_mul(Uint256::from(user_lp_amount))?)
 }
 
 //-----------------------------------------------------------
