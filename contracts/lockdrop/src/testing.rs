@@ -1,7 +1,7 @@
 use crate::contract::{execute, instantiate, query};
 use astroport_periphery::lockdrop::{ConfigResponse, ExecuteMsg, InstantiateMsg, QueryMsg};
 use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-use cosmwasm_std::{from_binary, Addr, Uint64};
+use cosmwasm_std::{from_binary, Addr};
 
 #[test]
 fn update_owner() {
