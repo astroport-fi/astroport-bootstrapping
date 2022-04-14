@@ -1,6 +1,7 @@
 use std::convert::TryInto;
 
 use astroport::asset::{addr_validate_to_lower, pair_info_by_pool, Asset, AssetInfo};
+use astroport::common::{claim_ownership, drop_ownership_proposal, propose_new_owner};
 use astroport::generator::{
     ExecuteMsg as GenExecuteMsg, PendingTokenResponse, QueryMsg as GenQueryMsg, RewardInfoResponse,
 };
@@ -24,8 +25,8 @@ use astroport_periphery::lockdrop::{
 };
 
 use crate::state::{
-    Config, LockupInfo, PoolInfo, State, ASSET_POOLS, CONFIG, LOCKUP_INFO, STATE,
-    TOTAL_ASSET_REWARD_INDEX, USERS_ASSET_REWARD_INDEX, USER_INFO,
+    Config, LockupInfo, PoolInfo, State, ASSET_POOLS, CONFIG, LOCKUP_INFO, OWNERSHIP_PROPOSAL,
+    STATE, TOTAL_ASSET_REWARD_INDEX, USERS_ASSET_REWARD_INDEX, USER_INFO,
 };
 
 const SECONDS_PER_WEEK: u64 = 86400 * 7;
@@ -77,7 +78,7 @@ pub fn instantiate(
     let config = Config {
         owner: msg
             .owner
-            .map(|v| deps.api.addr_validate(&v))
+            .map(|v| addr_validate_to_lower(deps.api, &v))
             .transpose()?
             .unwrap_or(info.sender),
         astro_token: None,
@@ -181,6 +182,36 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
             terraswap_lp_token,
             enable,
         } => handle_toggle_rewards(deps, info, terraswap_lp_token, enable),
+        ExecuteMsg::ProposeNewOwner { owner, expires_in } => {
+            let config: Config = CONFIG.load(deps.storage)?;
+
+            propose_new_owner(
+                deps,
+                info,
+                env,
+                owner,
+                expires_in,
+                config.owner,
+                OWNERSHIP_PROPOSAL,
+            )
+            .map_err(|e| e)
+        }
+        ExecuteMsg::DropOwnershipProposal {} => {
+            let config: Config = CONFIG.load(deps.storage)?;
+
+            drop_ownership_proposal(deps, info, config.owner, OWNERSHIP_PROPOSAL).map_err(|e| e)
+        }
+        ExecuteMsg::ClaimOwnership {} => {
+            claim_ownership(deps, info, env, OWNERSHIP_PROPOSAL, |deps, new_owner| {
+                CONFIG.update::<_, StdError>(deps.storage, |mut v| {
+                    v.owner = new_owner;
+                    Ok(v)
+                })?;
+
+                Ok(())
+            })
+            .map_err(|e| e)
+        }
     }
 }
 
@@ -190,8 +221,7 @@ pub fn receive_cw20(
     info: MessageInfo,
     cw20_msg: Cw20ReceiveMsg,
 ) -> Result<Response, StdError> {
-    let user_address = deps.api.addr_validate(&cw20_msg.sender)?;
-
+    let user_address = addr_validate_to_lower(deps.api, &cw20_msg.sender)?;
     // CHECK :: Tokens sent > 0
     if cw20_msg.amount == Uint128::zero() {
         return Err(StdError::generic_err(
@@ -383,16 +413,12 @@ pub fn handle_update_config(
         return Err(StdError::generic_err("Unauthorized"));
     }
 
-    if let Some(owner) = new_config.owner {
-        config.owner = deps.api.addr_validate(&owner)?;
-        attributes.push(attr("new_owner", owner.as_str()))
-    };
-
     if let Some(astro_addr) = new_config.astro_token_address {
         if config.astro_token.is_some() {
             return Err(StdError::generic_err("ASTRO token already set"));
         }
-        config.astro_token = Some(deps.api.addr_validate(&astro_addr)?);
+
+        config.astro_token = Some(addr_validate_to_lower(deps.api, &astro_addr)?);
         attributes.push(attr("new_astro_token", astro_addr))
     };
 
@@ -402,7 +428,7 @@ pub fn handle_update_config(
                 return Err(StdError::generic_err("Auction contract already set."));
             }
             None => {
-                config.auction_contract = Some(deps.api.addr_validate(&auction)?);
+                config.auction_contract = Some(addr_validate_to_lower(deps.api, &auction)?);
                 attributes.push(attr("auction_contract", auction))
             }
         }
@@ -427,7 +453,7 @@ pub fn handle_update_config(
             }
         }
 
-        config.generator = Some(deps.api.addr_validate(&generator)?);
+        config.generator = Some(addr_validate_to_lower(deps.api, &generator)?);
         attributes.push(attr("new_generator", generator))
     }
 
@@ -755,7 +781,7 @@ pub fn handle_stake_lp_tokens(
         return Err(StdError::generic_err("Unauthorized"));
     }
 
-    let terraswap_lp_token = deps.api.addr_validate(&terraswap_lp_token)?;
+    let terraswap_lp_token = addr_validate_to_lower(deps.api, &terraswap_lp_token)?;
 
     // CHECK ::: Is LP Token Pool supported or not ?
     let mut pool_info = ASSET_POOLS.load(deps.storage, &terraswap_lp_token)?;
@@ -1472,8 +1498,11 @@ pub fn callback_withdraw_user_rewards_for_lockup_optional_withdraw(
                 )?;
                 res.balance
             };
-            (lockup_info.lp_units_locked.full_mul(balance)
-                / Uint256::from(pool_info.terraswap_amount_in_lockups))
+
+            (lockup_info
+                .lp_units_locked
+                .full_mul(balance)
+                .checked_div(Uint256::from(pool_info.terraswap_amount_in_lockups))?)
             .try_into()?
         };
 
@@ -1492,7 +1521,7 @@ pub fn callback_withdraw_user_rewards_for_lockup_optional_withdraw(
             let total_lockup_astro_rewards =
                 pool_info.generator_astro_per_share * astroport_lp_amount;
             let pending_astro_rewards =
-                total_lockup_astro_rewards - lockup_info.generator_astro_debt;
+                total_lockup_astro_rewards.checked_sub(lockup_info.generator_astro_debt)?;
             lockup_info.generator_astro_debt = total_lockup_astro_rewards;
 
             // If claimable Astro staking rewards > 0, claim them
@@ -1521,10 +1550,11 @@ pub fn callback_withdraw_user_rewards_for_lockup_optional_withdraw(
             // If this LP token is getting dual incentives
             if let Some(proxy_reward_token) = rwi.proxy_reward_token {
                 // Calculate claimable proxy staking rewards for this lockup
-                let total_lockup_proxy_rewards =
-                    pool_info.generator_proxy_per_share * astroport_lp_amount;
+                let total_lockup_proxy_rewards = pool_info
+                    .generator_proxy_per_share
+                    .checked_mul(astroport_lp_amount)?;
                 let pending_proxy_rewards =
-                    total_lockup_proxy_rewards - lockup_info.generator_proxy_debt;
+                    total_lockup_proxy_rewards.checked_sub(lockup_info.generator_proxy_debt)?;
                 lockup_info.generator_proxy_debt = total_lockup_proxy_rewards;
 
                 // If this is a void transaction (no state change), then return error.
@@ -1574,7 +1604,9 @@ pub fn callback_withdraw_user_rewards_for_lockup_optional_withdraw(
                 })?,
                 funds: vec![],
             }));
-            pool_info.terraswap_amount_in_lockups -= lockup_info.lp_units_locked;
+            pool_info.terraswap_amount_in_lockups = pool_info
+                .terraswap_amount_in_lockups
+                .checked_sub(lockup_info.lp_units_locked)?;
             ASSET_POOLS.save(deps.storage, &terraswap_lp_token, &pool_info)?;
 
             attributes.push(attr("astroport_lp_unlocked", astroport_lp_amount));
@@ -1844,7 +1876,7 @@ pub fn query_pool(deps: Deps, terraswap_lp_token: String) -> StdResult<PoolRespo
 
 /// @dev Returns summarized details regarding the user
 pub fn query_user_info(deps: Deps, env: Env, user: String) -> StdResult<UserInfoResponse> {
-    let user_address = deps.api.addr_validate(&user)?;
+    let user_address = addr_validate_to_lower(deps.api, &user)?;
     let user_info = USER_INFO
         .may_load(deps.storage, &user_address)?
         .unwrap_or_default();
@@ -1974,7 +2006,7 @@ pub fn query_lockup_info(
             (lockup_info
                 .lp_units_locked
                 .full_mul(pool_astroport_lp_units)
-                / Uint256::from(pool_info.terraswap_amount_in_lockups))
+                .checked_div(Uint256::from(pool_info.terraswap_amount_in_lockups))?)
             .try_into()?
         };
         lockup_astroport_lp_units_opt = Some(lockup_astroport_lp_units);
@@ -2251,8 +2283,6 @@ fn update_user_lockup_positions_and_calc_rewards(
         let lockup_key = (&pool, user_address, U64Key::new(duration));
         let mut lockup_info = LOCKUP_INFO.load(deps.storage, lockup_key.clone())?;
 
-        let lockup_astro_rewards: Uint128;
-
         if lockup_info.astro_rewards == Uint128::zero() {
             // Weighted lockup balance (using terraswap LP units to calculate as pool's total weighted balance is calculated on terraswap LP deposits summed over each deposit tx)
             let weighted_lockup_balance =
@@ -2270,7 +2300,7 @@ fn update_user_lockup_positions_and_calc_rewards(
             LOCKUP_INFO.save(deps.storage, lockup_key, &lockup_info)?;
         };
 
-        lockup_astro_rewards = lockup_info.astro_rewards;
+        let lockup_astro_rewards = lockup_info.astro_rewards;
 
         // Save updated Lockup state
         total_astro_rewards += lockup_astro_rewards;

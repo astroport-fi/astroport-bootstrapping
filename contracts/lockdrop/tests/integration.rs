@@ -602,7 +602,6 @@ fn instantiate_all_contracts(
     .unwrap();
 
     let update_msg = UpdateConfigMsg {
-        owner: None,
         astro_token_address: Some(astro_token.to_string()),
         auction_contract_address: Some(auction_contract.to_string()),
         generator_address: Some(generator_address.to_string()),
@@ -1078,7 +1077,6 @@ fn test_update_config() {
     );
 
     let update_msg = UpdateConfigMsg {
-        owner: Some("new_owner".to_string()),
         astro_token_address: Some(astro_token.to_string()),
         auction_contract_address: Some(auction_contract.to_string()),
         generator_address: Some(generator_address.to_string()),
@@ -1126,7 +1124,6 @@ fn test_update_config() {
         .query_wasm_smart(&lockdrop_instance, &QueryMsg::Config {})
         .unwrap();
 
-    assert_eq!(update_msg.clone().owner.unwrap(), resp.owner);
     assert_eq!(
         update_msg.clone().astro_token_address.unwrap(),
         resp.astro_token.unwrap()
@@ -1157,7 +1154,7 @@ fn test_update_config() {
 
     let err = app
         .execute_contract(
-            Addr::unchecked("new_owner".to_string()),
+            owner.clone(),
             lockdrop_instance.clone(),
             &ExecuteMsg::UpdateConfig {
                 new_config: update_msg.clone(),
