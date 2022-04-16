@@ -2303,7 +2303,7 @@ fn update_user_lockup_positions_and_calc_rewards(
         let lockup_astro_rewards = lockup_info.astro_rewards;
 
         // Save updated Lockup state
-        total_astro_rewards += lockup_astro_rewards;
+        total_astro_rewards = total_astro_rewards.checked_add(lockup_astro_rewards)?;
     }
 
     Ok(total_astro_rewards)
