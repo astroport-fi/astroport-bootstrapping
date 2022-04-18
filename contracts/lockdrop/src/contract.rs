@@ -14,6 +14,7 @@ use cw20::{BalanceResponse, Cw20ExecuteMsg, Cw20QueryMsg, Cw20ReceiveMsg};
 use cw_storage_plus::{Path, U64Key};
 
 use crate::migration::ASSET_POOLS_V101;
+use crate::raw_queries::{raw_balance, raw_generator_deposit};
 use astroport_periphery::auction::Cw20HookMsg::DelegateAstroTokens;
 use astroport_periphery::lockdrop::{
     CallbackMsg, ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, LockUpInfoResponse,
@@ -411,7 +412,7 @@ pub fn handle_update_config(
                 if pool_info.is_staked {
                     return Err(StdError::generic_err(format!(
                         "{} astro LP tokens already staked. Unstake them before updating generator",
-                        pool.to_string()
+                        pool
                     )));
                 }
             }
@@ -1939,25 +1940,18 @@ pub fn query_lockup_info(
         let lockup_astroport_lp_units = {
             // Query Astro LP Tokens balance for the pool
             pool_astroport_lp_units = if pool_info.is_staked {
-                deps.querier.query_wasm_smart(
-                    &config
-                        .generator
-                        .as_ref()
-                        .expect("Should be set!")
-                        .to_string(),
-                    &GenQueryMsg::Deposit {
-                        lp_token: astroport_lp_token.to_string(),
-                        user: env.contract.address.to_string(),
-                    },
+                raw_generator_deposit(
+                    deps.querier,
+                    config.generator.as_ref().expect("Should be set!"),
+                    astroport_lp_token.as_bytes(),
+                    env.contract.address.as_bytes(),
                 )?
             } else {
-                let res: BalanceResponse = deps.querier.query_wasm_smart(
+                raw_balance(
+                    deps.querier,
                     &astroport_lp_token,
-                    &Cw20QueryMsg::Balance {
-                        address: env.contract.address.to_string(),
-                    },
-                )?;
-                res.balance
+                    env.contract.address.as_bytes(),
+                )?
             };
             // Calculate Lockup Astro LP shares
             (lockup_info
@@ -2241,8 +2235,6 @@ fn update_user_lockup_positions_and_calc_rewards(
         let lockup_key = (&pool, user_address, U64Key::new(duration));
         let mut lockup_info = LOCKUP_INFO.load(deps.storage, lockup_key.clone())?;
 
-        let lockup_astro_rewards: Uint128;
-
         if lockup_info.astro_rewards == Uint128::zero() {
             // Weighted lockup balance (using terraswap LP units to calculate as pool's total weighted balance is calculated on terraswap LP deposits summed over each deposit tx)
             let weighted_lockup_balance =
@@ -2260,7 +2252,7 @@ fn update_user_lockup_positions_and_calc_rewards(
             LOCKUP_INFO.save(deps.storage, lockup_key, &lockup_info)?;
         };
 
-        lockup_astro_rewards = lockup_info.astro_rewards;
+        let lockup_astro_rewards = lockup_info.astro_rewards;
 
         // Save updated Lockup state
         total_astro_rewards += lockup_astro_rewards;
