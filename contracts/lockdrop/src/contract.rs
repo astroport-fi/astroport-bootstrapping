@@ -17,6 +17,7 @@ use cw20::{BalanceResponse, Cw20ExecuteMsg, Cw20QueryMsg, Cw20ReceiveMsg};
 use cw_storage_plus::{Path, U64Key};
 
 use crate::migration::ASSET_POOLS_V101;
+use crate::raw_queries::{raw_balance, raw_generator_deposit};
 use astroport_periphery::auction::Cw20HookMsg::DelegateAstroTokens;
 use astroport_periphery::lockdrop::{
     CallbackMsg, ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, LockUpInfoResponse,
@@ -1982,25 +1983,18 @@ pub fn query_lockup_info(
         let lockup_astroport_lp_units = {
             // Query Astro LP Tokens balance for the pool
             pool_astroport_lp_units = if pool_info.is_staked {
-                deps.querier.query_wasm_smart(
-                    &config
-                        .generator
-                        .as_ref()
-                        .expect("Should be set!")
-                        .to_string(),
-                    &GenQueryMsg::Deposit {
-                        lp_token: astroport_lp_token.to_string(),
-                        user: env.contract.address.to_string(),
-                    },
+                raw_generator_deposit(
+                    deps.querier,
+                    config.generator.as_ref().expect("Should be set!"),
+                    astroport_lp_token.as_bytes(),
+                    env.contract.address.as_bytes(),
                 )?
             } else {
-                let res: BalanceResponse = deps.querier.query_wasm_smart(
+                raw_balance(
+                    deps.querier,
                     &astroport_lp_token,
-                    &Cw20QueryMsg::Balance {
-                        address: env.contract.address.to_string(),
-                    },
-                )?;
-                res.balance
+                    env.contract.address.as_bytes(),
+                )?
             };
             // Calculate Lockup Astro LP shares
             (lockup_info

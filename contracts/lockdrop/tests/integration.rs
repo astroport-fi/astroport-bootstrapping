@@ -2879,7 +2879,7 @@ fn test_stake_lp_tokens() {
         Addr::unchecked(owner.clone()),
         Addr::unchecked(update_msg.clone().generator_address.unwrap()),
         &astroport::generator::ExecuteMsg::SetupPools {
-            pools: vec![(astro_lp_address.to_string(), Uint128::new(10))],
+            pools: vec![(astro_lp_address.to_string(), Uint128::from(10u128))],
         },
         &[],
     )
@@ -3003,7 +3003,7 @@ fn test_claim_rewards() {
         Addr::unchecked(owner.clone()),
         Addr::unchecked(update_msg.clone().generator_address.unwrap()),
         &astroport::generator::ExecuteMsg::SetupPools {
-            pools: vec![(astro_lp_address.to_string(), Uint128::new(10))],
+            pools: vec![(astro_lp_address.to_string(), Uint128::from(10u128))],
         },
         &[],
     )
@@ -3427,7 +3427,7 @@ fn test_claim_rewards_and_unlock() {
         Addr::unchecked(owner.clone()),
         Addr::unchecked(update_msg.clone().generator_address.unwrap()),
         &astroport::generator::ExecuteMsg::SetupPools {
-            pools: vec![(astro_lp_address.to_string(), Uint128::new(10))],
+            pools: vec![(astro_lp_address.to_string(), Uint128::from(10u128))],
         },
         &[],
     )
@@ -3833,7 +3833,7 @@ fn test_delegate_astro_to_auction() {
         Addr::unchecked(owner.clone()),
         Addr::unchecked(update_msg.clone().generator_address.unwrap()),
         &astroport::generator::ExecuteMsg::SetupPools {
-            pools: vec![(astro_lp_address.to_string(), Uint128::new(10))],
+            pools: vec![(astro_lp_address.to_string(), Uint128::from(10u128))],
         },
         &[],
     )
