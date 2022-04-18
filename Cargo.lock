@@ -45,7 +45,6 @@ dependencies = [
  "astroport-pair 1.0.0 (git+https://github.com/astroport-fi/astroport-core.git?tag=v1.1.0)",
  "astroport-periphery",
  "astroport-token 1.0.0 (git+https://github.com/astroport-fi/astroport-core.git?tag=v1.1.0)",
- "cosmwasm-bignumber",
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-storage-plus 0.8.1",
@@ -70,7 +69,6 @@ dependencies = [
  "astroport-periphery",
  "astroport-token 1.0.0 (git+https://github.com/astroport-fi/astroport-core.git?tag=v1.1.0)",
  "astroport-vesting 1.0.0 (git+https://github.com/astroport-fi/astroport-core.git?tag=v1.1.0)",
- "cosmwasm-bignumber",
  "cosmwasm-schema",
  "cosmwasm-std",
  "cosmwasm-storage",
@@ -142,7 +140,6 @@ dependencies = [
  "astroport-token 1.0.0 (git+https://github.com/astroport-fi/astroport-core.git?branch=main)",
  "astroport-vesting 1.0.0 (git+https://github.com/astroport-fi/astroport-core.git?branch=main)",
  "astroport-whitelist",
- "cosmwasm-bignumber",
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-storage-plus 0.8.1",
@@ -216,7 +213,6 @@ dependencies = [
 name = "astroport-periphery"
 version = "1.1.0"
 dependencies = [
- "cosmwasm-bignumber",
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw20",
@@ -1053,7 +1049,6 @@ dependencies = [
  "astroport 1.1.0",
  "astroport-periphery",
  "astroport-token 1.0.0 (git+https://github.com/astroport-fi/astroport-core.git?tag=v1.1.0)",
- "cosmwasm-bignumber",
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-storage-plus 0.8.1",
