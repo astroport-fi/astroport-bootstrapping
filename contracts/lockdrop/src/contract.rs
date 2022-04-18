@@ -729,7 +729,7 @@ pub fn handle_migrate_liquidity(
                 terraswap::asset::AssetInfo::Token { contract_addr } => {
                     terraswap::querier::query_token_balance(
                         &deps.querier,
-                        deps.api.addr_validate(contract_addr)?,
+                        addr_validate_to_lower(deps.api, contract_addr)?,
                         env.contract.address.clone(),
                     )?
                 }
@@ -1691,7 +1691,7 @@ pub fn callback_deposit_liquidity_in_astroport(
             terraswap::asset::AssetInfo::Token { contract_addr } => {
                 let amount = terraswap::querier::query_token_balance(
                     &deps.querier,
-                    deps.api.addr_validate(&contract_addr)?,
+                    addr_validate_to_lower(deps.api, &contract_addr)?,
                     env.contract.address.clone(),
                 )?
                 .checked_sub(prev_asset.amount)?;
@@ -1711,7 +1711,7 @@ pub fn callback_deposit_liquidity_in_astroport(
 
                 assets.push(astroport::asset::Asset {
                     info: astroport::asset::AssetInfo::Token {
-                        contract_addr: deps.api.addr_validate(&contract_addr)?,
+                        contract_addr: addr_validate_to_lower(deps.api, &contract_addr)?,
                     },
                     amount,
                 });
