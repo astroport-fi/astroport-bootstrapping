@@ -6,8 +6,8 @@ jobs:
   check-artifacts-size:
     runs-on: ubuntu-latest
     steps:
-      - name: Build Artifacts
       - uses: actions/checkout@v2
+      - name: Build Artifacts
         run: |
           $GITHUB_WORKSPACE/scripts/build_release.sh
 
