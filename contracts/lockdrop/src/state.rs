@@ -1,3 +1,4 @@
+use astroport::common::OwnershipProposal;
 use astroport_periphery::lockdrop::MigrationInfo;
 use cosmwasm_std::{Addr, Decimal, Decimal256, Uint128, Uint256};
 use cw_storage_plus::{Item, Map, U64Key};
@@ -107,3 +108,5 @@ pub struct LockupInfo {
     /// Timestamp beyond which this position can be unlocked
     pub unlock_timestamp: u64,
 }
+
+pub const OWNERSHIP_PROPOSAL: Item<OwnershipProposal> = Item::new("ownership_proposal");
