@@ -11,7 +11,7 @@ jobs:
         run: |
           $GITHUB_WORKSPACE/scripts/build_release.sh
 
-      - name: Check Artifacts Size
+      - name: Check Artifacts size
         run: |
           maximum_size=580
 
