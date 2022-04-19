@@ -11,9 +11,7 @@ jobs:
       - uses: actions/cache@v2
         with:
           path: /tmp
-          key: ${{ runner.os }}-docker-${{ hashFiles('code:/') }}
-        run: |
-          $GITHUB_WORKSPACE/scripts/build_release.sh
+          key: ${{ runner.os }}-docker-${{ hashFiles('$GITHUB_WORKSPACE/scripts/build_release.sh') }}
 
       - name: Check Artifacts Size
         run: |
