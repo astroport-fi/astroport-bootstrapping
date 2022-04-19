@@ -8,7 +8,6 @@ jobs:
     steps:
       - name: Build Artifacts
       - uses: actions/checkout@v2
-      - uses: actions/cache@v2
         run: |
           $GITHUB_WORKSPACE/scripts/build_release.sh
 
