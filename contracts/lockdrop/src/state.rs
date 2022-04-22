@@ -1,4 +1,5 @@
-use astroport_periphery::lockdrop::MigrationInfo;
+use astroport::asset::AssetInfo;
+use astroport_periphery::lockdrop::{MigrationInfo, RestrictedAssetVector};
 use cosmwasm_std::{Addr, Decimal, Decimal256, Uint128, Uint256};
 use cw_storage_plus::{Item, Map, U64Key};
 
@@ -72,7 +73,7 @@ pub struct PoolInfo {
     /// Ratio of Generator ASTRO rewards accured to astroport pool share
     pub generator_astro_per_share: Decimal,
     /// Ratio of Generator Proxy rewards accured to astroport pool share
-    pub generator_proxy_per_share: Decimal,
+    pub generator_proxy_per_share: RestrictedAssetVector<Decimal>,
     /// Boolean value indicating if the LP Tokens are staked with the Generator contract or not
     pub is_staked: bool,
     /// Flag defines whether the asset has rewards or not
@@ -103,7 +104,7 @@ pub struct LockupInfo {
     /// Generator ASTRO tokens loockup received as generator rewards
     pub generator_astro_debt: Uint128,
     /// Generator Proxy tokens lockup received as generator rewards
-    pub generator_proxy_debt: Uint128,
+    pub generator_proxy_debt: Vec<(AssetInfo, Uint128)>,
     /// Timestamp beyond which this position can be unlocked
     pub unlock_timestamp: u64,
 }

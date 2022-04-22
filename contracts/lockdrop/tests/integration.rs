@@ -1,3 +1,5 @@
+use astroport::asset::AssetInfo;
+use astroport_governance::utils::EPOCH_START;
 use astroport_periphery::{
     auction::{ExecuteMsg as AuctionExecuteMsg, UpdateConfigMsg as AuctionUpdateConfigMsg},
     lockdrop::{
@@ -7,10 +9,12 @@ use astroport_periphery::{
 };
 use cosmwasm_std::testing::{mock_env, MockApi, MockStorage};
 use cosmwasm_std::{
-    attr, to_binary, Addr, Coin, Decimal, Timestamp, Uint128, Uint256 as CUint256, Uint64,
+    attr, to_binary, Addr, Coin, Decimal, QueryRequest, Timestamp, Uint128, Uint256 as CUint256,
+    Uint64, WasmQuery,
 };
 
 use astroport::token::InstantiateMsg as TokenInstantiateMsg;
+use astroport_periphery::lockdrop::RestrictedAssetVector;
 use cw20::{Cw20ExecuteMsg, Cw20QueryMsg};
 use terra_multi_test::{
     AppBuilder, BankKeeper, ContractWrapper, Executor, SwapQuerier, TerraApp, TerraMock,
@@ -18,7 +22,8 @@ use terra_multi_test::{
 };
 
 fn mock_app() -> TerraApp {
-    let env = mock_env();
+    let mut env = mock_env();
+    env.block.time = Timestamp::from_seconds(EPOCH_START);
     let api = MockApi::default();
     let bank = BankKeeper::new();
     let storage = MockStorage::new();
@@ -207,12 +212,93 @@ fn instantiate_astroport(app: &mut TerraApp, owner: Addr) -> Addr {
     astroport_factory_instance
 }
 
+fn instantiate_staking(app: &mut TerraApp, owner: Addr, astro_instance: Addr) -> (Addr, Addr) {
+    let staking_contract = Box::new(
+        ContractWrapper::new_with_empty(
+            astroport_staking::contract::execute,
+            astroport_staking::contract::instantiate,
+            astroport_staking::contract::query,
+        )
+        .with_reply_empty(astroport_staking::contract::reply),
+    );
+
+    let xastro_contract = Box::new(ContractWrapper::new_with_empty(
+        astroport_xastro_token::contract::execute,
+        astroport_xastro_token::contract::instantiate,
+        astroport_xastro_token::contract::query,
+    ));
+
+    let xastro_code_id = app.store_code(xastro_contract);
+    let staking_code_id = app.store_code(staking_contract);
+
+    let init_msg = astroport::staking::InstantiateMsg {
+        owner: owner.to_string(),
+        token_code_id: xastro_code_id,
+        deposit_token_addr: astro_instance.to_string(),
+    };
+
+    let staking_instance = app
+        .instantiate_contract(
+            staking_code_id,
+            owner.clone(),
+            &init_msg,
+            &[],
+            "Staking",
+            None,
+        )
+        .unwrap();
+
+    let msg = QueryMsg::Config {};
+    let res: astroport::staking::ConfigResponse = app
+        .wrap()
+        .query(&QueryRequest::Wasm(WasmQuery::Smart {
+            contract_addr: staking_instance.to_string(),
+            msg: to_binary(&msg).unwrap(),
+        }))
+        .unwrap();
+
+    (staking_instance, res.share_token_addr)
+}
+
+fn instantiate_voting_escrow(app: &mut TerraApp, owner: Addr, xastro_instance: Addr) -> Addr {
+    let voting_escrow_contract = Box::new(ContractWrapper::new_with_empty(
+        voting_escrow::contract::execute,
+        voting_escrow::contract::instantiate,
+        voting_escrow::contract::query,
+    ));
+
+    let voting_escrow_code_id = app.store_code(voting_escrow_contract);
+
+    let init_msg = astroport_governance::voting_escrow::InstantiateMsg {
+        owner: owner.to_string(),
+        guardian_addr: owner.to_string(),
+        deposit_token_addr: xastro_instance.to_string(),
+        marketing: None,
+        max_exit_penalty: Decimal::percent(20),
+        slashed_fund_receiver: None,
+    };
+
+    let voting_escrow_instance = app
+        .instantiate_contract(
+            voting_escrow_code_id,
+            owner.clone(),
+            &init_msg,
+            &[],
+            "Voting Escrow",
+            None,
+        )
+        .unwrap();
+
+    voting_escrow_instance
+}
+
 // Instantiate Astroport's generator and vesting contracts
 fn instantiate_generator_and_vesting(
     app: &mut TerraApp,
     owner: Addr,
     astro_token_instance: Addr,
     astro_factory_instance: Addr,
+    astro_voting_escrow_instance: Addr,
 ) -> (Addr, Addr) {
     // Vesting
     let vesting_contract = Box::new(ContractWrapper::new_with_empty(
@@ -257,6 +343,14 @@ fn instantiate_generator_and_vesting(
     )
     .unwrap();
 
+    let whitelist_contract = Box::new(ContractWrapper::new_with_empty(
+        astroport_whitelist::contract::execute,
+        astroport_whitelist::contract::instantiate,
+        astroport_whitelist::contract::query,
+    ));
+
+    let whitelist_code_id = app.store_code(whitelist_contract);
+
     // Generator
     let generator_contract = Box::new(
         ContractWrapper::new_with_empty(
@@ -278,7 +372,9 @@ fn instantiate_generator_and_vesting(
         owner: owner.to_string(),
         factory: astro_factory_instance.to_string(),
         generator_controller: None,
+        voting_escrow: Some(astro_voting_escrow_instance.to_string()),
         guardian: None,
+        whitelist_code_id,
     };
 
     let generator_instance = app
@@ -514,11 +610,16 @@ fn instantiate_all_contracts(
         .unwrap();
     let pool_address = pair_resp.contract_addr;
 
+    let (_, xastro_instance) = instantiate_staking(app, owner.clone(), astro_token.clone());
+
+    let voting_escrow_instance = instantiate_voting_escrow(app, owner.clone(), xastro_instance);
+
     let (generator_address, _) = instantiate_generator_and_vesting(
         app,
         owner.clone(),
         astro_token.clone(),
         astroport_factory_instance.clone(),
+        voting_escrow_instance.clone(),
     );
 
     // Airdrop Contract
@@ -1033,11 +1134,17 @@ fn test_update_config() {
         .unwrap();
     let pool_address = pair_resp.contract_addr;
 
+    let (_, xastro_instance) = instantiate_staking(&mut app, owner.clone(), astro_token.clone());
+
+    let voting_escrow_instance =
+        instantiate_voting_escrow(&mut app, owner.clone(), xastro_instance);
+
     let (generator_address, _) = instantiate_generator_and_vesting(
         &mut app,
         owner.clone(),
         astro_token.clone(),
         astroport_factory_instance.clone(),
+        voting_escrow_instance.clone(),
     );
 
     // Initiate Auction contract
@@ -1428,7 +1535,7 @@ fn test_update_pool() {
         pool_resp.generator_astro_per_share
     );
     assert_eq!(
-        Decimal::from_ratio(0u64, 1u64),
+        RestrictedAssetVector::default(),
         pool_resp.generator_proxy_per_share
     );
     assert_eq!(false, pool_resp.is_staked);
@@ -1705,7 +1812,7 @@ fn test_increase_lockup() {
         user_resp.lockup_infos[0].generator_astro_debt
     );
     assert_eq!(
-        Uint128::zero(),
+        Vec::<(AssetInfo, Uint128)>::new(),
         user_resp.lockup_infos[0].generator_proxy_debt
     );
     assert_eq!(13624000u64, user_resp.lockup_infos[0].unlock_timestamp);
@@ -2492,7 +2599,7 @@ fn test_migrate_liquidity() {
         pool_resp_after_migration.generator_astro_per_share
     );
     assert_eq!(
-        Decimal::zero(),
+        RestrictedAssetVector::default(),
         pool_resp_after_migration.generator_proxy_per_share
     );
     assert_eq!(
@@ -2794,7 +2901,7 @@ fn test_migrate_liquidity_uusd_uluna_pool() {
         pool_resp_after_migration.generator_astro_per_share
     );
     assert_eq!(
-        Decimal::zero(),
+        RestrictedAssetVector::default(),
         pool_resp_after_migration.generator_proxy_per_share
     );
     assert_eq!(
@@ -2856,7 +2963,7 @@ fn test_stake_lp_tokens() {
         Addr::unchecked(owner.clone()),
         Addr::unchecked(update_msg.clone().generator_address.unwrap()),
         &astroport::generator::ExecuteMsg::SetupPools {
-            pools: vec![(astro_lp_address.to_string(), Uint64::from(10u64))],
+            pools: vec![(astro_lp_address.to_string(), Uint128::from(10u64))],
         },
         &[],
     )
@@ -2980,7 +3087,7 @@ fn test_claim_rewards() {
         Addr::unchecked(owner.clone()),
         Addr::unchecked(update_msg.clone().generator_address.unwrap()),
         &astroport::generator::ExecuteMsg::SetupPools {
-            pools: vec![(astro_lp_address.to_string(), Uint64::from(10u64))],
+            pools: vec![(astro_lp_address.to_string(), Uint128::from(10u64))],
         },
         &[],
     )
@@ -3020,8 +3127,8 @@ fn test_claim_rewards() {
         duration: 10u64,
         generator_astro_debt: Uint128::from(0u64),
         claimable_generator_astro_debt: Uint128::from(0u64),
-        generator_proxy_debt: Uint128::from(0u64),
-        claimable_generator_proxy_debt: Uint128::from(0u64),
+        generator_proxy_debt: vec![],
+        claimable_generator_proxy_debt: RestrictedAssetVector::default(),
         unlock_timestamp: 16648000u64,
         astroport_lp_units: Some(Uint128::from(1000000000u64)),
         astroport_lp_token: Some(astro_lp_address.clone()),
@@ -3167,8 +3274,8 @@ fn test_claim_rewards() {
         duration: 10u64,
         generator_astro_debt: Uint128::from(0u64),
         claimable_generator_astro_debt: Uint128::from(172800000000u64),
-        generator_proxy_debt: Uint128::from(0u64),
-        claimable_generator_proxy_debt: Uint128::from(0u64),
+        generator_proxy_debt: vec![],
+        claimable_generator_proxy_debt: RestrictedAssetVector::default(),
         unlock_timestamp: 16648000u64,
         astroport_lp_units: Some(Uint128::from(1000000000u64)),
         astroport_lp_token: Some(astro_lp_address.clone()),
@@ -3222,8 +3329,8 @@ fn test_claim_rewards() {
         duration: 10u64,
         generator_astro_debt: Uint128::from(172800000000u64),
         claimable_generator_astro_debt: Uint128::from(0u64),
-        generator_proxy_debt: Uint128::from(0u64),
-        claimable_generator_proxy_debt: Uint128::from(0u64),
+        generator_proxy_debt: vec![],
+        claimable_generator_proxy_debt: RestrictedAssetVector::default(),
         unlock_timestamp: 16648000u64,
         astroport_lp_units: Some(Uint128::from(1000000000u64)),
         astroport_lp_token: Some(astro_lp_address.clone()),
@@ -3283,8 +3390,8 @@ fn test_claim_rewards() {
         duration: 10u64,
         generator_astro_debt: Uint128::from(0u64),
         claimable_generator_astro_debt: Uint128::from(172800000000u64),
-        generator_proxy_debt: Uint128::from(0u64),
-        claimable_generator_proxy_debt: Uint128::from(0u64),
+        generator_proxy_debt: vec![],
+        claimable_generator_proxy_debt: RestrictedAssetVector::default(),
         unlock_timestamp: 16648000u64,
         astroport_lp_units: Some(Uint128::from(1000000000u64)),
         astroport_lp_token: Some(astro_lp_address.clone()),
@@ -3325,8 +3432,8 @@ fn test_claim_rewards() {
         duration: 10u64,
         generator_astro_debt: Uint128::from(172800000000u64),
         claimable_generator_astro_debt: Uint128::from(0u64),
-        generator_proxy_debt: Uint128::from(0u64),
-        claimable_generator_proxy_debt: Uint128::from(0u64),
+        generator_proxy_debt: vec![],
+        claimable_generator_proxy_debt: RestrictedAssetVector::default(),
         unlock_timestamp: 16648000u64,
         astroport_lp_units: Some(Uint128::from(1000000000u64)),
         astroport_lp_token: Some(astro_lp_address.clone()),
@@ -3404,7 +3511,7 @@ fn test_claim_rewards_and_unlock() {
         Addr::unchecked(owner.clone()),
         Addr::unchecked(update_msg.clone().generator_address.unwrap()),
         &astroport::generator::ExecuteMsg::SetupPools {
-            pools: vec![(astro_lp_address.to_string(), Uint64::from(10u64))],
+            pools: vec![(astro_lp_address.to_string(), Uint128::from(10u64))],
         },
         &[],
     )
@@ -3444,8 +3551,8 @@ fn test_claim_rewards_and_unlock() {
         duration: 10u64,
         generator_astro_debt: Uint128::from(0u64),
         claimable_generator_astro_debt: Uint128::from(0u64),
-        generator_proxy_debt: Uint128::from(0u64),
-        claimable_generator_proxy_debt: Uint128::from(0u64),
+        generator_proxy_debt: vec![],
+        claimable_generator_proxy_debt: RestrictedAssetVector::default(),
         unlock_timestamp: 16648000u64,
         astroport_lp_units: Some(Uint128::from(1000000000u64)),
         astroport_lp_token: Some(astro_lp_address.clone()),
@@ -3559,8 +3666,8 @@ fn test_claim_rewards_and_unlock() {
         duration: 10u64,
         generator_astro_debt: Uint128::from(0u64),
         claimable_generator_astro_debt: Uint128::from(259200000000u64),
-        generator_proxy_debt: Uint128::from(0u64),
-        claimable_generator_proxy_debt: Uint128::from(0u64),
+        generator_proxy_debt: vec![],
+        claimable_generator_proxy_debt: RestrictedAssetVector::default(),
         unlock_timestamp: 16648000u64,
         astroport_lp_units: Some(Uint128::from(1000000000u64)),
         astroport_lp_token: Some(astro_lp_address.clone()),
@@ -3682,8 +3789,8 @@ fn test_claim_rewards_and_unlock() {
         duration: 10u64,
         generator_astro_debt: Uint128::from(0u64),
         claimable_generator_astro_debt: Uint128::from(259200000000u64),
-        generator_proxy_debt: Uint128::from(0u64),
-        claimable_generator_proxy_debt: Uint128::from(0u64),
+        generator_proxy_debt: vec![],
+        claimable_generator_proxy_debt: RestrictedAssetVector::default(),
         unlock_timestamp: 16648000u64,
         astroport_lp_units: Some(Uint128::from(1000000000u64)),
         astroport_lp_token: Some(astro_lp_address.clone()),
@@ -3810,7 +3917,7 @@ fn test_delegate_astro_to_auction() {
         Addr::unchecked(owner.clone()),
         Addr::unchecked(update_msg.clone().generator_address.unwrap()),
         &astroport::generator::ExecuteMsg::SetupPools {
-            pools: vec![(astro_lp_address.to_string(), Uint64::from(10u64))],
+            pools: vec![(astro_lp_address.to_string(), Uint128::from(10u64))],
         },
         &[],
     )
@@ -3850,8 +3957,8 @@ fn test_delegate_astro_to_auction() {
         duration: 10u64,
         generator_astro_debt: Uint128::from(0u64),
         claimable_generator_astro_debt: Uint128::from(0u64),
-        generator_proxy_debt: Uint128::from(0u64),
-        claimable_generator_proxy_debt: Uint128::from(0u64),
+        generator_proxy_debt: vec![],
+        claimable_generator_proxy_debt: RestrictedAssetVector::default(),
         unlock_timestamp: 16648000u64,
         astroport_lp_units: Some(Uint128::from(1000000000u64)),
         astroport_lp_token: Some(astro_lp_address.clone()),
