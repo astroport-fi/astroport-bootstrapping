@@ -2,7 +2,7 @@
 name = "astroport-auction"
 version = "1.0.0"
 authors = ["_astromartian"]
-edition = "2018"
+edition = "2021"
 description = "Contract to facilitate ASTRO-UST LP Pool bootstrapping via auction"
 
 exclude = [
@@ -32,7 +32,6 @@ cosmwasm-std = { version = "0.16.0" }
 cw-storage-plus = { version = "0.8.0" }
 serde = { version = "1.0.127", default-features = false, features = ["derive"] }
 schemars = "0.8.3"
-cosmwasm-bignumber = "2.2.0"
 
 [dev-dependencies]
 cosmwasm-schema = { version = "0.16.0" }

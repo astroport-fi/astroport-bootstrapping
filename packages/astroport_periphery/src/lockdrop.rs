@@ -31,8 +31,6 @@ pub struct InstantiateMsg {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct UpdateConfigMsg {
-    /// Account which can update config
-    pub owner: Option<String>,
     /// Astroport token address
     pub astro_token_address: Option<String>,
     /// Bootstrap Auction contract address
@@ -104,6 +102,18 @@ pub enum ExecuteMsg {
     },
     /// Callbacks; only callable by the contract itself.
     Callback(CallbackMsg),
+    /// ProposeNewOwner creates a proposal to change contract ownership.
+    /// The validity period for the proposal is set in the `expires_in` variable.
+    ProposeNewOwner {
+        /// Newly proposed contract owner
+        owner: String,
+        /// The date after which this proposal expires
+        expires_in: u64,
+    },
+    /// DropOwnershipProposal removes the existing offer to change contract ownership.
+    DropOwnershipProposal {},
+    /// Used to claim contract ownership.
+    ClaimOwnership {},
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

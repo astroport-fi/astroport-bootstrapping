@@ -2,7 +2,7 @@
 name = "astroport-periphery"
 version = "1.1.0"
 authors = ["_astromartian"]
-edition = "2018"
+edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -16,7 +16,6 @@ cw20 = { version = "0.8" }
 
 terra-cosmwasm = { version = "2.2.0" }
 cosmwasm-std = { version = "0.16.0", features = ["iterator"] }
-cosmwasm-bignumber = "2.2.0"
 terraswap = "2.4.0"
 astroport = { git = "https://github.com/astroport-fi/astroport-core.git", branch = "main" }
 

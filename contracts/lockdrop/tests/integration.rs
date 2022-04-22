@@ -551,6 +551,32 @@ fn instantiate_lockdrop_contract(app: &mut TerraApp, owner: Addr) -> (Addr, Inst
         b.time = Timestamp::from_seconds(900_00)
     });
 
+    // check for minimum acceptable value of lock positions per user
+    let lockdrop_instantiate_msg_failed = InstantiateMsg {
+        owner: Some(owner.clone().to_string()),
+        init_timestamp: 100_000,
+        deposit_window: 10_000_000,
+        withdrawal_window: 500_000,
+        min_lock_duration: 1u64,
+        max_lock_duration: 52u64,
+        weekly_multiplier: 1u64,
+        weekly_divider: 12u64,
+        max_positions_per_user: 0,
+    };
+
+    // Init contract
+    let err = app
+        .instantiate_contract(
+            lockdrop_code_id,
+            owner.clone(),
+            &lockdrop_instantiate_msg_failed,
+            &[],
+            "lockdrop",
+            None,
+        )
+        .unwrap_err();
+    assert_eq!("Generic error: The maximum number of locked positions per user cannot be lower than a minimum acceptable value.", err.to_string());
+
     // Init contract
     let lockdrop_instance = app
         .instantiate_contract(
@@ -677,7 +703,6 @@ fn instantiate_all_contracts(
     .unwrap();
 
     let update_msg = UpdateConfigMsg {
-        owner: None,
         astro_token_address: Some(astro_token.to_string()),
         auction_contract_address: Some(auction_contract.to_string()),
         generator_address: Some(generator_address.to_string()),
@@ -1159,7 +1184,6 @@ fn test_update_config() {
     );
 
     let update_msg = UpdateConfigMsg {
-        owner: Some("new_owner".to_string()),
         astro_token_address: Some(astro_token.to_string()),
         auction_contract_address: Some(auction_contract.to_string()),
         generator_address: Some(generator_address.to_string()),
@@ -1207,7 +1231,6 @@ fn test_update_config() {
         .query_wasm_smart(&lockdrop_instance, &QueryMsg::Config {})
         .unwrap();
 
-    assert_eq!(update_msg.clone().owner.unwrap(), resp.owner);
     assert_eq!(
         update_msg.clone().astro_token_address.unwrap(),
         resp.astro_token.unwrap()
@@ -1238,7 +1261,7 @@ fn test_update_config() {
 
     let err = app
         .execute_contract(
-            Addr::unchecked("new_owner".to_string()),
+            owner.clone(),
             lockdrop_instance.clone(),
             &ExecuteMsg::UpdateConfig {
                 new_config: update_msg.clone(),
@@ -2963,7 +2986,7 @@ fn test_stake_lp_tokens() {
         Addr::unchecked(owner.clone()),
         Addr::unchecked(update_msg.clone().generator_address.unwrap()),
         &astroport::generator::ExecuteMsg::SetupPools {
-            pools: vec![(astro_lp_address.to_string(), Uint128::from(10u64))],
+            pools: vec![(astro_lp_address.to_string(), Uint128::from(10u128))],
         },
         &[],
     )
@@ -3087,7 +3110,7 @@ fn test_claim_rewards() {
         Addr::unchecked(owner.clone()),
         Addr::unchecked(update_msg.clone().generator_address.unwrap()),
         &astroport::generator::ExecuteMsg::SetupPools {
-            pools: vec![(astro_lp_address.to_string(), Uint128::from(10u64))],
+            pools: vec![(astro_lp_address.to_string(), Uint128::from(10u128))],
         },
         &[],
     )
@@ -3511,7 +3534,7 @@ fn test_claim_rewards_and_unlock() {
         Addr::unchecked(owner.clone()),
         Addr::unchecked(update_msg.clone().generator_address.unwrap()),
         &astroport::generator::ExecuteMsg::SetupPools {
-            pools: vec![(astro_lp_address.to_string(), Uint128::from(10u64))],
+            pools: vec![(astro_lp_address.to_string(), Uint128::from(10u128))],
         },
         &[],
     )
@@ -3917,7 +3940,7 @@ fn test_delegate_astro_to_auction() {
         Addr::unchecked(owner.clone()),
         Addr::unchecked(update_msg.clone().generator_address.unwrap()),
         &astroport::generator::ExecuteMsg::SetupPools {
-            pools: vec![(astro_lp_address.to_string(), Uint128::from(10u64))],
+            pools: vec![(astro_lp_address.to_string(), Uint128::from(10u128))],
         },
         &[],
     )
