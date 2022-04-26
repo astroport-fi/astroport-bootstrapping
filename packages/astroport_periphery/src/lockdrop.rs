@@ -1,7 +1,9 @@
 use astroport::asset::{Asset, AssetInfo};
-use astroport::generator::Increaseable;
+use astroport::generator::QueryMsg as GenQueryMsg;
+use astroport::generator::RewardInfoResponse;
+use astroport::restricted_vector::RestrictedVector;
 use cosmwasm_std::{
-    to_binary, Addr, CosmosMsg, Decimal, Env, StdResult, Uint128, Uint256, WasmMsg,
+    to_binary, Addr, CosmosMsg, Decimal, Deps, Env, StdResult, Uint128, Uint256, WasmMsg,
 };
 use cw20::Cw20ReceiveMsg;
 use schemars::JsonSchema;
@@ -253,7 +255,7 @@ pub struct PoolResponse {
     /// Ratio of ASTRO rewards accured to weighted_amount. Used to calculate ASTRO incentives accured by each user
     pub generator_astro_per_share: Decimal,
     /// Ratio of ASSET rewards accured to weighted. Used to calculate ASSET incentives accured by each user
-    pub generator_proxy_per_share: RestrictedAssetVector<Decimal>,
+    pub generator_proxy_per_share: RestrictedVector<AssetInfo, Decimal>,
     /// Boolean value indicating if the LP Tokens are staked with the Generator contract or not
     pub is_staked: bool,
 }
@@ -312,7 +314,7 @@ pub struct LockUpInfoResponse {
     /// Generator Proxy tokens lockup received as generator rewards
     pub generator_proxy_debt: Vec<(AssetInfo, Uint128)>,
     /// Proxy tokens receivable as generator rewards that user can claim
-    pub claimable_generator_proxy_debt: RestrictedAssetVector<Uint128>,
+    pub claimable_generator_proxy_debt: RestrictedVector<AssetInfo, Uint128>,
     /// Timestamp beyond which this position can be unlocked
     pub unlock_timestamp: u64,
     /// User's Astroport LP units, calculated as lp_units_locked (terraswap) / total LP units locked (terraswap) * Astroport LP units minted post migration
@@ -326,45 +328,24 @@ pub struct PendingAssetRewardResponse {
     pub amount: Uint128,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema, Default)]
-pub struct RestrictedAssetVector<T>(Vec<(AssetInfo, T)>);
-
-impl<T> RestrictedAssetVector<T>
-where
-    T: Copy + Increaseable,
-{
-    pub fn increase(&mut self, key: &AssetInfo, value: T) -> StdResult<T> {
-        let found_asset = self.0.iter_mut().find(|(asset, _)| asset.equal(key));
-
-        let value = match found_asset {
-            Some((_, index)) => {
-                *index = index.increase(value)?;
-                index.clone()
-            }
-            None => {
-                self.0.push((key.clone(), value));
-                value
-            }
-        };
-
-        Ok(value)
-    }
-
-    pub fn load(&self, key: &AssetInfo) -> Option<T> {
-        self.0
-            .iter()
-            .find(|(asset, _)| asset.equal(key))
-            .map(|(_, value)| *value)
-    }
-
-    pub fn inner_ref(&self) -> &Vec<(AssetInfo, T)> {
-        &self.0
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
-    }
-}
-
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct MigrateMsg {}
+
+pub fn query_proxy_reward_token(
+    deps: &Deps,
+    generator: &Addr,
+    migration_info: Option<MigrationInfo>,
+) -> StdResult<Addr> {
+    let reward_info: RewardInfoResponse = deps.querier.query_wasm_smart(
+        generator,
+        &GenQueryMsg::RewardInfo {
+            lp_token: migration_info
+                .expect("Should be migrated!")
+                .astroport_lp_token
+                .to_string(),
+        },
+    )?;
+    Ok(reward_info
+        .proxy_reward_token
+        .expect("Proxy reward should be set!"))
+}

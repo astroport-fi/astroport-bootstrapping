@@ -4,14 +4,28 @@ version = 3
 
 [[package]]
 name = "anyhow"
-version = "1.0.56"
+version = "1.0.57"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4361135be9122e0870de935d7c439aef945b9f9ddd4199a553b5270b49c82a27"
+checksum = "08f9b8508dccb7687a1d6c4ce66b2b0ecef467c94667de27d8d7fe1f8d2a9cdc"
 
 [[package]]
 name = "astroport"
 version = "1.1.0"
 source = "git+https://github.com/astroport-fi/astroport-core.git?tag=v1.1.0#c5bbb89150cdc1a0268078954c894d296c8b9ab9"
+dependencies = [
+ "cosmwasm-std",
+ "cw-storage-plus 0.8.1",
+ "cw20",
+ "schemars",
+ "serde",
+ "terra-cosmwasm",
+ "uint",
+]
+
+[[package]]
+name = "astroport"
+version = "1.2.0"
+source = "git+https://github.com/astroport-fi/astroport-core.git?branch=feat/make_global_restricted_vector#9c39be968c92bf05b98c8288cdbbef496f482ff0"
 dependencies = [
  "cosmwasm-std",
  "cw-storage-plus 0.8.1",
@@ -59,7 +73,6 @@ dependencies = [
  "astroport-pair 1.0.0 (git+https://github.com/astroport-fi/astroport-core.git?tag=v1.1.0)",
  "astroport-periphery",
  "astroport-token 1.0.0 (git+https://github.com/astroport-fi/astroport-core.git?tag=v1.1.0)",
- "cosmwasm-bignumber",
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-storage-plus 0.8.1",
@@ -84,7 +97,6 @@ dependencies = [
  "astroport-periphery",
  "astroport-token 1.0.0 (git+https://github.com/astroport-fi/astroport-core.git?tag=v1.1.0)",
  "astroport-vesting 1.0.0 (git+https://github.com/astroport-fi/astroport-core.git?tag=v1.1.0)",
- "cosmwasm-bignumber",
  "cosmwasm-schema",
  "cosmwasm-std",
  "cosmwasm-storage",
@@ -158,9 +170,9 @@ dependencies = [
 
 [[package]]
 name = "astroport-lockdrop"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
- "astroport 2.0.0 (git+https://github.com/astroport-fi/astroport-core.git?branch=main)",
+ "astroport 1.2.0",
  "astroport-airdrop",
  "astroport-auction",
  "astroport-factory",
@@ -174,7 +186,6 @@ dependencies = [
  "astroport-vesting 1.0.0 (git+https://github.com/astroport-fi/astroport-core.git?branch=main)",
  "astroport-whitelist",
  "astroport-xastro-token",
- "cosmwasm-bignumber",
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-storage-plus 0.8.1",
@@ -249,8 +260,7 @@ dependencies = [
 name = "astroport-periphery"
 version = "1.1.0"
 dependencies = [
- "astroport 2.0.0 (git+https://github.com/astroport-fi/astroport-core.git?branch=main)",
- "cosmwasm-bignumber",
+ "astroport 1.2.0",
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw20",
@@ -899,9 +909,9 @@ checksum = "67c21572b4949434e4fc1e1978b99c5f77064153c59d998bf13ecd96fb5ecba7"
 
 [[package]]
 name = "libc"
-version = "0.2.123"
+version = "0.2.124"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cb691a747a7ab48abc15c5b42066eaafde10dc427e3b6ee2a1cf43db04c763bd"
+checksum = "21a41fed9d98f27ab1c6d161da622a4fa35e8a54a8adc24bbf3ddd0ef70b0e50"
 
 [[package]]
 name = "num-traits"
@@ -1119,7 +1129,6 @@ dependencies = [
  "astroport 1.1.0",
  "astroport-periphery",
  "astroport-token 1.0.0 (git+https://github.com/astroport-fi/astroport-core.git?tag=v1.1.0)",
- "cosmwasm-bignumber",
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-storage-plus 0.8.1",

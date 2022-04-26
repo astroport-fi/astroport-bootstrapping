@@ -1,4 +1,5 @@
 use astroport::asset::AssetInfo;
+use astroport::restricted_vector::RestrictedVector;
 use astroport_governance::utils::EPOCH_START;
 use astroport_periphery::{
     auction::{ExecuteMsg as AuctionExecuteMsg, UpdateConfigMsg as AuctionUpdateConfigMsg},
@@ -9,12 +10,10 @@ use astroport_periphery::{
 };
 use cosmwasm_std::testing::{mock_env, MockApi, MockStorage};
 use cosmwasm_std::{
-    attr, to_binary, Addr, Coin, Decimal, QueryRequest, Timestamp, Uint128, Uint256 as CUint256,
-    Uint64, WasmQuery,
+    attr, to_binary, Addr, Coin, Decimal, Timestamp, Uint128, Uint256 as CUint256, Uint64,
 };
 
 use astroport::token::InstantiateMsg as TokenInstantiateMsg;
-use astroport_periphery::lockdrop::RestrictedAssetVector;
 use cw20::{Cw20ExecuteMsg, Cw20QueryMsg};
 use terra_multi_test::{
     AppBuilder, BankKeeper, ContractWrapper, Executor, SwapQuerier, TerraApp, TerraMock,
@@ -212,93 +211,12 @@ fn instantiate_astroport(app: &mut TerraApp, owner: Addr) -> Addr {
     astroport_factory_instance
 }
 
-fn instantiate_staking(app: &mut TerraApp, owner: Addr, astro_instance: Addr) -> (Addr, Addr) {
-    let staking_contract = Box::new(
-        ContractWrapper::new_with_empty(
-            astroport_staking::contract::execute,
-            astroport_staking::contract::instantiate,
-            astroport_staking::contract::query,
-        )
-        .with_reply_empty(astroport_staking::contract::reply),
-    );
-
-    let xastro_contract = Box::new(ContractWrapper::new_with_empty(
-        astroport_xastro_token::contract::execute,
-        astroport_xastro_token::contract::instantiate,
-        astroport_xastro_token::contract::query,
-    ));
-
-    let xastro_code_id = app.store_code(xastro_contract);
-    let staking_code_id = app.store_code(staking_contract);
-
-    let init_msg = astroport::staking::InstantiateMsg {
-        owner: owner.to_string(),
-        token_code_id: xastro_code_id,
-        deposit_token_addr: astro_instance.to_string(),
-    };
-
-    let staking_instance = app
-        .instantiate_contract(
-            staking_code_id,
-            owner.clone(),
-            &init_msg,
-            &[],
-            "Staking",
-            None,
-        )
-        .unwrap();
-
-    let msg = QueryMsg::Config {};
-    let res: astroport::staking::ConfigResponse = app
-        .wrap()
-        .query(&QueryRequest::Wasm(WasmQuery::Smart {
-            contract_addr: staking_instance.to_string(),
-            msg: to_binary(&msg).unwrap(),
-        }))
-        .unwrap();
-
-    (staking_instance, res.share_token_addr)
-}
-
-fn instantiate_voting_escrow(app: &mut TerraApp, owner: Addr, xastro_instance: Addr) -> Addr {
-    let voting_escrow_contract = Box::new(ContractWrapper::new_with_empty(
-        voting_escrow::contract::execute,
-        voting_escrow::contract::instantiate,
-        voting_escrow::contract::query,
-    ));
-
-    let voting_escrow_code_id = app.store_code(voting_escrow_contract);
-
-    let init_msg = astroport_governance::voting_escrow::InstantiateMsg {
-        owner: owner.to_string(),
-        guardian_addr: owner.to_string(),
-        deposit_token_addr: xastro_instance.to_string(),
-        marketing: None,
-        max_exit_penalty: Decimal::percent(20),
-        slashed_fund_receiver: None,
-    };
-
-    let voting_escrow_instance = app
-        .instantiate_contract(
-            voting_escrow_code_id,
-            owner.clone(),
-            &init_msg,
-            &[],
-            "Voting Escrow",
-            None,
-        )
-        .unwrap();
-
-    voting_escrow_instance
-}
-
 // Instantiate Astroport's generator and vesting contracts
 fn instantiate_generator_and_vesting(
     app: &mut TerraApp,
     owner: Addr,
     astro_token_instance: Addr,
     astro_factory_instance: Addr,
-    astro_voting_escrow_instance: Addr,
 ) -> (Addr, Addr) {
     // Vesting
     let vesting_contract = Box::new(ContractWrapper::new_with_empty(
@@ -372,7 +290,6 @@ fn instantiate_generator_and_vesting(
         owner: owner.to_string(),
         factory: astro_factory_instance.to_string(),
         generator_controller: None,
-        voting_escrow: Some(astro_voting_escrow_instance.to_string()),
         guardian: None,
         whitelist_code_id,
     };
@@ -491,7 +408,7 @@ fn instantiate_auction_contract(
         airdrop_contract_address: airdrop_instance.to_string(),
         lockdrop_contract_address: lockdrop_instance.to_string(),
         lp_tokens_vesting_duration: 7776000u64,
-        init_timestamp: 10_600_000,
+        init_timestamp: EPOCH_START + 10_600_000,
         deposit_window: 100_00_0,
         withdrawal_window: 5_00_00,
     };
@@ -536,7 +453,7 @@ fn instantiate_lockdrop_contract(app: &mut TerraApp, owner: Addr) -> (Addr, Inst
 
     let lockdrop_instantiate_msg = InstantiateMsg {
         owner: Some(owner.clone().to_string()),
-        init_timestamp: 100_000,
+        init_timestamp: EPOCH_START + 100_000,
         deposit_window: 10_000_000,
         withdrawal_window: 500_000,
         min_lock_duration: 1u64,
@@ -548,34 +465,8 @@ fn instantiate_lockdrop_contract(app: &mut TerraApp, owner: Addr) -> (Addr, Inst
 
     app.update_block(|b| {
         b.height += 17280;
-        b.time = Timestamp::from_seconds(900_00)
+        b.time = Timestamp::from_seconds(EPOCH_START + 900_00)
     });
-
-    // check for minimum acceptable value of lock positions per user
-    let lockdrop_instantiate_msg_failed = InstantiateMsg {
-        owner: Some(owner.clone().to_string()),
-        init_timestamp: 100_000,
-        deposit_window: 10_000_000,
-        withdrawal_window: 500_000,
-        min_lock_duration: 1u64,
-        max_lock_duration: 52u64,
-        weekly_multiplier: 1u64,
-        weekly_divider: 12u64,
-        max_positions_per_user: 0,
-    };
-
-    // Init contract
-    let err = app
-        .instantiate_contract(
-            lockdrop_code_id,
-            owner.clone(),
-            &lockdrop_instantiate_msg_failed,
-            &[],
-            "lockdrop",
-            None,
-        )
-        .unwrap_err();
-    assert_eq!("Generic error: The maximum number of locked positions per user cannot be lower than a minimum acceptable value.", err.to_string());
 
     // Init contract
     let lockdrop_instance = app
@@ -636,16 +527,11 @@ fn instantiate_all_contracts(
         .unwrap();
     let pool_address = pair_resp.contract_addr;
 
-    let (_, xastro_instance) = instantiate_staking(app, owner.clone(), astro_token.clone());
-
-    let voting_escrow_instance = instantiate_voting_escrow(app, owner.clone(), xastro_instance);
-
     let (generator_address, _) = instantiate_generator_and_vesting(
         app,
         owner.clone(),
         astro_token.clone(),
         astroport_factory_instance.clone(),
-        voting_escrow_instance.clone(),
     );
 
     // Airdrop Contract
@@ -912,7 +798,7 @@ fn initialize_and_migrate_liquidity_for_pool(
 
     app.update_block(|b| {
         b.height += 17280;
-        b.time = Timestamp::from_seconds(1_000_00)
+        b.time = Timestamp::from_seconds(EPOCH_START + 1_000_00)
     });
 
     // Lock LP Tokens into Lockup Position
@@ -982,7 +868,7 @@ fn initialize_and_migrate_liquidity_for_pool(
 
     app.update_block(|b| {
         b.height += 17280;
-        b.time = Timestamp::from_seconds(1_000_00)
+        b.time = Timestamp::from_seconds(EPOCH_START + 1_000_00)
     });
 
     // Lock LP Tokens into Lockup Position
@@ -1001,7 +887,7 @@ fn initialize_and_migrate_liquidity_for_pool(
     // Increase timestamp for window closure
     app.update_block(|b| {
         b.height += 17280;
-        b.time = Timestamp::from_seconds(10600001)
+        b.time = Timestamp::from_seconds(EPOCH_START + 10600001)
     });
 
     // Create Astroport Pair
@@ -1159,17 +1045,11 @@ fn test_update_config() {
         .unwrap();
     let pool_address = pair_resp.contract_addr;
 
-    let (_, xastro_instance) = instantiate_staking(&mut app, owner.clone(), astro_token.clone());
-
-    let voting_escrow_instance =
-        instantiate_voting_escrow(&mut app, owner.clone(), xastro_instance);
-
     let (generator_address, _) = instantiate_generator_and_vesting(
         &mut app,
         owner.clone(),
         astro_token.clone(),
         astroport_factory_instance.clone(),
-        voting_escrow_instance.clone(),
     );
 
     // Initiate Auction contract
@@ -1247,7 +1127,7 @@ fn test_update_config() {
 
     app.update_block(|b| {
         b.height += 17280;
-        b.time = Timestamp::from_seconds(10600001)
+        b.time = Timestamp::from_seconds(EPOCH_START + 10600001)
     });
 
     // ######    ERROR :: ASTRO tokens are live. Configuration cannot be updated now     ######
@@ -1437,7 +1317,7 @@ fn test_initialize_pool() {
     // ######    ERROR :: Pools cannot be added post deposit window closure     ######
     app.update_block(|b| {
         b.height += 17280;
-        b.time = Timestamp::from_seconds(900000_00)
+        b.time = Timestamp::from_seconds(EPOCH_START + 900000_00)
     });
     let err = app
         .execute_contract(
@@ -1558,7 +1438,7 @@ fn test_update_pool() {
         pool_resp.generator_astro_per_share
     );
     assert_eq!(
-        RestrictedAssetVector::default(),
+        RestrictedVector::default(),
         pool_resp.generator_proxy_per_share
     );
     assert_eq!(false, pool_resp.is_staked);
@@ -1566,7 +1446,7 @@ fn test_update_pool() {
     // ######    ERROR :: Pools cannot be added post deposit window closure     ######
     app.update_block(|b| {
         b.height += 17280;
-        b.time = Timestamp::from_seconds(900000_00)
+        b.time = Timestamp::from_seconds(EPOCH_START + 900000_00)
     });
     let err = app
         .execute_contract(
@@ -1739,7 +1619,7 @@ fn test_increase_lockup() {
 
     app.update_block(|b| {
         b.height += 17280;
-        b.time = Timestamp::from_seconds(1_000_00)
+        b.time = Timestamp::from_seconds(EPOCH_START + 1_000_00)
     });
 
     let err = app
@@ -1838,7 +1718,10 @@ fn test_increase_lockup() {
         Vec::<(AssetInfo, Uint128)>::new(),
         user_resp.lockup_infos[0].generator_proxy_debt
     );
-    assert_eq!(13624000u64, user_resp.lockup_infos[0].unlock_timestamp);
+    assert_eq!(
+        EPOCH_START + 13624000u64,
+        user_resp.lockup_infos[0].unlock_timestamp
+    );
     assert_eq!(None, user_resp.lockup_infos[0].astroport_lp_units);
     assert_eq!(None, user_resp.lockup_infos[0].astroport_lp_token);
 
@@ -1890,7 +1773,10 @@ fn test_increase_lockup() {
         user_resp.total_astro_rewards,
         user_resp.lockup_infos[0].astro_rewards
     );
-    assert_eq!(16648000u64, user_resp.lockup_infos[0].unlock_timestamp);
+    assert_eq!(
+        EPOCH_START + 16648000u64,
+        user_resp.lockup_infos[0].unlock_timestamp
+    );
 
     // check User#1 Info (ASTRO rewards should be the latest one)
     let user_resp: UserInfoResponse = app
@@ -1956,7 +1842,7 @@ fn test_increase_lockup() {
     // ######    ERROR :: Deposit window closed   ######
     app.update_block(|b| {
         b.height += 17280;
-        b.time = Timestamp::from_seconds(900_000000)
+        b.time = Timestamp::from_seconds(EPOCH_START + 900_000000)
     });
 
     let err = app
@@ -2042,7 +1928,7 @@ fn test_withdraw_from_lockup() {
 
     app.update_block(|b| {
         b.height += 17280;
-        b.time = Timestamp::from_seconds(1_000_00)
+        b.time = Timestamp::from_seconds(EPOCH_START + 1_000_00)
     });
 
     app.execute_contract(
@@ -2108,7 +1994,7 @@ fn test_withdraw_from_lockup() {
         .unwrap_err();
     assert_eq!(
         err.to_string(),
-        "astroport_lockdrop::state::LockupInfo not found"
+        "astroport_lockdrop::state::LockupInfoV1 not found"
     );
 
     // ######    SUCCESS :: SHOULD SUCCESSFULLY WITHDRAW LP TOKENS FROM POOL     ######
@@ -2168,7 +2054,7 @@ fn test_withdraw_from_lockup() {
     // First half of withdrawal window
     app.update_block(|b| {
         b.height += 17280;
-        b.time = Timestamp::from_seconds(10350000)
+        b.time = Timestamp::from_seconds(EPOCH_START + 10350000)
     });
 
     let err = app
@@ -2191,7 +2077,7 @@ fn test_withdraw_from_lockup() {
     // 2nd half of withdrawal window
     app.update_block(|b| {
         b.height += 17280;
-        b.time = Timestamp::from_seconds(10390000)
+        b.time = Timestamp::from_seconds(EPOCH_START + 10390000)
     });
 
     let err = app
@@ -2470,7 +2356,7 @@ fn test_migrate_liquidity() {
 
     app.update_block(|b| {
         b.height += 17280;
-        b.time = Timestamp::from_seconds(1_000_00)
+        b.time = Timestamp::from_seconds(EPOCH_START + 1_000_00)
     });
 
     // Lock LP Tokens into Lockup Position
@@ -2489,7 +2375,7 @@ fn test_migrate_liquidity() {
     // Increase timestamp for window closure
     app.update_block(|b| {
         b.height += 17280;
-        b.time = Timestamp::from_seconds(10600001)
+        b.time = Timestamp::from_seconds(EPOCH_START + 10600001)
     });
 
     // Create Astroport Pair
@@ -2622,7 +2508,7 @@ fn test_migrate_liquidity() {
         pool_resp_after_migration.generator_astro_per_share
     );
     assert_eq!(
-        RestrictedAssetVector::default(),
+        RestrictedVector::default(),
         pool_resp_after_migration.generator_proxy_per_share
     );
     assert_eq!(
@@ -2771,7 +2657,7 @@ fn test_migrate_liquidity_uusd_uluna_pool() {
 
     app.update_block(|b| {
         b.height += 17280;
-        b.time = Timestamp::from_seconds(1_000_00)
+        b.time = Timestamp::from_seconds(EPOCH_START + 1_000_00)
     });
 
     // Lock LP Tokens into Lockup Position
@@ -2790,7 +2676,7 @@ fn test_migrate_liquidity_uusd_uluna_pool() {
     // Increase timestamp for window closure
     app.update_block(|b| {
         b.height += 17280;
-        b.time = Timestamp::from_seconds(10600001)
+        b.time = Timestamp::from_seconds(EPOCH_START + 10600001)
     });
 
     // Create Astroport Pair
@@ -2924,7 +2810,7 @@ fn test_migrate_liquidity_uusd_uluna_pool() {
         pool_resp_after_migration.generator_astro_per_share
     );
     assert_eq!(
-        RestrictedAssetVector::default(),
+        RestrictedVector::default(),
         pool_resp_after_migration.generator_proxy_per_share
     );
     assert_eq!(
@@ -3151,8 +3037,8 @@ fn test_claim_rewards() {
         generator_astro_debt: Uint128::from(0u64),
         claimable_generator_astro_debt: Uint128::from(0u64),
         generator_proxy_debt: vec![],
-        claimable_generator_proxy_debt: RestrictedAssetVector::default(),
-        unlock_timestamp: 16648000u64,
+        claimable_generator_proxy_debt: RestrictedVector::default(),
+        unlock_timestamp: EPOCH_START + 16648000u64,
         astroport_lp_units: Some(Uint128::from(1000000000u64)),
         astroport_lp_token: Some(astro_lp_address.clone()),
         terraswap_lp_token: Addr::unchecked(terraswap_token_instance.clone()),
@@ -3162,7 +3048,7 @@ fn test_claim_rewards() {
 
     app.update_block(|b| {
         b.height += 17280;
-        b.time = Timestamp::from_seconds(10600001)
+        b.time = Timestamp::from_seconds(EPOCH_START + 10600001)
     });
 
     // DELEGATE ASTRO TO AUCTION
@@ -3240,7 +3126,7 @@ fn test_claim_rewards() {
 
     app.update_block(|b| {
         b.height += 17280;
-        b.time = Timestamp::from_seconds(10750001)
+        b.time = Timestamp::from_seconds(EPOCH_START + 10750001)
     });
 
     // INITIALIZE ASTRO-UST POOL TO ENABLE CLAIMS
@@ -3269,7 +3155,7 @@ fn test_claim_rewards() {
 
     assert_eq!(
         err.to_string(),
-        "astroport_lockdrop::state::LockupInfo not found"
+        "astroport_lockdrop::state::LockupInfoV1 not found"
     );
 
     // ######    SHOULD SUCCESSFULLY CLAIM REWARDS   ######
@@ -3298,8 +3184,8 @@ fn test_claim_rewards() {
         generator_astro_debt: Uint128::from(0u64),
         claimable_generator_astro_debt: Uint128::from(172800000000u64),
         generator_proxy_debt: vec![],
-        claimable_generator_proxy_debt: RestrictedAssetVector::default(),
-        unlock_timestamp: 16648000u64,
+        claimable_generator_proxy_debt: RestrictedVector::default(),
+        unlock_timestamp: EPOCH_START + 16648000u64,
         astroport_lp_units: Some(Uint128::from(1000000000u64)),
         astroport_lp_token: Some(astro_lp_address.clone()),
         terraswap_lp_token: Addr::unchecked(terraswap_token_instance.clone()),
@@ -3353,8 +3239,8 @@ fn test_claim_rewards() {
         generator_astro_debt: Uint128::from(172800000000u64),
         claimable_generator_astro_debt: Uint128::from(0u64),
         generator_proxy_debt: vec![],
-        claimable_generator_proxy_debt: RestrictedAssetVector::default(),
-        unlock_timestamp: 16648000u64,
+        claimable_generator_proxy_debt: RestrictedVector::default(),
+        unlock_timestamp: EPOCH_START + 16648000u64,
         astroport_lp_units: Some(Uint128::from(1000000000u64)),
         astroport_lp_token: Some(astro_lp_address.clone()),
         terraswap_lp_token: Addr::unchecked(terraswap_token_instance.clone()),
@@ -3414,8 +3300,8 @@ fn test_claim_rewards() {
         generator_astro_debt: Uint128::from(0u64),
         claimable_generator_astro_debt: Uint128::from(172800000000u64),
         generator_proxy_debt: vec![],
-        claimable_generator_proxy_debt: RestrictedAssetVector::default(),
-        unlock_timestamp: 16648000u64,
+        claimable_generator_proxy_debt: RestrictedVector::default(),
+        unlock_timestamp: EPOCH_START + 16648000u64,
         astroport_lp_units: Some(Uint128::from(1000000000u64)),
         astroport_lp_token: Some(astro_lp_address.clone()),
         terraswap_lp_token: Addr::unchecked(terraswap_token_instance.clone()),
@@ -3456,8 +3342,8 @@ fn test_claim_rewards() {
         generator_astro_debt: Uint128::from(172800000000u64),
         claimable_generator_astro_debt: Uint128::from(0u64),
         generator_proxy_debt: vec![],
-        claimable_generator_proxy_debt: RestrictedAssetVector::default(),
-        unlock_timestamp: 16648000u64,
+        claimable_generator_proxy_debt: RestrictedVector::default(),
+        unlock_timestamp: EPOCH_START + 16648000u64,
         astroport_lp_units: Some(Uint128::from(1000000000u64)),
         astroport_lp_token: Some(astro_lp_address.clone()),
         terraswap_lp_token: Addr::unchecked(terraswap_token_instance.clone()),
@@ -3575,8 +3461,8 @@ fn test_claim_rewards_and_unlock() {
         generator_astro_debt: Uint128::from(0u64),
         claimable_generator_astro_debt: Uint128::from(0u64),
         generator_proxy_debt: vec![],
-        claimable_generator_proxy_debt: RestrictedAssetVector::default(),
-        unlock_timestamp: 16648000u64,
+        claimable_generator_proxy_debt: RestrictedVector::default(),
+        unlock_timestamp: EPOCH_START + 16648000u64,
         astroport_lp_units: Some(Uint128::from(1000000000u64)),
         astroport_lp_token: Some(astro_lp_address.clone()),
         terraswap_lp_token: Addr::unchecked(terraswap_token_instance.clone()),
@@ -3586,7 +3472,7 @@ fn test_claim_rewards_and_unlock() {
 
     app.update_block(|b| {
         b.height += 17280;
-        b.time = Timestamp::from_seconds(10600001)
+        b.time = Timestamp::from_seconds(EPOCH_START + 10600001)
     });
 
     // DELEGATE ASTRO TO AUCTION
@@ -3647,7 +3533,7 @@ fn test_claim_rewards_and_unlock() {
 
     app.update_block(|b| {
         b.height += 17280;
-        b.time = Timestamp::from_seconds(10750001)
+        b.time = Timestamp::from_seconds(EPOCH_START + 10750001)
     });
 
     // INITIALIZE ASTRO-UST POOL TO ENABLE CLAIMS
@@ -3663,7 +3549,7 @@ fn test_claim_rewards_and_unlock() {
 
     app.update_block(|b| {
         b.height += 17280;
-        b.time = Timestamp::from_seconds(16648001)
+        b.time = Timestamp::from_seconds(EPOCH_START + 16648001)
     });
 
     // Query user
@@ -3690,8 +3576,8 @@ fn test_claim_rewards_and_unlock() {
         generator_astro_debt: Uint128::from(0u64),
         claimable_generator_astro_debt: Uint128::from(259200000000u64),
         generator_proxy_debt: vec![],
-        claimable_generator_proxy_debt: RestrictedAssetVector::default(),
-        unlock_timestamp: 16648000u64,
+        claimable_generator_proxy_debt: RestrictedVector::default(),
+        unlock_timestamp: EPOCH_START + 16648000u64,
         astroport_lp_units: Some(Uint128::from(1000000000u64)),
         astroport_lp_token: Some(astro_lp_address.clone()),
         terraswap_lp_token: Addr::unchecked(terraswap_token_instance.clone()),
@@ -3813,8 +3699,8 @@ fn test_claim_rewards_and_unlock() {
         generator_astro_debt: Uint128::from(0u64),
         claimable_generator_astro_debt: Uint128::from(259200000000u64),
         generator_proxy_debt: vec![],
-        claimable_generator_proxy_debt: RestrictedAssetVector::default(),
-        unlock_timestamp: 16648000u64,
+        claimable_generator_proxy_debt: RestrictedVector::default(),
+        unlock_timestamp: EPOCH_START + 16648000u64,
         astroport_lp_units: Some(Uint128::from(1000000000u64)),
         astroport_lp_token: Some(astro_lp_address.clone()),
         terraswap_lp_token: Addr::unchecked(terraswap_token_instance.clone()),
@@ -3981,8 +3867,8 @@ fn test_delegate_astro_to_auction() {
         generator_astro_debt: Uint128::from(0u64),
         claimable_generator_astro_debt: Uint128::from(0u64),
         generator_proxy_debt: vec![],
-        claimable_generator_proxy_debt: RestrictedAssetVector::default(),
-        unlock_timestamp: 16648000u64,
+        claimable_generator_proxy_debt: RestrictedVector::default(),
+        unlock_timestamp: EPOCH_START + 16648000u64,
         astroport_lp_units: Some(Uint128::from(1000000000u64)),
         astroport_lp_token: Some(astro_lp_address.clone()),
         terraswap_lp_token: Addr::unchecked(terraswap_token_instance.clone()),
@@ -3992,7 +3878,7 @@ fn test_delegate_astro_to_auction() {
 
     app.update_block(|b| {
         b.height += 17280;
-        b.time = Timestamp::from_seconds(10600001)
+        b.time = Timestamp::from_seconds(EPOCH_START + 10600001)
     });
 
     // DELEGATE ASTRO TO AUCTION
