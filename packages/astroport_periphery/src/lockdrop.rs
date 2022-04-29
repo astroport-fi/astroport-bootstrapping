@@ -1,9 +1,7 @@
 use astroport::asset::{Asset, AssetInfo};
-use astroport::generator::QueryMsg as GenQueryMsg;
-use astroport::generator::RewardInfoResponse;
 use astroport::restricted_vector::RestrictedVector;
 use cosmwasm_std::{
-    to_binary, Addr, CosmosMsg, Decimal, Deps, Env, StdResult, Uint128, Uint256, WasmMsg,
+    to_binary, Addr, CosmosMsg, Decimal, Env, StdResult, Uint128, Uint256, WasmMsg,
 };
 use cw20::Cw20ReceiveMsg;
 use schemars::JsonSchema;
@@ -330,22 +328,3 @@ pub struct PendingAssetRewardResponse {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct MigrateMsg {}
-
-pub fn query_proxy_reward_token(
-    deps: &Deps,
-    generator: &Addr,
-    migration_info: Option<MigrationInfo>,
-) -> StdResult<Addr> {
-    let reward_info: RewardInfoResponse = deps.querier.query_wasm_smart(
-        generator,
-        &GenQueryMsg::RewardInfo {
-            lp_token: migration_info
-                .expect("Should be migrated!")
-                .astroport_lp_token
-                .to_string(),
-        },
-    )?;
-    Ok(reward_info
-        .proxy_reward_token
-        .expect("Proxy reward should be set!"))
-}

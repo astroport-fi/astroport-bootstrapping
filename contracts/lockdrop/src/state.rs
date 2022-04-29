@@ -1,12 +1,10 @@
-use astroport::asset::AssetInfo;
+use astroport::asset::{addr_validate_to_lower, AssetInfo};
 use astroport::common::OwnershipProposal;
-use astroport::generator::QueryMsg::RewardInfo;
-use astroport::generator::RewardInfoResponse;
+use astroport::generator::PoolInfoResponse;
+use astroport::generator::QueryMsg as GenQueryMsg;
 use astroport::restricted_vector::RestrictedVector;
 use astroport_periphery::lockdrop::MigrationInfo;
-use cosmwasm_std::{
-    Addr, Decimal, Decimal256, QuerierWrapper, StdResult, Storage, Uint128, Uint256,
-};
+use cosmwasm_std::{Addr, Decimal, Decimal256, Deps, StdResult, Uint128, Uint256};
 use cw_storage_plus::{Item, Map, U64Key};
 
 use schemars::JsonSchema;
@@ -30,23 +28,14 @@ pub const USERS_ASSET_REWARD_INDEX: Map<(&Addr, &Addr, U64Key), Decimal256> =
     Map::new("users_asset_reward_index");
 
 pub trait CompatibleLoader<K, R> {
-    fn compatible_load(
-        &self,
-        store: &dyn Storage,
-        query: &QuerierWrapper,
-        generator: &Option<Addr>,
-        key: K,
-    ) -> StdResult<R>;
+    fn compatible_load(&self, deps: Deps, key: K, generator: &Option<Addr>) -> StdResult<R>;
 
     fn compatible_may_load(
         &self,
-        store: &dyn Storage,
-        query: &QuerierWrapper,
-        generator: &Option<Addr>,
+        deps: Deps,
         key: K,
+        generator: &Option<Addr>,
     ) -> StdResult<Option<R>>;
-
-    fn compatible_remove(&self, store: &mut dyn Storage, key: (&Addr, &Addr, U64Key));
 }
 
 impl CompatibleLoader<(&Addr, &Addr, U64Key), LockupInfoV2>
@@ -54,38 +43,43 @@ impl CompatibleLoader<(&Addr, &Addr, U64Key), LockupInfoV2>
 {
     fn compatible_load(
         &self,
-        store: &dyn Storage,
-        querier: &QuerierWrapper,
-        generator: &Option<Addr>,
+        deps: Deps,
         key: (&Addr, &Addr, U64Key),
+        generator: &Option<Addr>,
     ) -> StdResult<LockupInfoV2> {
-        self.load(store, key.clone()).or_else(|_| {
-            let old_lockup_info = OLD_LOCKUP_INFO.load(store, key.clone())?;
-
+        self.load(deps.storage, key.clone()).or_else(|_| {
+            let old_lockup_info = OLD_LOCKUP_INFO.load(deps.storage, key.clone())?;
             let mut generator_proxy_debt = Vec::default();
 
-            if !old_lockup_info.generator_proxy_debt.is_zero() && generator.is_some() {
-                let asset = ASSET_POOLS.load(store, key.0)?;
+            if generator.is_some() && !old_lockup_info.generator_proxy_debt.is_zero() {
+                let asset = ASSET_POOLS.load(deps.storage, key.0)?;
                 let astro_lp = asset
                     .migration_info
-                    .expect("Should be migrated")
+                    .expect("Pool should be migrated!")
                     .astroport_lp_token;
-                let reward_info: RewardInfoResponse = querier.query_wasm_smart(
+                let pool_info: PoolInfoResponse = deps.querier.query_wasm_smart(
                     generator.as_ref().expect("Generator should be set!"),
-                    &RewardInfo {
+                    &GenQueryMsg::PoolInfo {
                         lp_token: astro_lp.to_string(),
                     },
                 )?;
-                let reward_token = reward_info
-                    .proxy_reward_token
-                    .expect("Proxy reward token should be set!");
+                if let Some((proxy, _)) = pool_info.accumulated_proxy_rewards_per_share.first() {
+                    let proxy_cfg: astroport::generator_proxy::ConfigResponse =
+                        deps.querier.query_wasm_smart(
+                            proxy,
+                            &astroport::generator_proxy::QueryMsg::Config {},
+                        )?;
 
-                generator_proxy_debt.push((
-                    AssetInfo::Token {
-                        contract_addr: reward_token,
-                    },
-                    old_lockup_info.generator_proxy_debt,
-                ));
+                    generator_proxy_debt.push((
+                        AssetInfo::Token {
+                            contract_addr: addr_validate_to_lower(
+                                deps.api,
+                                &proxy_cfg.reward_token_addr,
+                            )?,
+                        },
+                        old_lockup_info.generator_proxy_debt,
+                    ));
+                };
             }
 
             let lockup_info = LockupInfoV2 {
@@ -104,20 +98,14 @@ impl CompatibleLoader<(&Addr, &Addr, U64Key), LockupInfoV2>
 
     fn compatible_may_load(
         &self,
-        store: &dyn Storage,
-        query: &QuerierWrapper,
-        generator: &Option<Addr>,
+        deps: Deps,
         key: (&Addr, &Addr, U64Key),
+        generator: &Option<Addr>,
     ) -> StdResult<Option<LockupInfoV2>> {
-        if !OLD_LOCKUP_INFO.has(store, key.clone()) {
+        if !OLD_LOCKUP_INFO.has(deps.storage, key.clone()) {
             return Ok(None);
         }
-        Ok(Some(self.compatible_load(store, query, generator, key)?))
-    }
-
-    fn compatible_remove(&self, store: &mut dyn Storage, key: (&Addr, &Addr, U64Key)) {
-        OLD_LOCKUP_INFO.remove(store, key.clone());
-        LOCKUP_INFO.remove(store, key);
+        Ok(Some(self.compatible_load(deps, key, generator)?))
     }
 }
 

@@ -1,5 +1,6 @@
 use astroport::asset::AssetInfo;
-use astroport_periphery::lockdrop::{query_proxy_reward_token, MigrationInfo};
+use astroport::generator::{QueryMsg as GenQueryMsg, RewardInfoResponse};
+use astroport_periphery::lockdrop::MigrationInfo;
 use cosmwasm_std::{Addr, Decimal, DepsMut, StdResult, Uint128, Uint256};
 use cw_storage_plus::Map;
 
@@ -49,7 +50,18 @@ pub fn migrate_generator_proxy_per_share_to_v120(
 ) -> StdResult<RestrictedVector<AssetInfo, Decimal>> {
     let mut generator_proxy_per_share = RestrictedVector::default();
     if !generator_proxy_per_share_old.is_zero() {
-        let reward_token = query_proxy_reward_token(&deps.as_ref(), generator, migration_info)?;
+        let reward_info: RewardInfoResponse = deps.querier.query_wasm_smart(
+            generator,
+            &GenQueryMsg::RewardInfo {
+                lp_token: migration_info
+                    .expect("Should be migrated!")
+                    .astroport_lp_token
+                    .to_string(),
+            },
+        )?;
+        let reward_token = reward_info
+            .proxy_reward_token
+            .expect("Proxy reward should be set!");
         generator_proxy_per_share.update(
             AssetInfo::Token {
                 contract_addr: reward_token,

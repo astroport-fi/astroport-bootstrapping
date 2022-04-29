@@ -932,10 +932,9 @@ pub fn handle_increase_lockup(
     let lockup_key = (&terraswap_lp_token, &user_address, U64Key::new(duration));
 
     let lockup_info = match LOCKUP_INFO.compatible_may_load(
-        deps.storage,
-        &deps.querier,
-        &config.generator,
+        deps.as_ref(),
         lockup_key.clone(),
+        &config.generator,
     )? {
         Some(mut li) => {
             li.lp_units_locked = li.lp_units_locked.checked_add(amount)?;
@@ -1007,12 +1006,8 @@ pub fn handle_withdraw_from_lockup(
     // Retrieve Lockup position
     let user_address = info.sender;
     let lockup_key = (&terraswap_lp_token, &user_address, U64Key::new(duration));
-    let mut lockup_info = LOCKUP_INFO.compatible_load(
-        deps.storage,
-        &deps.querier,
-        &config.generator,
-        lockup_key.clone(),
-    )?;
+    let mut lockup_info =
+        LOCKUP_INFO.compatible_load(deps.as_ref(), lockup_key.clone(), &config.generator)?;
 
     // CHECK :: Has user already withdrawn LP tokens once post the deposit window closure state
     if lockup_info.withdrawal_flag {
@@ -1044,7 +1039,7 @@ pub fn handle_withdraw_from_lockup(
 
     // Remove Lockup position from the list of user positions if Lp_Locked balance == 0
     if lockup_info.lp_units_locked.is_zero() {
-        LOCKUP_INFO.compatible_remove(deps.storage, lockup_key);
+        LOCKUP_INFO.remove(deps.storage, lockup_key);
         // decrement number of user's lockup positions
         let mut user_info = USER_INFO
             .may_load(deps.storage, &user_address)?
@@ -1212,12 +1207,8 @@ pub fn handle_claim_rewards_and_unlock_for_lockup(
 
     // Check is there lockup or not ?
     let lockup_key = (&terraswap_lp_token, &user_address, U64Key::new(duration));
-    let lockup_info = LOCKUP_INFO.compatible_load(
-        deps.storage,
-        &deps.querier,
-        &config.generator,
-        lockup_key.clone(),
-    )?;
+    let lockup_info =
+        LOCKUP_INFO.compatible_load(deps.as_ref(), lockup_key.clone(), &config.generator)?;
 
     // CHECK :: Can the Lockup position be unlocked or not ?
     if withdraw_lp_stake && env.block.time.seconds() < lockup_info.unlock_timestamp {
@@ -1524,12 +1515,8 @@ pub fn callback_withdraw_user_rewards_for_lockup_optional_withdraw(
     let config = CONFIG.load(deps.storage)?;
     let mut pool_info = ASSET_POOLS.load(deps.storage, &terraswap_lp_token)?;
     let lockup_key = (&terraswap_lp_token, &user_address, U64Key::new(duration));
-    let mut lockup_info = LOCKUP_INFO.compatible_load(
-        deps.storage,
-        &deps.querier,
-        &config.generator,
-        lockup_key.clone(),
-    )?;
+    let mut lockup_info =
+        LOCKUP_INFO.compatible_load(deps.as_ref(), lockup_key.clone(), &config.generator)?;
 
     let mut user_info = USER_INFO
         .may_load(deps.storage, &user_address)?
@@ -1853,12 +1840,7 @@ fn callback_distribute_asset_reward(
     let mut user_reward = Uint128::zero();
     // get only lockups that have not yet been withdrawn
     let lockup_info_opt = LOCKUP_INFO
-        .compatible_may_load(
-            deps.storage,
-            &deps.querier,
-            &config.generator,
-            lockup_key.clone(),
-        )?
+        .compatible_may_load(deps.as_ref(), lockup_key.clone(), &config.generator)?
         .filter(|lock_info| lock_info.astroport_lp_transferred.is_none());
     if let Some(lockup_info) = lockup_info_opt {
         let user_index_lp_path = USERS_ASSET_REWARD_INDEX.key(lockup_key);
@@ -2033,8 +2015,7 @@ pub fn query_lockup_info(
 
     let lockup_key = (&terraswap_lp_token, &user_address, U64Key::new(duration));
     let mut pool_info = ASSET_POOLS.load(deps.storage, &terraswap_lp_token)?;
-    let mut lockup_info =
-        LOCKUP_INFO.compatible_load(deps.storage, &deps.querier, &config.generator, lockup_key)?;
+    let mut lockup_info = LOCKUP_INFO.compatible_load(deps, lockup_key, &config.generator)?;
 
     let mut lockup_astroport_lp_units_opt: Option<Uint128> = None;
     let mut astroport_lp_token_opt: Option<Addr> = None;
@@ -2171,12 +2152,7 @@ pub fn query_pending_asset_reward(
     let lockup_key = (&terraswap_lp_token, &user_address, U64Key::new(duration));
 
     let lockup_info_opt = LOCKUP_INFO
-        .compatible_may_load(
-            deps.storage,
-            &deps.querier,
-            &config.generator,
-            lockup_key.clone(),
-        )?
+        .compatible_may_load(deps, lockup_key.clone(), &config.generator)?
         .filter(|lock_info| lock_info.astroport_lp_transferred.is_none());
 
     let mut user_reward = Uint128::zero();
@@ -2359,12 +2335,8 @@ fn update_user_lockup_positions_and_calc_rewards(
     for (pool, duration) in keys {
         let pool_info = ASSET_POOLS.load(deps.storage, &pool)?;
         let lockup_key = (&pool, user_address, U64Key::new(duration));
-        let mut lockup_info = LOCKUP_INFO.compatible_load(
-            deps.storage,
-            &deps.as_ref().querier,
-            &config.generator,
-            lockup_key.clone(),
-        )?;
+        let mut lockup_info =
+            LOCKUP_INFO.compatible_load(deps.as_ref(), lockup_key.clone(), &config.generator)?;
 
         if lockup_info.astro_rewards == Uint128::zero() {
             // Weighted lockup balance (using terraswap LP units to calculate as pool's total weighted balance is calculated on terraswap LP deposits summed over each deposit tx)
