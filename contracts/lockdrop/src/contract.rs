@@ -353,7 +353,7 @@ pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response
 
     match contract_version.contract.as_ref() {
         "astroport_lockdrop" => match contract_version.version.as_ref() {
-            "1.0.1" | "1.1.1" => {
+            "1.0.1" | "1.1.0" => {
                 let pools = ASSET_POOLS_V101
                     .range(deps.storage, None, None, Order::Ascending)
                     .map(|pair_result| {
