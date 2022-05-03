@@ -380,6 +380,7 @@ pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response
                     ASSET_POOLS.save(deps.storage, &key, &new_pool_info)?
                 }
             }
+            "1.1.0" => {}
             _ => return Err(StdError::generic_err("Migration error")),
         },
         _ => return Err(StdError::generic_err("Migration error")),
