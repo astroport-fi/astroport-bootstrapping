@@ -290,6 +290,7 @@ fn instantiate_generator_and_vesting(
         owner: owner.to_string(),
         factory: astro_factory_instance.to_string(),
         generator_controller: None,
+        voting_escrow: None,
         guardian: None,
         whitelist_code_id,
     };

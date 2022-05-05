@@ -1481,7 +1481,7 @@ pub fn update_pool_on_dual_rewards_claim(
             .query_pool(&deps.querier, env.contract.address.clone())?;
         let received_amount = current_balance - prev_balance.amount;
         pool_info.generator_proxy_per_share.update(
-            prev_balance.info,
+            &prev_balance.info,
             Decimal::from_ratio(received_amount, lp_balance),
         )?;
     }
@@ -2085,7 +2085,7 @@ pub fn query_lockup_info(
             if let Some(pending_on_proxy) = pending_rewards.pending_on_proxy {
                 for reward in pending_on_proxy {
                     let generator_proxy_per_share = pool_info.generator_proxy_per_share.update(
-                        reward.info.clone(),
+                        &reward.info,
                         Decimal::from_ratio(reward.amount, pool_astroport_lp_units),
                     )?;
 
@@ -2099,7 +2099,7 @@ pub fn query_lockup_info(
                                 .unwrap_or_default(),
                         )?;
 
-                    claimable_generator_proxy_debt.update(reward.info, debt)?;
+                    claimable_generator_proxy_debt.update(&reward.info, debt)?;
                 }
             }
         }

@@ -63,7 +63,7 @@ pub fn migrate_generator_proxy_per_share_to_v120(
             .proxy_reward_token
             .expect("Proxy reward should be set!");
         generator_proxy_per_share.update(
-            AssetInfo::Token {
+            &AssetInfo::Token {
                 contract_addr: reward_token,
             },
             generator_proxy_per_share_old,
