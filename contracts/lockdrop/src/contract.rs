@@ -393,6 +393,7 @@ pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response
                     ASSET_POOLS.save(deps.storage, &key, &new_pool_info)?
                 }
             }
+            "1.1.0" => {}
             "1.1.1" => {
                 let pools = ASSET_POOLS_V111
                     .range(deps.storage, None, None, Order::Ascending)
