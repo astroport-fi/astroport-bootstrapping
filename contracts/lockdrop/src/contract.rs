@@ -393,8 +393,7 @@ pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response
                     ASSET_POOLS.save(deps.storage, &key, &new_pool_info)?
                 }
             }
-            "1.1.0" => {}
-            "1.1.1" => {
+            "1.1.0" | "1.1.1" => {
                 let pools = ASSET_POOLS_V111
                     .range(deps.storage, None, None, Order::Ascending)
                     .map(|result| {
@@ -1246,13 +1245,10 @@ pub fn handle_claim_rewards_and_unlock_for_lockup(
                 },
             )?;
 
+            let pending_on_proxy = &pending_rewards.pending_on_proxy.unwrap_or_default();
+
             if !pending_rewards.pending.is_zero()
-                || pending_rewards
-                    .pending_on_proxy
-                    .clone()
-                    .unwrap_or_default()
-                    .iter()
-                    .any(|asset| !asset.amount.is_zero())
+                || pending_on_proxy.iter().any(|asset| !asset.amount.is_zero())
             {
                 let rwi: RewardInfoResponse = deps.querier.query_wasm_smart(
                     generator,
@@ -1271,9 +1267,7 @@ pub fn handle_claim_rewards_and_unlock_for_lockup(
                     res.balance
                 };
 
-                let prev_proxy_reward_balances: Vec<Asset> = pending_rewards
-                    .pending_on_proxy
-                    .unwrap_or_default()
+                let prev_proxy_reward_balances: Vec<Asset> = pending_on_proxy
                     .iter()
                     .map(|asset| {
                         let balance = asset
@@ -1596,23 +1590,30 @@ pub fn callback_withdraw_user_rewards_for_lockup_optional_withdraw(
             let mut pending_proxy_rewards: Vec<Asset> = vec![];
             // If this LP token is getting dual incentives
             // Calculate claimable proxy staking rewards for this lockup
-            for (asset, debt) in lockup_info.generator_proxy_debt.iter_mut() {
-                let generator_proxy_per_share = pool_info
-                    .generator_proxy_per_share
-                    .load(asset)
-                    .unwrap_or_default();
-                let total_lockup_proxy_reward =
-                    generator_proxy_per_share.checked_mul(astroport_lp_amount)?;
-                let pending_proxy_reward: Uint128 = total_lockup_proxy_reward.checked_sub(*debt)?;
+            lockup_info.generator_proxy_debt = lockup_info
+                .generator_proxy_debt
+                .inner_ref()
+                .iter()
+                .map(|(asset, debt)| {
+                    let generator_proxy_per_share = pool_info
+                        .generator_proxy_per_share
+                        .load(asset)
+                        .unwrap_or_default();
+                    let total_lockup_proxy_reward =
+                        generator_proxy_per_share.checked_mul(astroport_lp_amount)?;
+                    let pending_proxy_reward: Uint128 =
+                        total_lockup_proxy_reward.checked_sub(*debt)?;
 
-                if !pending_proxy_reward.is_zero() {
-                    pending_proxy_rewards.push(Asset {
-                        info: asset.clone(),
-                        amount: pending_proxy_reward,
-                    });
-                }
-                *debt = total_lockup_proxy_reward;
-            }
+                    if !pending_proxy_reward.is_zero() {
+                        pending_proxy_rewards.push(Asset {
+                            info: asset.clone(),
+                            amount: pending_proxy_reward,
+                        });
+                    }
+                    Ok((asset.clone(), total_lockup_proxy_reward))
+                })
+                .collect::<StdResult<Vec<_>>>()?
+                .into();
 
             // If this is a void transaction (no state change), then return error.
             // Void tx scenario = ASTRO already claimed, 0 pending ASTRO staking reward, 0 pending proxy rewards, not unlocking LP tokens in this tx
@@ -2094,6 +2095,7 @@ pub fn query_lockup_info(
                         .checked_sub(
                             lockup_info
                                 .generator_proxy_debt
+                                .inner_ref()
                                 .iter()
                                 .find_map(|a| if reward.info == a.0 { Some(a.1) } else { None })
                                 .unwrap_or_default(),

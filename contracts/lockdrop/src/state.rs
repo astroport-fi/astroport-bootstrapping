@@ -1,12 +1,13 @@
-use astroport::asset::{addr_validate_to_lower, AssetInfo};
+use astroport::asset::AssetInfo;
 use astroport::common::OwnershipProposal;
 use astroport::generator::PoolInfoResponse;
 use astroport::generator::QueryMsg as GenQueryMsg;
 use astroport::restricted_vector::RestrictedVector;
 use astroport_periphery::lockdrop::MigrationInfo;
-use cosmwasm_std::{Addr, Decimal, Decimal256, Deps, StdResult, Uint128, Uint256};
+use cosmwasm_std::{Addr, Decimal, Decimal256, Deps, StdError, StdResult, Uint128, Uint256};
 use cw_storage_plus::{Item, Map, U64Key};
 
+use crate::raw_queries::raw_proxy_asset;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -49,37 +50,30 @@ impl CompatibleLoader<(&Addr, &Addr, U64Key), LockupInfoV2>
     ) -> StdResult<LockupInfoV2> {
         self.load(deps.storage, key.clone()).or_else(|_| {
             let old_lockup_info = OLD_LOCKUP_INFO.load(deps.storage, key.clone())?;
-            let mut generator_proxy_debt = Vec::default();
+            let mut generator_proxy_debt = RestrictedVector::default();
+            let generator = generator.as_ref().expect("Generator should be set!");
 
-            if generator.is_some() && !old_lockup_info.generator_proxy_debt.is_zero() {
+            if !old_lockup_info.generator_proxy_debt.is_zero() {
                 let asset = ASSET_POOLS.load(deps.storage, key.0)?;
                 let astro_lp = asset
                     .migration_info
                     .expect("Pool should be migrated!")
                     .astroport_lp_token;
                 let pool_info: PoolInfoResponse = deps.querier.query_wasm_smart(
-                    generator.as_ref().expect("Generator should be set!"),
+                    generator,
                     &GenQueryMsg::PoolInfo {
                         lp_token: astro_lp.to_string(),
                     },
                 )?;
-                if let Some((proxy, _)) = pool_info.accumulated_proxy_rewards_per_share.first() {
-                    let proxy_cfg: astroport::generator_proxy::ConfigResponse =
-                        deps.querier.query_wasm_smart(
-                            proxy,
-                            &astroport::generator_proxy::QueryMsg::Config {},
-                        )?;
+                let (proxy, _) = pool_info
+                    .accumulated_proxy_rewards_per_share
+                    .first()
+                    .ok_or_else(|| {
+                        StdError::generic_err(format!("Proxy rewards not found: {}", astro_lp))
+                    })?;
+                let reward_asset = raw_proxy_asset(deps.querier, generator, proxy.as_bytes())?;
 
-                    generator_proxy_debt.push((
-                        AssetInfo::Token {
-                            contract_addr: addr_validate_to_lower(
-                                deps.api,
-                                &proxy_cfg.reward_token_addr,
-                            )?,
-                        },
-                        old_lockup_info.generator_proxy_debt,
-                    ));
-                };
+                generator_proxy_debt.update(&reward_asset, old_lockup_info.generator_proxy_debt)?;
             }
 
             let lockup_info = LockupInfoV2 {
@@ -105,7 +99,7 @@ impl CompatibleLoader<(&Addr, &Addr, U64Key), LockupInfoV2>
         if !OLD_LOCKUP_INFO.has(deps.storage, key.clone()) {
             return Ok(None);
         }
-        Ok(Some(self.compatible_load(deps, key, generator)?))
+        Some(self.compatible_load(deps, key, generator)).transpose()
     }
 }
 
@@ -209,7 +203,7 @@ pub struct LockupInfoV2 {
     /// Generator ASTRO tokens loockup received as generator rewards
     pub generator_astro_debt: Uint128,
     /// Generator Proxy tokens lockup received as generator rewards
-    pub generator_proxy_debt: Vec<(AssetInfo, Uint128)>,
+    pub generator_proxy_debt: RestrictedVector<AssetInfo, Uint128>,
     /// Timestamp beyond which this position can be unlocked
     pub unlock_timestamp: u64,
 }
