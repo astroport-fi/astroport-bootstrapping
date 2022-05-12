@@ -23,7 +23,7 @@ async function main() {
     return;
   }
 
-  // Auction:::UpdateConfig :: SET ASTRO-UST pool in Auction if bombay-12
+  //  Auction:::UpdateConfig :: SET ASTRO-UST pool in Auction if bombay-12
   if (
     !network.astro_ust_pool_set_in_auction &&
     network.astro_ust_astroport_pool
@@ -54,7 +54,7 @@ async function main() {
     writeArtifact(network, terra.config.chainID);
   }
 
-  // Auction:::InitPool :: Initialize ASTRO-UST pool if bombay-12
+  // Auction:::InitPool :: Initialize ASTRO-UST Pool if bombay-12
   if (
     !network.astro_ust_pool_initialized &&
     network.astro_ust_pool_set_in_auction
@@ -70,7 +70,7 @@ async function main() {
       "Auction ::: InitPool ::: Initialize ASTRO-UST pool on Astroport"
     );
     console.log(
-      `${terra.config.chainID} :: Initializing ASTRO-UST pool on Astroport ==>  ${out.txhash}`
+      `${terra.config.chainID} :: Initializing ASTRO-UST Pool on Astroport ==>  ${out.txhash}`
     );
     network.auction_set_in_airdrop = true;
     writeArtifact(network, terra.config.chainID);

@@ -174,6 +174,7 @@ fn init_all_contracts(app: &mut App) -> (Addr, Addr, Addr, Addr, Addr, Addr, Ins
         lockdrop_instance.clone(),
         &astroport_periphery::lockdrop::ExecuteMsg::UpdateConfig {
             new_config: astroport_periphery::lockdrop::UpdateConfigMsg {
+                owner: None,
                 auction_contract_address: Some(auction_instance.to_string()),
                 generator_address: None,
                 astro_token_address: None,
@@ -225,7 +226,7 @@ fn instantiate_pair(app: &mut App, owner: Addr, astro_token_instance: Addr) -> (
         ],
         token_code_id: lp_token_code_id,
         init_params: None,
-        factory_addr: Addr::unchecked("factory").to_string(),
+        factory_addr: Addr::unchecked("factory"),
     };
 
     let pair_instance = app
@@ -363,6 +364,7 @@ fn instantiate_airdrop_lockdrop_contracts(
         lockdrop_instance.clone(),
         &astroport_periphery::lockdrop::ExecuteMsg::UpdateConfig {
             new_config: astroport_periphery::lockdrop::UpdateConfigMsg {
+                owner: None,
                 astro_token_address: Some(astro_token_instance.clone().into_string()),
                 auction_contract_address: None,
                 generator_address: None,
@@ -403,7 +405,6 @@ fn instantiate_generator_and_vesting(
     let vesting_code_id = app.store_code(vesting_contract);
 
     let init_msg = astroport::vesting::InstantiateMsg {
-        owner: owner.to_string(),
         token_addr: astro_token_instance.clone().to_string(),
     };
 
@@ -498,7 +499,7 @@ fn instantiate_generator_and_vesting(
                 address: generator_instance.to_string(),
                 schedules: vec![astroport::vesting::VestingSchedule {
                     start_point: astroport::vesting::VestingSchedulePoint {
-                        time: current_block.time.seconds(),
+                        time: current_block.time,
                         amount,
                     },
                     end_point: None,
@@ -514,7 +515,7 @@ fn instantiate_generator_and_vesting(
     let msg = astroport::generator::ExecuteMsg::Add {
         alloc_point: Uint64::from(10u64),
         reward_proxy: None,
-        lp_token: lp_token_instance.to_string(),
+        lp_token: lp_token_instance.clone(),
     };
     app.execute_contract(
         Addr::unchecked(owner.clone()),

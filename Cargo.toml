@@ -1,14 +1,15 @@
 [workspace]
 members = [
-    "contracts/airdrop",
-    "contracts/simple_airdrop",
-    "contracts/auction",
-    "contracts/lockdrop",
+    "contracts/airdrop", 
+    "contracts/simple_airdrop", 
+    "contracts/auction", 
+    "contracts/lockdrop", 
     "packages/*"
 ]
 
+
 [profile.release]
-opt-level = "z"
+opt-level = 3
 debug = false
 rpath = false
 lto = true

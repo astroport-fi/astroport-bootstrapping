@@ -51,9 +51,11 @@ async function main() {
 
   const INCENTIVES = 5000000000000;
 
-  // ##################### ANC-UST staking contract #####################
+  // ##################### ANC-UST STAKING CONTRACT #####################
+  // ##################### ANC-UST STAKING CONTRACT #####################
+  // ##################### ANC-UST STAKING CONTRACT #####################
 
-  // ANC-UST staking contract ID
+  // ANC-UST STAKING CONTRACT ID
   if (!network.anc_lp_staking_contract_code_id) {
     network.anc_lp_staking_contract_code_id = await uploadContract(
       terra,
@@ -66,7 +68,7 @@ async function main() {
     writeArtifact(network, terra.config.chainID);
   }
 
-  // Deploy :: ANC-UST staking contract
+  // Deploy :: ANC-UST STAKING CONTRACT
   if (!network.anc_lp_staking_contract_address) {
     network.anc_lp_staking_contract_address = await instantiateContract(
       terra,
@@ -81,15 +83,15 @@ async function main() {
       }
     );
     console.log(
-      `ANC-UST staking contract deployed successfully, address : ${network.anc_lp_staking_contract_address} `
+      `ANC-UST STAKING CONTRACT deployed successfully, address : ${network.anc_lp_staking_contract_address} `
     );
     writeArtifact(network, terra.config.chainID);
     await delay(300);
   } else {
-    console.log(`ANC-UST staking contract already deployed on bombay-12`);
+    console.log(`ANC-UST STAKING CONTRACT already deployed on bombay-12`);
   }
 
-  // Transfer :: Transfer ANC to ANC-UST staking contract for incentives
+  // Transfer :: Transfer ANC to ANC-UST STAKING CONTRACT for incentives
   if (!network.anc_sent_to_lp_staking_contract_) {
     let tx = await executeContract(terra, wallet, network.anc_token, {
       transfer: {
@@ -108,9 +110,11 @@ async function main() {
     );
   }
 
-  // ##################### MIR-UST staking contract #####################
+  // ##################### MIR-UST STAKING CONTRACT #####################
+  // ##################### MIR-UST STAKING CONTRACT #####################
+  // ##################### MIR-UST STAKING CONTRACT #####################
 
-  // MIR-UST staking contract ID
+  // MIR-UST STAKING CONTRACT ID
   if (!network.mir_lp_staking_contract_code_id) {
     network.mir_lp_staking_contract_code_id = await uploadContract(
       terra,
@@ -123,7 +127,7 @@ async function main() {
     writeArtifact(network, terra.config.chainID);
   }
 
-  // Deploy :: MIR-UST staking contract
+  // // Deploy :: MIR-UST STAKING CONTRACT
   if (!network.mir_lp_staking_contract_address) {
     console.log("Deploying mirror staking contract...");
     network.mir_lp_staking_contract_address = await instantiateContract(
@@ -133,21 +137,21 @@ async function main() {
       {
         owner: wallet.key.accAddress,
         mirror_token: network.mir_token,
-        mint_contract: wallet.key.accAddress,                 // mock value
-        oracle_contract: wallet.key.accAddress,               // mock value
+        mint_contract: wallet.key.accAddress, // mock value
+        oracle_contract: wallet.key.accAddress, // mock value
         terraswap_factory: network.terraswap_factory_address, // mock value
         base_denom: "uusd",
         premium_min_update_interval: 0,
-        short_reward_contract: wallet.key.accAddress,         // mock value
+        short_reward_contract: wallet.key.accAddress, // mock value
       }
     );
     writeArtifact(network, terra.config.chainID);
     console.log(
-      `MIR-UST staking contract deployed successfully, address : ${network.mir_lp_staking_contract_address}`
+      `MIR-UST STAKING CONTRACT deployed successfully, address : ${network.mir_lp_staking_contract_address}`
     );
   }
 
-  // Register MIR-UST Astroport pool with the LP staking contract
+  // Register MIR-UST astroport pool with the LP staking contract
   if (
     network.mir_lp_staking_contract_address &&
     !network.mir_ust_pair_registered_with_staking
@@ -207,9 +211,11 @@ async function main() {
     );
   }
 
-  // ##################### ORION-UST staking contract #####################
+  // ##################### ORION-UST STAKING CONTRACT #####################
+  // ##################### ORION-UST STAKING CONTRACT #####################
+  // ##################### ORION-UST STAKING CONTRACT #####################
 
-  // ORION-UST staking contract ID
+  // ORION-UST STAKING CONTRACT ID
   if (!network.orion_lp_staking_contract_code_id) {
     network.orion_lp_staking_contract_code_id = await uploadContract(
       terra,
@@ -222,7 +228,7 @@ async function main() {
     writeArtifact(network, terra.config.chainID);
   }
 
-  // Deploy :: ORION-UST staking contract
+  // Deploy :: ORION-UST STAKING CONTRACT
   if (!network.orion_lp_staking_contract_address) {
     network.orion_lp_staking_contract_address = await instantiateContract(
       terra,
@@ -236,11 +242,11 @@ async function main() {
       }
     );
     console.log(
-      `ORION-UST staking contract deployed successfully, address : ${network.orion_lp_staking_contract_address}`
+      `ORION-UST STAKING CONTRACT deployed successfully, address : ${network.orion_lp_staking_contract_address}`
     );
     writeArtifact(network, terra.config.chainID);
   } else {
-    console.log(`ORION-UST staking contract already deployed on bombay-12`);
+    console.log(`ORION-UST STAKING CONTRACT already deployed on bombay-12`);
   }
 
   // Send ORION to ORION LP staking contract for incentives
@@ -294,9 +300,11 @@ async function main() {
     );
   }
 
-  // ##################### STT-UST staking contract #####################
+  // ##################### STT-UST STAKING CONTRACT #####################
+  // ##################### STT-UST STAKING CONTRACT #####################
+  // ##################### STT-UST STAKING CONTRACT #####################
 
-  // STT-UST staking gateway contract ID
+  // STT-UST STAKING GATEWAY CONTRACT ID
   if (!network.stt_lp_staking_gateway_contract_code_id) {
     network.stt_lp_staking_gateway_contract_code_id = await uploadContract(
       terra,
@@ -309,7 +317,7 @@ async function main() {
     writeArtifact(network, terra.config.chainID);
   }
 
-  // STT-UST staking contract ID
+  // STT-UST STAKING CONTRACT ID
   if (!network.stt_lp_staking_contract_code_id) {
     network.stt_lp_staking_contract_code_id = await uploadContract(
       terra,
@@ -322,7 +330,7 @@ async function main() {
     writeArtifact(network, terra.config.chainID);
   }
 
-  // Deploy :: STT-UST staking gateway contract
+  // Deploy :: STT-UST STAKING GATEWAY CONTRACT
   if (!network.stt_lp_staking_gateway_contract_address) {
     network.stt_lp_staking_gateway_contract_address = await instantiateContract(
       terra,
@@ -334,16 +342,16 @@ async function main() {
       }
     );
     console.log(
-      `STT-UST staking gateway contract deployed successfully, address : ${network.stt_lp_staking_gateway_contract_address}`
+      `STT-UST STAKING GATEWAY CONTRACT deployed successfully, address : ${network.stt_lp_staking_gateway_contract_address}`
     );
     writeArtifact(network, terra.config.chainID);
   } else {
     console.log(
-      `STT-UST staking gateway contract already deployed on bombay-12`
+      `STT-UST STAKING GATEWAY CONTRACT already deployed on bombay-12`
     );
   }
 
-  // Deploy :: STT-UST staking contract
+  // Deploy :: STT-UST STAKING CONTRACT
   if (
     !network.stt_lp_staking_contract_address &&
     network.stt_lp_staking_gateway_contract_address
@@ -371,11 +379,11 @@ async function main() {
       }
     );
     console.log(
-      `STT-UST staking contract deployed successfully, address : ${network.stt_lp_staking_contract_address}`
+      `STT-UST STAKING CONTRACT deployed successfully, address : ${network.stt_lp_staking_contract_address}`
     );
     writeArtifact(network, terra.config.chainID);
   } else {
-    console.log(`STT-UST staking contract already deployed on bombay-12`);
+    console.log(`STT-UST STAKING CONTRACT already deployed on bombay-12`);
   }
 
   // Send STT to STT LP staking contract for incentives
@@ -400,7 +408,7 @@ async function main() {
     );
   }
 
-  // UpdateConfig :: STT staking gateway contract
+  // UpdateConfig :: STT STAKING GATEWAY CONTRACT
   if (
     network.stt_lp_staking_contract_address &&
     network.stt_lp_staking_gateway_contract_address &&
@@ -420,17 +428,19 @@ async function main() {
       `STT Staking gateway :: update config for testing`
     );
     console.log(
-      `STT-UST staking gateway contract config updated successfully, tx : ${tx.txhash}`
+      `STT-UST STAKING GATEWAY CONTRACT config updated successfully, tx : ${tx.txhash}`
     );
     network.stt_lp_staking_gateway_config_updated = true;
     writeArtifact(network, terra.config.chainID);
   } else {
-    console.log(`STT-UST staking gateway contract  config already updated`);
+    console.log(`STT-UST STAKING GATEWAY CONTRACT  config already updated`);
   }
 
-  // ##################### VKR-UST staking contract #####################
+  // ##################### VKR-UST STAKING CONTRACT #####################
+  // ##################### VKR-UST STAKING CONTRACT #####################
+  // ##################### VKR-UST STAKING CONTRACT #####################
 
-  // VKR-UST staking contract ID
+  // VKR-UST STAKING CONTRACT ID
   if (!network.vkr_lp_staking_contract_code_id) {
     network.vkr_lp_staking_contract_code_id = await uploadContract(
       terra,
@@ -443,7 +453,7 @@ async function main() {
     writeArtifact(network, terra.config.chainID);
   }
 
-  // // Deploy :: VKR-UST staking contract
+  // // Deploy :: VKR-UST STAKING CONTRACT
   if (!network.vkr_lp_staking_contract_address) {
     network.vkr_lp_staking_contract_address = await instantiateContract(
       terra,
@@ -459,11 +469,11 @@ async function main() {
       }
     );
     console.log(
-      `VKR-UST staking contract deployed successfully, address : ${network.vkr_lp_staking_contract_address}`
+      `VKR-UST STAKING CONTRACT deployed successfully, address : ${network.vkr_lp_staking_contract_address}`
     );
     writeArtifact(network, terra.config.chainID);
   } else {
-    console.log(`VKR-UST staking contract already deployed on bombay-12`);
+    console.log(`VKR-UST STAKING CONTRACT already deployed on bombay-12`);
   }
 
   // Send VKR to VKR LP staking contract for incentives
@@ -488,9 +498,11 @@ async function main() {
     );
   }
 
-  // ##################### MINE-UST staking contract #####################
+  // ##################### MINE-UST STAKING CONTRACT #####################
+  // ##################### MINE-UST STAKING CONTRACT #####################
+  // ##################### MINE-UST STAKING CONTRACT #####################
 
-  // MINE-UST staking contract ID
+  // MINE-UST STAKING CONTRACT ID
   if (!network.mine_lp_staking_contract_code_id) {
     network.mine_lp_staking_contract_code_id = await uploadContract(
       terra,
@@ -503,7 +515,7 @@ async function main() {
     writeArtifact(network, terra.config.chainID);
   }
 
-  // Deploy :: MINE-UST staking contract
+  // Deploy :: MINE-UST STAKING CONTRACT
   if (!network.mine_lp_staking_contract_address) {
     network.mine_lp_staking_contract_address = await instantiateContract(
       terra,
@@ -518,11 +530,11 @@ async function main() {
       }
     );
     console.log(
-      `MINE-UST staking contract deployed successfully, address : ${network.mine_lp_staking_contract_address}`
+      `MINE-UST STAKING CONTRACT deployed successfully, address : ${network.mine_lp_staking_contract_address}`
     );
     writeArtifact(network, terra.config.chainID);
   } else {
-    console.log(`MINE-UST staking contract already deployed on bombay-12`);
+    console.log(`MINE-UST STAKING CONTRACT already deployed on bombay-12`);
   }
 
   // Send MINE to MINE LP staking contract for incentives
@@ -547,9 +559,11 @@ async function main() {
     );
   }
 
-  // ##################### PSI-UST staking contract #####################
+  // ##################### PSI-UST STAKING CONTRACT #####################
+  // ##################### PSI-UST STAKING CONTRACT #####################
+  // ##################### PSI-UST STAKING CONTRACT #####################
 
-  // PSI-UST staking contract ID
+  // PSI-UST STAKING CONTRACT ID
   if (!network.psi_lp_staking_contract_code_id) {
     network.psi_lp_staking_contract_code_id = await uploadContract(
       terra,
@@ -562,7 +576,7 @@ async function main() {
     writeArtifact(network, terra.config.chainID);
   }
 
-  // Deploy :: PSI-UST staking contract
+  // Deploy :: PSI-UST STAKING CONTRACT
   if (!network.psi_lp_staking_contract_address) {
     network.psi_lp_staking_contract_address = await instantiateContract(
       terra,
@@ -583,11 +597,11 @@ async function main() {
       }
     );
     console.log(
-      `PSI-UST staking contract deployed successfully, address : ${network.psi_lp_staking_contract_address}`
+      `PSI-UST STAKING CONTRACT deployed successfully, address : ${network.psi_lp_staking_contract_address}`
     );
     writeArtifact(network, terra.config.chainID);
   } else {
-    console.log(`PSI-UST staking contract already deployed on bombay-12`);
+    console.log(`PSI-UST STAKING CONTRACT already deployed on bombay-12`);
   }
 
   // Send PSI to PSI LP staking contract for incentives
@@ -612,7 +626,9 @@ async function main() {
     );
   }
 
-  // ##################### APOLLO-UST staking contract #####################
+  // ##################### APOLLO-UST STAKING CONTRACT #####################
+  // ##################### APOLLO-UST STAKING CONTRACT #####################
+  // ##################### APOLLO-UST STAKING CONTRACT #####################
 
   // APOLLO-FACTORY  CONTRACT ID
   // if (!network.apollo_factory_contract_code_id) {
@@ -627,7 +643,7 @@ async function main() {
   //   writeArtifact(network, terra.config.chainID);
   // }
 
-  // // APOLLO-UST staking contract ID
+  // // APOLLO-UST STAKING CONTRACT ID
   // if (!network.apollo_lp_staking_contract_code_id) {
   //   network.apollo_lp_staking_contract_code_id = await uploadContract(
   //     terra,
@@ -666,7 +682,7 @@ async function main() {
   //   console.log(`APOLLO FACTORY CONTRACT already deployed on bombay-12`);
   // }
 
-  // Deploy :: APOLLO-UST staking contract
+  // Deploy :: APOLLO-UST STAKING CONTRACT
   // if (!network.apollo_lp_staking_contract_address) {
   //   network.apollo_lp_staking_contract_address = await instantiateContract(
   //     terra,
@@ -688,11 +704,11 @@ async function main() {
   //     }
   //   );
   //   console.log(
-  //     `APOLLO-UST staking contract deployed successfully, address : ${network.apollo_lp_staking_contract_address}`
+  //     `APOLLO-UST STAKING CONTRACT deployed successfully, address : ${network.apollo_lp_staking_contract_address}`
   //   );
   //   writeArtifact(network, terra.config.chainID);
   // } else {
-  //   console.log(`PSI-UST staking contract already deployed on bombay-12`);
+  //   console.log(`PSI-UST STAKING CONTRACT already deployed on bombay-12`);
   // }
 }
 

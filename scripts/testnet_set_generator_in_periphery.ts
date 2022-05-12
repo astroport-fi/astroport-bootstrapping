@@ -31,10 +31,10 @@ async function main() {
     return;
   }
 
-  //  LOCKDROP::UpdateConfig :: SET Astroport generator address in Lockdrop if bombay-12
+  //  LOCKDROP::UpdateConfig :: SET astroport generator address in Lockdrop if bombay-12
   if (!network.generator_set_in_lockdrop) {
     console.log(
-      `${terra.config.chainID} :: Setting Astroport generator address in Lockdrop...`
+      `${terra.config.chainID} :: Setting astroport generator address in Lockdrop...`
     );
     let tx = await executeContract(
       terra,
@@ -51,7 +51,7 @@ async function main() {
         },
       },
       [],
-      "Lockdrop : Setting Astroport generator"
+      "Lockdrop : Setting astroport generator"
     );
     console.log(
       `Lockdrop ::: Astroport generator set successfully ::: ${tx.txhash}\n`
@@ -62,10 +62,10 @@ async function main() {
     console.log(`Lockdrop ::: Astroport generator already set \n`);
   }
 
-  //  Auction::UpdateConfig :: SET Astroport generator address in Auction if bombay-12
+  //  Auction::UpdateConfig :: SET astroport generator address in Auction if bombay-12
   if (!network.generator_set_in_auction) {
     console.log(
-      `${terra.config.chainID} :: Setting Astroport generator address in Auction...`
+      `${terra.config.chainID} :: Setting astroport generator address in Auction...`
     );
     let tx = await executeContract(
       terra,
@@ -81,7 +81,7 @@ async function main() {
         },
       },
       [],
-      "Auction : Setting Astroport generator"
+      "Auction : Setting astroport generator"
     );
     console.log(
       `Auction ::: Astroport generator set successfully ::: ${tx.txhash}\n`

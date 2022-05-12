@@ -29,6 +29,8 @@ pub struct InstantiateMsg {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct UpdateConfigMsg {
+    /// Account which can update config
+    pub owner: Option<String>,
     /// Astroport token address
     pub astro_token_address: Option<String>,
     /// Bootstrap Auction contract address
@@ -88,30 +90,8 @@ pub enum ExecuteMsg {
         duration: u64,
         withdraw_lp_stake: bool,
     },
-    ClaimAssetReward {
-        recipient: Option<String>,
-        terraswap_lp_token: String,
-        duration: u64,
-    },
-    // ADMIN Function ::: Toggle poll rewards
-    TogglePoolRewards {
-        terraswap_lp_token: String,
-        enable: bool,
-    },
     /// Callbacks; only callable by the contract itself.
     Callback(CallbackMsg),
-    /// ProposeNewOwner creates a proposal to change contract ownership.
-    /// The validity period for the proposal is set in the `expires_in` variable.
-    ProposeNewOwner {
-        /// Newly proposed contract owner
-        owner: String,
-        /// The date after which this proposal expires
-        expires_in: u64,
-    },
-    /// DropOwnershipProposal removes the existing offer to change contract ownership.
-    DropOwnershipProposal {},
-    /// Used to claim contract ownership.
-    ClaimOwnership {},
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -144,13 +124,6 @@ pub enum CallbackMsg {
         prev_assets: [terraswap::asset::Asset; 2],
         slippage_tolerance: Option<Decimal>,
     },
-    DistributeAssetReward {
-        previous_balance: Uint128,
-        terraswap_lp_token: Addr,
-        user_address: Addr,
-        recipient: Addr,
-        lock_duration: u64,
-    },
 }
 
 // Modified from
@@ -180,11 +153,6 @@ pub enum QueryMsg {
         address: String,
     },
     LockUpInfo {
-        user_address: String,
-        terraswap_lp_token: String,
-        duration: u64,
-    },
-    PendingAssetReward {
         user_address: String,
         terraswap_lp_token: String,
         duration: u64,
@@ -317,11 +285,6 @@ pub struct LockUpInfoResponse {
     pub astroport_lp_units: Option<Uint128>,
     pub astroport_lp_token: Option<Addr>,
     pub astroport_lp_transferred: Option<Uint128>,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct PendingAssetRewardResponse {
-    pub amount: Uint128,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

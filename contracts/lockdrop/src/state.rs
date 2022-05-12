@@ -1,6 +1,5 @@
-use astroport::common::OwnershipProposal;
 use astroport_periphery::lockdrop::MigrationInfo;
-use cosmwasm_std::{Addr, Decimal, Decimal256, Uint128, Uint256};
+use cosmwasm_std::{Addr, Decimal, Uint128, Uint256};
 use cw_storage_plus::{Item, Map, U64Key};
 
 use schemars::JsonSchema;
@@ -15,11 +14,6 @@ pub const ASSET_POOLS: Map<&Addr, PoolInfo> = Map::new("LiquidityPools");
 pub const USER_INFO: Map<&Addr, UserInfo> = Map::new("users");
 /// Key consists of an Terraswap LP token address, an user address, and a duration
 pub const LOCKUP_INFO: Map<(&Addr, &Addr, U64Key), LockupInfo> = Map::new("lockup_position");
-/// Total received asset reward by lockdrop contract per lp token share
-pub const TOTAL_ASSET_REWARD_INDEX: Map<&Addr, Decimal256> = Map::new("total_asset_reward_index");
-/// Last used total asset reward index for user claim ( lp_addr -> user -> duration )
-pub const USERS_ASSET_REWARD_INDEX: Map<(&Addr, &Addr, U64Key), Decimal256> =
-    Map::new("users_asset_reward_index");
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Config {
@@ -76,8 +70,6 @@ pub struct PoolInfo {
     pub generator_proxy_per_share: Decimal,
     /// Boolean value indicating if the LP Tokens are staked with the Generator contract or not
     pub is_staked: bool,
-    /// Flag defines whether the asset has rewards or not
-    pub has_asset_rewards: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema, Default)]
@@ -108,5 +100,3 @@ pub struct LockupInfo {
     /// Timestamp beyond which this position can be unlocked
     pub unlock_timestamp: u64,
 }
-
-pub const OWNERSHIP_PROPOSAL: Item<OwnershipProposal> = Item::new("ownership_proposal");

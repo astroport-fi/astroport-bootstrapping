@@ -14,10 +14,12 @@ import { LCDClient, Wallet, LocalTerra } from "@terra-money/terra.js";
 // - isAirdropClaimed(terra, airdropContractAdr, address) --> Returns true if airdrop already claimed, else false
 //------------------------------------------------------
 
+
 // UPDATE TERRA MERKLE ROOTS : EXECUTE TX
 export async function updateAirdropConfig(terra: LocalTerra | LCDClient, wallet: Wallet, airdropContractAdr: string, new_config: any) {
     let resp = await executeContract(terra, wallet, airdropContractAdr, new_config);
 }
+
 
 // AIRDROP CLAIM BY TERRA USER : EXECUTE TX
 export async function claimAirdrop(terra: LocalTerra | LCDClient, wallet: Wallet, airdropContractAdr: string, claim_amount: number, merkle_proof: any, root_index: number) {
@@ -30,6 +32,8 @@ export async function claimAirdrop(terra: LocalTerra | LCDClient, wallet: Wallet
     }
 }
 
+
+
 // TRANSFER ASTRO TOKENS : EXECUTE TX
 export async function transferAstroByAdminFromAirdropContract(terra: LocalTerra | LCDClient, wallet: Wallet, airdropContractAdr: string, recipient: string, amount: number) {
     try {
@@ -41,6 +45,7 @@ export async function transferAstroByAdminFromAirdropContract(terra: LocalTerra 
         console.log("ERROR IN transferAstroByAdminFromAirdropContract function")
     }
 }
+
 
 // GET CONFIG : CONTRACT QUERY
 export async function getAirdropConfig(terra: LocalTerra | LCDClient, airdropContractAdr: string) {
@@ -66,6 +71,10 @@ export async function isAirdropClaimed(terra: LocalTerra | LCDClient, airdropCon
 
 }
 
+
+
+
+
 // // GET NATIVE TOKEN BALANCE
 // export async function getUserNativeAssetBalance(terra, native_asset, wallet_addr) {
 //     let res = await terra.bank.balance(  wallet_addr );
@@ -74,9 +83,10 @@ export async function isAirdropClaimed(terra: LocalTerra | LCDClient, airdropCon
 //         if ( balances[i].denom == native_asset ) {
 //             return balances[i].amount;
 //         }
-//     }
+//     }    
 //     return 0;
 // }
+
 
 // function print_events(response) {
 //     if (response.height > 0) {
@@ -87,3 +97,5 @@ export async function isAirdropClaimed(terra: LocalTerra | LCDClient, airdropCon
 //       }
 //     }
 //   }
+
+

@@ -14,8 +14,8 @@ import { join } from "path";
 const ASTRO_MULTISIG = "terra1c7m6j8ya58a2fkkptn8fgudx8sqjqvc8azq0ex";
 
 const LOCKDROP_INCENTIVES = 75_000_000_000000; // 7.5 Million = 7.5%
-const AIRDROP_INCENTIVES = 25_000_000_000000;  // 2.5 Million = 2.5%
-const auction_INCENTIVES = 10_000_000_000000;  // 1.0 Million = 1%
+const AIRDROP_INCENTIVES = 25_000_000_000000; // 2.5 Million = 2.5%
+const AUCTION_INCENTIVES = 10_000_000_000000; // 1.0 Million = 1%
 // LOCKDROP INCENTIVES
 const LUNA_UST_ASTRO_INCENTIVES = 21_750_000_000000;
 const LUNA_BLUNA_ASTRO_INCENTIVES = 17_250_000_000000;
@@ -49,14 +49,16 @@ async function main() {
     return;
   }
 
-  // ASTRO token addresss should be set
+  // ASTRO Token addresss should be set
   if (!network.astro_token_address) {
     console.log(
-      `Please set the ASTRO token address in the deploy config before running this script...`
+      `Please set the ASTRO Token address in the deploy config before running this script...`
     );
     return;
   }
 
+  /*************************************** DEPLOYMENT :: LOCKDROP CONTRACT  *****************************************/
+  /*************************************** DEPLOYMENT :: LOCKDROP CONTRACT  *****************************************/
   /*************************************** DEPLOYMENT :: LOCKDROP CONTRACT  *****************************************/
 
   if (!network.lockdrop_address) {
@@ -68,14 +70,16 @@ async function main() {
       wallet,
       join(ARTIFACTS_PATH, "astroport_lockdrop.wasm"),
       CONFIGURATION.lockdrop_InitMsg.config,
-      "ASTROPORT launch : Phase 1  -::- Lockdrop -::- Liquidity Migration"
+      "ASTROPORT Launch : Phase 1  -::- Lockdrop -::- Liquidity Migration"
     );
     writeArtifact(network, terra.config.chainID);
     console.log(
-      `${terra.config.chainID} :: Lockdrop contract address : ${network.lockdrop_address} \n`
+      `${terra.config.chainID} :: Lockdrop Contract Address : ${network.lockdrop_address} \n`
     );
   }
 
+  /*************************************** DEPLOYMENT :: AIRDROP CONTRACT  *****************************************/
+  /*************************************** DEPLOYMENT :: AIRDROP CONTRACT  *****************************************/
   /*************************************** DEPLOYMENT :: AIRDROP CONTRACT  *****************************************/
 
   if (!network.airdrop_address) {
@@ -89,22 +93,24 @@ async function main() {
     ];
     CONFIGURATION.airdrop_InitMsg.config.astro_token_address =
       network.astro_token_address;
-    // Deploy airdrop contract
+    // deploy airdrop contract
     console.log(CONFIGURATION.airdrop_InitMsg);
     network.airdrop_address = await deployContract(
       terra,
       wallet,
       join(ARTIFACTS_PATH, "astroport_airdrop.wasm"),
       CONFIGURATION.airdrop_InitMsg.config,
-      "ASTROPORT launch -::- ASTRO Airdrop"
+      "ASTROPORT Launch -::- ASTRO Airdrop"
     );
     console.log(
-      `${terra.config.chainID} :: Airdrop contract address : ${network.airdrop_address} \n`
+      `${terra.config.chainID} :: Airdrop Contract Address : ${network.airdrop_address} \n`
     );
     writeArtifact(network, terra.config.chainID);
   }
 
-  /*************************************** DEPLOYMENT :: auction CONTRACT  *****************************************/
+  /*************************************** DEPLOYMENT :: AUCTION CONTRACT  *****************************************/
+  /*************************************** DEPLOYMENT :: AUCTION CONTRACT  *****************************************/
+  /*************************************** DEPLOYMENT :: AUCTION CONTRACT  *****************************************/
 
   if (!network.auction_address) {
     console.log(`${terra.config.chainID} :: Deploying Auction Contract`);
@@ -116,26 +122,26 @@ async function main() {
       network.airdrop_address;
     CONFIGURATION.auction_InitMsg.config.lockdrop_contract_address =
       network.lockdrop_address;
-    // Deploy Auction contract
+    // deploy auction contract
     console.log(CONFIGURATION.auction_InitMsg);
     network.auction_address = await deployContract(
       terra,
       wallet,
       join(ARTIFACTS_PATH, "astroport_auction.wasm"),
       CONFIGURATION.auction_InitMsg.config,
-      "ASTROPORT launch -::- Auction -::- ASTRO-UST LP pool Bootstrapping"
+      "ASTROPORT Launch -::- Auction -::- ASTRO-UST LP Pool Bootstrapping"
     );
     console.log(
-      `${terra.config.chainID} :: Auction contract address : ${network.auction_address} \n`
+      `${terra.config.chainID} :: Auction Contract Address : ${network.auction_address} \n`
     );
     network.auction_multisig_made_owner = true;
     writeArtifact(network, terra.config.chainID);
   }
 
-  //  UpdateConfig :: Set ASTRO token and Auction contract
+  //  UpdateConfig :: SET ASTRO Token and Auction Contract in Lockdrop
   if (!network.lockdrop_astro_token_set && !network.auction_set_in_lockdrop) {
     console.log(
-      `${terra.config.chainID} :: Setting ASTRO token for Lockdrop...`
+      `${terra.config.chainID} :: Setting ASTRO Token for Lockdrop...`
     );
     let tx = await executeContract(
       terra,
@@ -152,10 +158,10 @@ async function main() {
         },
       },
       [],
-      "ASTROPORT launch -::-  Phase 1 -::-  Lockdrop -::-  UpdateConfig -::- Set ASTRO & Auction addresses"
+      "ASTROPORT Launch -::-  Phase 1 -::-  Lockdrop -::-  UpdateConfig -::- Set ASTRO & Auction addresses"
     );
     console.log(
-      `Lockdrop :: ASTRO token & Auction contract set successfully set ${tx.txhash}\n`
+      `Lockdrop :: ASTRO Token & Auction contract set successfully set ${tx.txhash}\n`
     );
     network.lockdrop_astro_token_set = true;
     network.auction_set_in_lockdrop = true;
@@ -164,7 +170,7 @@ async function main() {
 
   // UpdateConfig :: Set Auction address & update owner in airdrop
   if (!network.auction_set_in_airdrop) {
-    // Update config tx
+    // update Config Tx
     let out = await executeContract(
       terra,
       wallet,
@@ -179,10 +185,10 @@ async function main() {
         },
       },
       [],
-      "ASTROPORT launch -::-  Phase 1 -::-  Airdrop -::- UpdateConfig -::- Set Auction address, update owner "
+      "ASTROPORT Launch -::-  Phase 1 -::-  Airdrop -::-  UpdateConfig -::- Set Auction address, update owner "
     );
     console.log(
-      `${terra.config.chainID} :: Setting auction contract address  in ASTRO Airdrop contract,  ${out.txhash}`
+      `${terra.config.chainID} :: Setting auction contract address in ASTRO Airdrop contract,  ${out.txhash}`
     );
     network.auction_set_in_airdrop = true;
     network.airdrop_multisig_made_owner = true;
@@ -206,10 +212,10 @@ async function main() {
       network.astro_token_address,
       transfer_msg,
       [],
-      "ASTROPORT launch -::-  Phase 1 -::-  Lockdrop -::- Transfer ASTRO to Lockdrop for Incentives"
+      "ASTROPORT Launch -::-  Phase 1 -::-  Lockdrop -::- Transfer ASTRO to Lockdrop for Incentives"
     );
     console.log(
-      `${terra.config.chainID} :: Transferring ASTRO token and setting incentives in Lockdrop... ${increase_astro_incentives.txhash}`
+      `${terra.config.chainID} :: Transferring ASTRO Token and setting incentives in Lockdrop... ${increase_astro_incentives.txhash}`
     );
     network.lockdrop_astro_token_transferred = true;
     writeArtifact(network, terra.config.chainID);
@@ -217,7 +223,7 @@ async function main() {
 
   // ASTRO::Send::Airdrop::IncreaseAstroIncentives:: Transfer ASTRO to Airdrop
   if (!network.airdrop_astro_token_transferred) {
-    // Transfer ASTRO tx
+    // transfer ASTRO Tx
     let tx = await executeContract(
       terra,
       wallet,
@@ -232,10 +238,10 @@ async function main() {
         },
       },
       [],
-      "ASTROPORT launch -::-  Phase 1 -::- Airdrop -::- Transfer ASTRO to Airdrop for Incentives"
+      "ASTROPORT Launch -::-  Phase 1 -::-  Airdrop -::- Transfer ASTRO to Airdrop for Incentives"
     );
     console.log(
-      `${terra.config.chainID} :: Transferring ASTRO token and setting incentives in Airdrop... ${tx.txhash}`
+      `${terra.config.chainID} :: Transferring ASTRO Token and setting incentives in Airdrop... ${tx.txhash}`
     );
     network.airdrop_astro_token_transferred = true;
     writeArtifact(network, terra.config.chainID);
@@ -243,11 +249,11 @@ async function main() {
 
   // Set Auction incentives
   if (!network.auction_astro_token_transferred) {
-    // Transfer ASTRO Tx
+    // transfer ASTRO Tx
     let msg = {
       send: {
         contract: network.auction_address,
-        amount: String(auction_INCENTIVES),
+        amount: String(AUCTION_INCENTIVES),
         msg: Buffer.from(
           JSON.stringify({ increase_astro_incentives: {} })
         ).toString("base64"),
@@ -259,10 +265,10 @@ async function main() {
       network.astro_token_address,
       msg,
       [],
-      "ASTROPORT launch -::-  Phase 1 -::-  Auction -::- Transfer ASTRO to Auction for Incentives"
+      "ASTROPORT Launch -::-  Phase 1 -::-  Auction -::- Transfer ASTRO to Auction for Incentives"
     );
     console.log(
-      `${terra.config.chainID} :: Transferring ASTRO token and setting incentives in Auction... ${out.txhash}`
+      `${terra.config.chainID} :: Transferring ASTRO Token and setting incentives in Auction... ${out.txhash}`
     );
     network.auction_astro_token_transferred = true;
     writeArtifact(network, terra.config.chainID);
@@ -277,7 +283,7 @@ async function main() {
       },
     };
     console.log(
-      `${terra.config.chainID} :: Initializing LUNA-UST LP token pool in Lockdrop...`
+      `${terra.config.chainID} :: Initializing LUNA-UST LP Token Pool in Lockdrop...`
     );
     let luna_ust_pool_init = await executeContract(
       terra,
@@ -285,17 +291,17 @@ async function main() {
       network.lockdrop_address,
       luna_ust_init_msg,
       [],
-      "Lockdrop -::- Initialize LUNA-UST pool"
+      "Lockdrop -::- Initialize LUNA-UST Pool"
     );
     console.log(luna_ust_pool_init.txhash);
     console.log(
-      `Lockdrop :: LUNA-UST pool successfully initialized with Lockdrop \n`
+      `Lockdrop :: Luna-ust Pool successfully initialized with Lockdrop \n`
     );
     network.luna_ust_lockdrop_pool_initialized = true;
     writeArtifact(network, terra.config.chainID);
   }
 
-  // Initialize LUNA-BLUNA pool in Lockdrop
+  // Initialize LUNA-BLUNA Pool in Lockdrop
   if (!network.bluna_luna_lockdrop_pool_initialized) {
     let bluna_luna_init_msg = {
       initialize_pool: {
@@ -305,7 +311,7 @@ async function main() {
     };
 
     console.log(
-      `${terra.config.chainID} :: Lockdrop -::- Initialize LUNA-BLUNA LP pool...`
+      `${terra.config.chainID} :: Lockdrop -::- Initialize LUNA-BLUNA LP Pool...`
     );
     let bluna_luna_pool_init = await executeContract(
       terra,
@@ -313,17 +319,17 @@ async function main() {
       network.lockdrop_address,
       bluna_luna_init_msg,
       [],
-      "Lockdrop -::- Initialize LUNA-BLUNA LP pool"
+      "Lockdrop -::- Initialize LUNA-BLUNA LP Pool"
     );
     console.log(bluna_luna_pool_init.txhash);
     console.log(
-      `Lockdrop :: LUNA-BLUNA pool successfully initialized with Lockdrop \n`
+      `Lockdrop :: LUNA-BLUNA Pool successfully initialized with Lockdrop \n`
     );
     network.bluna_luna_lockdrop_pool_initialized = true;
     writeArtifact(network, terra.config.chainID);
   }
 
-  // Initialize ANC-UST pool in Lockdrop
+  // Initialize ANC-UST Pool in Lockdrop
   if (!network.anc_ust_lockdrop_pool_initialized) {
     let anc_ust_init_msg = {
       initialize_pool: {
@@ -332,7 +338,7 @@ async function main() {
       },
     };
     console.log(
-      `${terra.config.chainID} :: Lockdrop -::- Initialize ANC-UST LP pool...`
+      `${terra.config.chainID} :: Lockdrop -::- Initialize ANC-UST LP Pool...`
     );
     let anc_ust_pool_init = await executeContract(
       terra,
@@ -340,17 +346,17 @@ async function main() {
       network.lockdrop_address,
       anc_ust_init_msg,
       [],
-      "Lockdrop -::- Initialize ANC-UST LP pool"
+      "Lockdrop -::- Initialize ANC-UST LP Pool"
     );
     console.log(anc_ust_pool_init.txhash);
     console.log(
-      `Lockdrop :: ANC-UST pool successfully initialized with Lockdrop \n`
+      `Lockdrop :: ANC-UST Pool successfully initialized with Lockdrop \n`
     );
     network.anc_ust_lockdrop_pool_initialized = true;
     writeArtifact(network, terra.config.chainID);
   }
 
-  // Initialize MIR-UST pool in Lockdrop
+  // Initialize MIR-UST Pool in Lockdrop
   if (!network.mir_ust_lockdrop_pool_initialized) {
     let mir_ust_init_msg = {
       initialize_pool: {
@@ -359,7 +365,7 @@ async function main() {
       },
     };
     console.log(
-      `${terra.config.chainID} :: Lockdrop -::- Initialize MIR-UST LP pool...`
+      `${terra.config.chainID} :: Lockdrop -::- Initialize MIR-UST LP Pool...`
     );
     let mir_ust_pool_init = await executeContract(
       terra,
@@ -367,17 +373,17 @@ async function main() {
       network.lockdrop_address,
       mir_ust_init_msg,
       [],
-      "Lockdrop -::- Initialize MIR-UST LP pool"
+      "Lockdrop -::- Initialize MIR-UST LP Pool"
     );
     console.log(mir_ust_pool_init.txhash);
     console.log(
-      `Lockdrop :: MIR-UST pool successfully initialized with Lockdrop \n`
+      `Lockdrop :: MIR-UST Pool successfully initialized with Lockdrop \n`
     );
     network.mir_ust_lockdrop_pool_initialized = true;
     writeArtifact(network, terra.config.chainID);
   }
 
-  // Initialize ORION-UST pool in Lockdrop
+  // Initialize ORION-UST Pool in Lockdrop
   if (!network.orion_ust_lockdrop_pool_initialized) {
     let orion_ust_init_msg = {
       initialize_pool: {
@@ -386,7 +392,7 @@ async function main() {
       },
     };
     console.log(
-      `${terra.config.chainID} :: Lockdrop -::- Initialize ORION-UST LP pool...`
+      `${terra.config.chainID} :: Lockdrop -::- Initialize ORION-UST LP Pool...`
     );
     let orion_ust_pool_init = await executeContract(
       terra,
@@ -394,17 +400,17 @@ async function main() {
       network.lockdrop_address,
       orion_ust_init_msg,
       [],
-      "Lockdrop -::- Initialize ORION-UST LP pool"
+      "Lockdrop -::- Initialize ORION-UST LP Pool"
     );
     console.log(orion_ust_pool_init.txhash);
     console.log(
-      `Lockdrop :: ORION-UST pool successfully initialized with Lockdrop \n`
+      `Lockdrop :: ORION-UST Pool successfully initialized with Lockdrop \n`
     );
     network.orion_ust_lockdrop_pool_initialized = true;
     writeArtifact(network, terra.config.chainID);
   }
 
-  // Initialize STT-UST pool in Lockdrop
+  // Initialize STT-UST Pool in Lockdrop
   if (!network.stt_ust_lockdrop_pool_initialized) {
     let stt_ust_init_msg = {
       initialize_pool: {
@@ -413,7 +419,7 @@ async function main() {
       },
     };
     console.log(
-      `${terra.config.chainID} :: Lockdrop -::- Initialize STT-UST LP pool...`
+      `${terra.config.chainID} :: Lockdrop -::- Initialize STT-UST LP Pool...`
     );
     let stt_ust_pool_init = await executeContract(
       terra,
@@ -421,17 +427,17 @@ async function main() {
       network.lockdrop_address,
       stt_ust_init_msg,
       [],
-      "Lockdrop -::- Initialize STT-UST LP pool"
+      "Lockdrop -::- Initialize STT-UST LP Pool"
     );
     console.log(stt_ust_pool_init.txhash);
     console.log(
-      `Lockdrop :: STT-UST pool successfully initialized with Lockdrop \n`
+      `Lockdrop :: STT-UST Pool successfully initialized with Lockdrop \n`
     );
     network.stt_ust_lockdrop_pool_initialized = true;
     writeArtifact(network, terra.config.chainID);
   }
 
-  // Initialize VKR-UST pool in Lockdrop
+  // Initialize VKR-UST Pool in Lockdrop
   if (!network.vkr_ust_lockdrop_pool_initialized) {
     let vkr_ust_init_msg = {
       initialize_pool: {
@@ -441,7 +447,7 @@ async function main() {
     };
 
     console.log(
-      `${terra.config.chainID} :: Lockdrop -::- Initialize VKR-UST LP pool...`
+      `${terra.config.chainID} :: Lockdrop -::- Initialize VKR-UST LP Pool...`
     );
     let vkr_ust_pool_init = await executeContract(
       terra,
@@ -449,17 +455,17 @@ async function main() {
       network.lockdrop_address,
       vkr_ust_init_msg,
       [],
-      "Lockdrop -::- Initialize VKR-UST LP pool"
+      "Lockdrop -::- Initialize VKR-UST LP Pool"
     );
     console.log(vkr_ust_pool_init.txhash);
     console.log(
-      `Lockdrop :: VKR-UST pool successfully initialized with Lockdrop \n`
+      `Lockdrop :: VKR-UST Pool successfully initialized with Lockdrop \n`
     );
     network.vkr_ust_lockdrop_pool_initialized = true;
     writeArtifact(network, terra.config.chainID);
   }
 
-  // Initialize MINE-UST pool in Lockdrop
+  // Initialize MINE-UST Pool in Lockdrop
   if (!network.mine_ust_lockdrop_pool_initialized) {
     let mine_ust_init_msg = {
       initialize_pool: {
@@ -469,7 +475,7 @@ async function main() {
     };
 
     console.log(
-      `${terra.config.chainID} :: Lockdrop -::- Initialize MINE-UST LP pool...`
+      `${terra.config.chainID} :: Lockdrop -::- Initialize MINE-UST LP Pool...`
     );
     let mine_ust_pool_init = await executeContract(
       terra,
@@ -477,17 +483,17 @@ async function main() {
       network.lockdrop_address,
       mine_ust_init_msg,
       [],
-      "Lockdrop -::- Initialize MINE-UST LP pool"
+      "Lockdrop -::- Initialize MINE-UST LP Pool"
     );
     console.log(mine_ust_pool_init.txhash);
     console.log(
-      `Lockdrop :: MINE-UST pool successfully initialized with Lockdrop \n`
+      `Lockdrop :: MINE-UST Pool successfully initialized with Lockdrop \n`
     );
     network.mine_ust_lockdrop_pool_initialized = true;
     writeArtifact(network, terra.config.chainID);
   }
 
-  // Initialize PSI-UST pool in Lockdrop
+  // Initialize PSI-UST Pool in Lockdrop
   if (!network.psi_ust_lockdrop_pool_initialized) {
     let psi_ust_init_msg = {
       initialize_pool: {
@@ -497,7 +503,7 @@ async function main() {
     };
 
     console.log(
-      `${terra.config.chainID} :: Lockdrop -::- Initialize PSI-UST LP pool...`
+      `${terra.config.chainID} :: Lockdrop -::- Initialize PSI-UST LP Pool...`
     );
     let psi_ust_pool_init = await executeContract(
       terra,
@@ -505,17 +511,17 @@ async function main() {
       network.lockdrop_address,
       psi_ust_init_msg,
       [],
-      " Lockdrop -::- Initialize PSI-UST LP pool"
+      " Lockdrop -::- Initialize PSI-UST LP Pool"
     );
     console.log(psi_ust_pool_init.txhash);
     console.log(
-      `Lockdrop :: PSI-UST pool successfully initialized with Lockdrop \n`
+      `Lockdrop :: PSI-UST Pool successfully initialized with Lockdrop \n`
     );
     network.psi_ust_lockdrop_pool_initialized = true;
     writeArtifact(network, terra.config.chainID);
   }
 
-  // Initialize APOLLO-UST pool with incentive
+  // Initialize APOLLO-UST Pool with incentive
   if (!network.apollo_ust_lockdrop_pool_initialized) {
     let apollo_ust_init_msg = {
       initialize_pool: {
@@ -524,7 +530,7 @@ async function main() {
       },
     };
     console.log(
-      `${terra.config.chainID} :: Lockdrop -::- Initialize APOLLO-UST LP pool...`
+      `${terra.config.chainID} :: Lockdrop -::- Initialize APOLLO-UST LP Pool...`
     );
     let apollo_ust_pool_init = await executeContract(
       terra,
@@ -532,20 +538,20 @@ async function main() {
       network.lockdrop_address,
       apollo_ust_init_msg,
       [],
-      "Lockdrop -::- Initialize APOLLO-UST LP pool"
+      "Lockdrop -::- Initialize APOLLO-UST LP Pool"
     );
     console.log(apollo_ust_pool_init.txhash);
     console.log(
-      `Lockdrop :: APOLLO-UST pool successfully initialized with Lockdrop \n`
+      `Lockdrop :: APOLLO-UST Pool successfully initialized with Lockdrop \n`
     );
     network.apollo_ust_lockdrop_pool_initialized = true;
     writeArtifact(network, terra.config.chainID);
   }
 
-  // Lockdrop ::: UpdateConfig :: Update Owner to ASTRO multisig
+  // Lockdrop ::: UpdateConfig :: Update Owner to ASTRO MultiSig
   if (!network.lockdrop_multisig_made_owner) {
     console.log(
-      `${terra.config.chainID} :: Lockdrop -::- UpdateConfig :: Update Owner to ASTRO multisig`
+      `${terra.config.chainID} :: Lockdrop -::- UpdateConfig :: Update Owner to ASTRO MultiSig`
     );
     let tx = await executeContract(
       terra,
@@ -565,13 +571,13 @@ async function main() {
       "Lockdrop -::- Update Owner"
     );
     console.log(
-      `Lockdrop :: Owner updated successfully to ASTRO multisig ---> ${tx.txhash}\n`
+      `Lockdrop :: Owner updated successfully to ASTRO MultiSig ---> ${tx.txhash}\n`
     );
     network.lockdrop_multisig_made_owner = true;
     writeArtifact(network, terra.config.chainID);
   }
 
-  // Lockdrop ::: Transfer ownership to multiSig
+  // Lockdrop ::: Transfer Ownership to multiSig
   if (!network.lockdrop_ownership_transferred_to_multisig) {
     let tx = await transfer_ownership_to_multisig(
       terra,
@@ -586,7 +592,7 @@ async function main() {
     writeArtifact(network, terra.config.chainID);
   }
 
-  // Airdrop ::: Transfer ownership to multiSig
+  // Airdrop ::: Transfer Ownership to multiSig
   if (!network.airdrop_ownership_transferred_to_multisig) {
     let tx = await transfer_ownership_to_multisig(
       terra,
@@ -601,7 +607,7 @@ async function main() {
     writeArtifact(network, terra.config.chainID);
   }
 
-  // Auction ::: Transfer ownership to multiSig
+  // Auction ::: Transfer Ownership to multiSig
   if (!network.auction_ownership_transferred_to_multisig) {
     let tx = await transfer_ownership_to_multisig(
       terra,
@@ -610,7 +616,7 @@ async function main() {
       network.auction_address
     );
     console.log(
-      `Transferred ownership of auction contract, \n Tx hash --> ${tx.txhash} \n`
+      `Transferred ownership of AUCTION contract, \n Tx hash --> ${tx.txhash} \n`
     );
     network.auction_ownership_transferred_to_multisig = true;
     writeArtifact(network, terra.config.chainID);
