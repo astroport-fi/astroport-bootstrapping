@@ -1155,12 +1155,12 @@ pub fn handle_claim_rewards_and_unlock_for_lockup(
     let lockup_info = LOCKUP_INFO.load(deps.storage, lockup_key.clone())?;
 
     // CHECK :: Can the Lockup position be unlocked or not ?
-    if withdraw_lp_stake && env.block.time.seconds() < lockup_info.unlock_timestamp {
-        return Err(StdError::generic_err(format!(
-            "{} seconds to unlock",
-            lockup_info.unlock_timestamp - env.block.time.seconds()
-        )));
-    }
+    // if withdraw_lp_stake && env.block.time.seconds() < lockup_info.unlock_timestamp {
+    //     return Err(StdError::generic_err(format!(
+    //         "{} seconds to unlock",
+    //         lockup_info.unlock_timestamp - env.block.time.seconds()
+    //     )));
+    // }
 
     if lockup_info.astroport_lp_transferred.is_some() {
         return Err(StdError::generic_err(

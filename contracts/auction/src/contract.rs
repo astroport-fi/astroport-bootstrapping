@@ -675,16 +675,16 @@ pub fn handle_claim_rewards_and_withdraw_lp_shares(
 
         // If user wants to withdraw LP tokens, then we calculate the max amount he can withdraw for check
         if let Some(withdraw_lp_shares) = withdraw_lp_shares {
-            let max_withdrawable = calculate_withdrawable_lp_shares(
-                env.block.time.seconds(),
-                &config,
-                &state,
-                &user_info,
-            )?;
-            if max_withdrawable.is_none() || withdraw_lp_shares > max_withdrawable.unwrap() {
-                return Err(StdError::generic_err(
-                    "No available LP shares to withdraw / Invalid amount",
-                ));
+            let max_withdrawable = user_info
+                .lp_shares
+                .expect("user doesn't have any locked lp shares")
+                - user_info.claimed_lp_shares;
+
+            if withdraw_lp_shares > max_withdrawable {
+                return Err(StdError::generic_err(format!(
+                    "Max {} LP shares can be withdrawn",
+                    max_withdrawable
+                )));
             }
         }
 
