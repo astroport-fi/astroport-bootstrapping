@@ -673,6 +673,13 @@ pub fn handle_claim_rewards_and_withdraw_lp_shares(
             USERS.save(deps.storage, &user_address, &user_info)?;
         }
 
+        // check if user has no LP shares to withdraw
+        if let Some(lp_shares) = user_info.lp_shares {
+            if lp_shares.eq(&user_info.claimed_lp_shares) {
+                return Err(StdError::generic_err("Rewards already claimed!"));
+            }
+        }
+
         // If user wants to withdraw LP tokens, then we calculate the max amount he can withdraw for check
         if let Some(withdraw_lp_shares) = withdraw_lp_shares {
             let max_withdrawable = user_info
@@ -1063,9 +1070,10 @@ pub fn calculate_withdrawable_lp_shares(
             return Ok(Some(user_lp_shares - user_info.claimed_lp_shares));
         }
 
-        let withdrawable_lp_balance =
-            user_lp_shares * Decimal::from_ratio(time_elapsed, config.lp_tokens_vesting_duration);
-        Ok(Some(withdrawable_lp_balance - user_info.claimed_lp_shares))
+        // let withdrawable_lp_balance =
+        //     user_lp_shares * Decimal::from_ratio(time_elapsed, config.lp_tokens_vesting_duration);
+        // Ok(Some(withdrawable_lp_balance - user_info.claimed_lp_shares))
+        Ok(Some(user_lp_shares - user_info.claimed_lp_shares))
     } else {
         Ok(None)
     }
