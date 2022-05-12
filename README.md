@@ -2,8 +2,6 @@
 
 This repo contains the contracts which facilitates ASTRO tokens airdrop, lockdrop and LP Bootstrapping via auction during the intital protocol launch.
 
-![Astroport Launch : Overview](./Astroport-periphery.png?raw=true 'Astroport Launch : Overview')
-
 ## Development
 
 ### Dependencies

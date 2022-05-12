@@ -1710,7 +1710,7 @@ fn test_add_liquidity_to_astroport_pool() {
     assert_eq!(Uint128::from(432423u64), user1info_resp.ust_delegated);
     assert_eq!(Some(Uint128::from(9527010u64)), user1info_resp.lp_shares);
     assert_eq!(
-        Some(Uint128::from(367554u64)),
+        Some(Uint128::from(9527010u64)),
         user1info_resp.withdrawable_lp_shares
     );
     assert_eq!(
@@ -1733,7 +1733,7 @@ fn test_add_liquidity_to_astroport_pool() {
     assert_eq!(Uint128::from(454353u64), user2info_resp.ust_delegated);
     assert_eq!(Some(Uint128::from(6755923u64)), user2info_resp.lp_shares);
     assert_eq!(
-        Some(Uint128::from(260645u64)),
+        Some(Uint128::from(6755923u64)),
         user2info_resp.withdrawable_lp_shares
     );
     assert_eq!(
@@ -1755,7 +1755,7 @@ fn test_add_liquidity_to_astroport_pool() {
     assert_eq!(Uint128::from(5643543u64), user3info_resp.ust_delegated);
     assert_eq!(Some(Uint128::from(23486123u64)), user3info_resp.lp_shares);
     assert_eq!(
-        Some(Uint128::from(906100u64)),
+        Some(Uint128::from(23486123u64)),
         user3info_resp.withdrawable_lp_shares
     );
     assert_eq!(
@@ -1919,7 +1919,7 @@ fn test_stake_lp_tokens() {
     assert_eq!(Some(Uint128::from(9527010u64)), user1info_resp.lp_shares);
     assert_eq!(Uint128::from(0u64), user1info_resp.claimed_lp_shares);
     assert_eq!(
-        Some(Uint128::from(367554u64)),
+        Some(Uint128::from(9527010u64)),
         user1info_resp.withdrawable_lp_shares
     );
     assert_eq!(
@@ -1942,7 +1942,7 @@ fn test_stake_lp_tokens() {
     assert_eq!(Some(Uint128::from(6755923u64)), user2info_resp.lp_shares);
     assert_eq!(Uint128::from(0u64), user2info_resp.claimed_lp_shares);
     assert_eq!(
-        Some(Uint128::from(260645u64)),
+        Some(Uint128::from(6755923u64)),
         user2info_resp.withdrawable_lp_shares
     );
     assert_eq!(
@@ -1965,7 +1965,7 @@ fn test_stake_lp_tokens() {
     assert_eq!(Some(Uint128::from(23486123u64)), user3info_resp.lp_shares);
     assert_eq!(Uint128::from(0u64), user3info_resp.claimed_lp_shares);
     assert_eq!(
-        Some(Uint128::from(906100u64)),
+        Some(Uint128::from(23486123u64)),
         user3info_resp.withdrawable_lp_shares
     );
     assert_eq!(
@@ -2461,12 +2461,30 @@ fn test_withdraw_unlocked_lp_shares() {
         user1info_before_claim.claimed_lp_shares
     );
 
+    // check if user can't withdrawing more than he had
+    let err = app
+        .execute_contract(
+            user1_address.clone(),
+            auction_instance.clone(),
+            &ExecuteMsg::ClaimRewards {
+                withdraw_lp_shares: Some(
+                    user1info_before_claim.lp_shares.unwrap() + Uint128::new(1),
+                ),
+            },
+            &[],
+        )
+        .unwrap_err();
+    assert_eq!(
+        "Generic error: Max 9527010 LP shares can be withdrawn",
+        err.to_string()
+    );
+
     // Auction :: Withdraw unvested LP shares for the user
     app.execute_contract(
         user1_address.clone(),
         auction_instance.clone(),
         &ExecuteMsg::ClaimRewards {
-            withdraw_lp_shares: Some(user1info_before_claim.withdrawable_lp_shares.unwrap()),
+            withdraw_lp_shares: Some(user1info_before_claim.lp_shares.unwrap()),
         },
         &[],
     )
@@ -2482,13 +2500,18 @@ fn test_withdraw_unlocked_lp_shares() {
             },
         )
         .unwrap();
+    // check if user1 claimed all his share
     assert_eq!(
-        user1info_before_claim.withdrawable_lp_shares.unwrap(),
+        //user1info_before_claim.withdrawable_lp_shares.unwrap(),
+        user1info_before_claim.lp_shares.unwrap(),
         user1info_after_claim.claimed_lp_shares
     );
+    // check if user1 has no available share
     assert_eq!(
-        Uint128::from(0u64),
-        user1info_after_claim.withdrawable_lp_shares.unwrap()
+        Uint128::zero(),
+        user1info_after_claim
+            .withdrawable_lp_shares
+            .unwrap_or_default()
     );
 
     // ######    SUCCESS :: Successfully withdraw LP shares (which also claims rewards) for User-2 ######
@@ -2604,15 +2627,17 @@ fn test_withdraw_unlocked_lp_shares() {
         .unwrap();
 
     // Auction :: Withdraw LP for the user
-    app.execute_contract(
-        user1_address.clone(),
-        auction_instance.clone(),
-        &ExecuteMsg::ClaimRewards {
-            withdraw_lp_shares: Some(user1info_before_claim2.withdrawable_lp_shares.unwrap()),
-        },
-        &[],
-    )
-    .unwrap();
+    let err = app
+        .execute_contract(
+            user1_address.clone(),
+            auction_instance.clone(),
+            &ExecuteMsg::ClaimRewards {
+                withdraw_lp_shares: Some(user1info_before_claim2.withdrawable_lp_shares.unwrap()),
+            },
+            &[],
+        )
+        .unwrap_err();
+    assert_eq!("Generic error: Rewards already claimed!", err.to_string());
 
     // Auction :: Check user-1 state (After Claim)
     let user1info_after_claim2: astroport_periphery::auction::UserInfoResponse = app
@@ -2625,8 +2650,7 @@ fn test_withdraw_unlocked_lp_shares() {
         )
         .unwrap();
     assert_eq!(
-        user1info_before_claim2.claimed_lp_shares
-            + user1info_before_claim2.withdrawable_lp_shares.unwrap(),
+        user1info_before_claim2.lp_shares.unwrap(),
         user1info_after_claim2.claimed_lp_shares
     );
     assert_eq!(
