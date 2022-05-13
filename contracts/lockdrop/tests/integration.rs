@@ -4580,7 +4580,7 @@ fn test_migration() {
             duration: 10,
             generator_astro_debt: Uint128::from(86400000000u64),
             claimable_generator_astro_debt: Uint128::zero(),
-            generator_proxy_debt: Uint128::zero(),
+            generator_proxy_debt: Uint128::from(1u8),
             claimable_generator_proxy_debt: Uint128::zero(),
             unlock_timestamp: 1662654400,
             astroport_lp_units: Some(Uint128::from(1000000000u64)),
@@ -4655,7 +4655,12 @@ fn test_migration() {
             duration: 10,
             generator_astro_debt: Uint128::from(86400000000u64),
             claimable_generator_astro_debt: Uint128::zero(),
-            generator_proxy_debt: RestrictedVector::default(),
+            generator_proxy_debt: RestrictedVector::new(
+                AssetInfo::Token {
+                    contract_addr: mirror_token_instance
+                },
+                Uint128::from(1u8)
+            ),
             claimable_generator_proxy_debt: RestrictedVector::default(),
             unlock_timestamp: 1662654400,
             astroport_lp_units: Some(Uint128::from(1000000000u64)),
