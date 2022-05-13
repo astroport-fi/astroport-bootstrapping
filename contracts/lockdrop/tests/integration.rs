@@ -1,4 +1,5 @@
 use astroport::asset::AssetInfo;
+use astroport::generator_proxy::InstantiateMsg as ProxyInstantiateMsg;
 use astroport::restricted_vector::RestrictedVector;
 use astroport_governance::utils::EPOCH_START;
 use astroport_periphery::{
@@ -8,16 +9,21 @@ use astroport_periphery::{
         QueryMsg, StateResponse, UpdateConfigMsg, UserInfoResponse,
     },
 };
-use cosmwasm_std::testing::{mock_env, MockApi, MockStorage};
+use cosmwasm_std::testing::{mock_env, MockApi, MockStorage, MOCK_CONTRACT_ADDR};
 use cosmwasm_std::{
     attr, to_binary, Addr, Coin, Decimal, Timestamp, Uint128, Uint256 as CUint256, Uint64,
 };
+use mirror_protocol::staking::{
+    Cw20HookMsg as MirrorStakingHookMsg, ExecuteMsg as MirrorExecuteMsg,
+    InstantiateMsg as MirrorInstantiateMsg,
+};
 
 use astroport::token::InstantiateMsg as TokenInstantiateMsg;
-use cw20::{Cw20ExecuteMsg, Cw20QueryMsg};
+use astroport_periphery::lockdrop::MigrateMsg;
+use cw20::{Cw20ExecuteMsg, Cw20QueryMsg, MinterResponse};
 use terra_multi_test::{
-    AppBuilder, BankKeeper, ContractWrapper, Executor, SwapQuerier, TerraApp, TerraMock,
-    TreasuryQuerier,
+    next_block, AppBuilder, BankKeeper, ContractWrapper, Executor, SwapQuerier, TerraApp,
+    TerraMock, TreasuryQuerier,
 };
 
 fn mock_app() -> TerraApp {
@@ -38,6 +44,62 @@ fn mock_app() -> TerraApp {
         .with_storage(storage)
         .with_custom(custom)
         .build()
+}
+
+fn store_token_code_id(app: &mut TerraApp) -> u64 {
+    let token_contract = Box::new(ContractWrapper::new_with_empty(
+        astroport_token::contract::execute,
+        astroport_token::contract::instantiate,
+        astroport_token::contract::query,
+    ));
+
+    let token_code = app.store_code(token_contract);
+
+    token_code
+}
+
+fn store_proxy_code(app: &mut TerraApp) -> u64 {
+    let generator_proxy_to_mirror_contract = Box::new(ContractWrapper::new_with_empty(
+        astroport_generator_proxy_to_mirror::contract::execute,
+        astroport_generator_proxy_to_mirror::contract::instantiate,
+        astroport_generator_proxy_to_mirror::contract::query,
+    ));
+
+    app.store_code(generator_proxy_to_mirror_contract)
+}
+
+fn store_whitelist_code(app: &mut TerraApp) -> u64 {
+    let whitelist_contract = Box::new(ContractWrapper::new_with_empty(
+        astroport_whitelist::contract::execute,
+        astroport_whitelist::contract::instantiate,
+        astroport_whitelist::contract::query,
+    ));
+
+    app.store_code(whitelist_contract)
+}
+
+fn instantiate_token(
+    app: &mut TerraApp,
+    owner: Addr,
+    token_code_id: u64,
+    name: &str,
+    cap: Option<u128>,
+) -> Addr {
+    let name = String::from(name);
+
+    let msg = TokenInstantiateMsg {
+        name: name.clone(),
+        symbol: name.clone(),
+        decimals: 6,
+        initial_balances: vec![],
+        mint: Some(MinterResponse {
+            minter: owner.to_string(),
+            cap: cap.map(|v| Uint128::from(v)),
+        }),
+    };
+
+    app.instantiate_contract(token_code_id, owner, &msg, &[], name, None)
+        .unwrap()
 }
 
 // Instantiate ASTRO Token Contract
@@ -242,7 +304,7 @@ fn instantiate_generator_and_vesting(
         )
         .unwrap();
 
-    mint_some_astro(
+    mint_some_tokens(
         app,
         owner.clone(),
         astro_token_instance.clone(),
@@ -301,7 +363,7 @@ fn instantiate_generator_and_vesting(
             owner.clone(),
             &init_msg,
             &[],
-            "Guage",
+            "Generator",
             None,
         )
         .unwrap();
@@ -315,7 +377,7 @@ fn instantiate_generator_and_vesting(
         .unwrap();
 
     let msg = astroport::generator::QueryMsg::Config {};
-    let res: astroport::generator::ConfigResponse = app
+    let res: astroport::generator::Config = app
         .wrap()
         .query_wasm_smart(&generator_instance, &msg)
         .unwrap();
@@ -365,11 +427,154 @@ fn instantiate_generator_and_vesting(
     (generator_instance, vesting_instance)
 }
 
-// Mints some ASTRO to "to" recipient
-fn mint_some_astro(
+fn instantiate_generator_and_vesting_v120(
     app: &mut TerraApp,
     owner: Addr,
     astro_token_instance: Addr,
+    astro_factory_instance: Addr,
+) -> (Addr, Addr) {
+    // Vesting
+    let vesting_contract = Box::new(ContractWrapper::new_with_empty(
+        astroport_vesting::contract::execute,
+        astroport_vesting::contract::instantiate,
+        astroport_vesting::contract::query,
+    ));
+    let vesting_code_id = app.store_code(vesting_contract);
+
+    let init_msg = astroport::vesting::InstantiateMsg {
+        owner: owner.to_string(),
+        token_addr: astro_token_instance.clone().to_string(),
+    };
+
+    let vesting_instance = app
+        .instantiate_contract(
+            vesting_code_id,
+            owner.clone(),
+            &init_msg,
+            &[],
+            "Vesting",
+            None,
+        )
+        .unwrap();
+
+    mint_some_tokens(
+        app,
+        owner.clone(),
+        astro_token_instance.clone(),
+        Uint128::new(900_000_000_000),
+        owner.to_string(),
+    );
+    app.execute_contract(
+        owner.clone(),
+        astro_token_instance.clone(),
+        &Cw20ExecuteMsg::IncreaseAllowance {
+            spender: vesting_instance.clone().to_string(),
+            amount: Uint128::new(900_000_000_000),
+            expires: None,
+        },
+        &[],
+    )
+    .unwrap();
+
+    // Generator
+    let generator_contract = Box::new(
+        ContractWrapper::new_with_empty(
+            astroport_generator_v120::contract::execute,
+            astroport_generator_v120::contract::instantiate,
+            astroport_generator_v120::contract::query,
+        )
+        .with_reply_empty(astroport_generator::contract::reply),
+    );
+
+    let generator_code_id = app.store_code(generator_contract);
+
+    let init_msg = astroport_package_generator_v120::generator::InstantiateMsg {
+        allowed_reward_proxies: vec![],
+        start_block: Uint64::from(app.block_info().height),
+        astro_token: astro_token_instance.to_string(),
+        tokens_per_block: Uint128::from(0u128),
+        vesting_contract: vesting_instance.clone().to_string(),
+        owner: owner.to_string(),
+        factory: astro_factory_instance.to_string(),
+        generator_controller: None,
+        guardian: None,
+    };
+
+    let generator_instance = app
+        .instantiate_contract(
+            generator_code_id,
+            owner.clone(),
+            &init_msg,
+            &[],
+            "Generator",
+            Some(owner.to_string()),
+        )
+        .unwrap();
+
+    let tokens_per_block = Uint128::new(10_000000);
+
+    let msg = astroport::generator::ExecuteMsg::SetTokensPerBlock {
+        amount: tokens_per_block,
+    };
+    app.execute_contract(owner.clone(), generator_instance.clone(), &msg, &[])
+        .unwrap();
+
+    let msg = astroport::generator::QueryMsg::Config {};
+    let res: astroport_package_generator_v120::generator::ConfigResponse = app
+        .wrap()
+        .query_wasm_smart(&generator_instance, &msg)
+        .unwrap();
+    assert_eq!(res.tokens_per_block, tokens_per_block);
+
+    // vesting to generator:
+
+    let current_block = app.block_info();
+
+    let amount = Uint128::new(630720000000);
+
+    let msg = Cw20ExecuteMsg::Send {
+        contract: vesting_instance.to_string(),
+        amount,
+        msg: to_binary(&astroport::vesting::Cw20HookMsg::RegisterVestingAccounts {
+            vesting_accounts: vec![astroport::vesting::VestingAccount {
+                address: generator_instance.to_string(),
+                schedules: vec![astroport::vesting::VestingSchedule {
+                    start_point: astroport::vesting::VestingSchedulePoint {
+                        time: current_block.time.seconds(),
+                        amount,
+                    },
+                    end_point: None,
+                }],
+            }],
+        })
+        .unwrap(),
+    };
+
+    app.execute_contract(owner.clone(), astro_token_instance.clone(), &msg, &[])
+        .unwrap();
+
+    // let msg = astroport::generator::ExecuteMsg::Add {
+    //     alloc_point: Uint64::from(10u64),
+    //     reward_proxy: None,
+    //     lp_token: lp_token_instance.clone(),
+    //     with_update: true,
+    // };
+    // app.execute_contract(
+    //     Addr::unchecked(owner.clone()),
+    //     generator_instance.clone(),
+    //     &msg,
+    //     &[],
+    // )
+    // .unwrap();
+
+    (generator_instance, vesting_instance)
+}
+
+// Mints some Tokens to "to" recipient
+fn mint_some_tokens(
+    app: &mut TerraApp,
+    owner: Addr,
+    token_instance: Addr,
     amount: Uint128,
     to: String,
 ) {
@@ -378,7 +583,7 @@ fn mint_some_astro(
         amount: amount,
     };
     let res = app
-        .execute_contract(owner.clone(), astro_token_instance.clone(), &msg, &[])
+        .execute_contract(owner.clone(), token_instance.clone(), &msg, &[])
         .unwrap();
     assert_eq!(res.events[1].attributes[1], attr("action", "mint"));
     assert_eq!(res.events[1].attributes[2], attr("to", to));
@@ -481,6 +686,129 @@ fn instantiate_lockdrop_contract(app: &mut TerraApp, owner: Addr) -> (Addr, Inst
         )
         .unwrap();
     (lockdrop_instance, lockdrop_instantiate_msg)
+}
+
+fn instantiate_lockdrop_contract_v111(
+    app: &mut TerraApp,
+    owner: Addr,
+) -> (Addr, astroport_periphery_v111::lockdrop::InstantiateMsg) {
+    let lockdrop_contract = Box::new(ContractWrapper::new_with_empty(
+        astroport_lockdrop_v111::contract::execute,
+        astroport_lockdrop_v111::contract::instantiate,
+        astroport_lockdrop_v111::contract::query,
+    ));
+
+    let lockdrop_code_id = app.store_code(lockdrop_contract);
+
+    let lockdrop_instantiate_msg = astroport_periphery_v111::lockdrop::InstantiateMsg {
+        owner: Some(owner.clone().to_string()),
+        init_timestamp: EPOCH_START + 100_000,
+        deposit_window: 10_000_000,
+        withdrawal_window: 500_000,
+        min_lock_duration: 1u64,
+        max_lock_duration: 52u64,
+        weekly_multiplier: 1u64,
+        weekly_divider: 12u64,
+        max_positions_per_user: 14,
+    };
+
+    app.update_block(|b| {
+        b.height += 17280;
+        b.time = Timestamp::from_seconds(EPOCH_START + 900_00)
+    });
+
+    // Init contract
+    let lockdrop_instance = app
+        .instantiate_contract(
+            lockdrop_code_id,
+            owner.clone(),
+            &lockdrop_instantiate_msg,
+            &[],
+            "lockdrop",
+            Some(owner.to_string()),
+        )
+        .unwrap();
+    (lockdrop_instance, lockdrop_instantiate_msg)
+}
+
+fn instantiate_proxy(
+    app: &mut TerraApp,
+    owner: Addr,
+    proxy_code: u64,
+    generator_instance: &Addr,
+    pair: &Addr,
+    lp_token: &Addr,
+    mirror_staking_instance: &Addr,
+    mirror_token_instance: &Addr,
+) -> Addr {
+    let init_msg = ProxyInstantiateMsg {
+        generator_contract_addr: generator_instance.to_string(),
+        pair_addr: pair.to_string(),
+        lp_token_addr: lp_token.to_string(),
+        reward_contract_addr: mirror_staking_instance.to_string(),
+        reward_token_addr: mirror_token_instance.to_string(),
+    };
+
+    app.instantiate_contract(
+        proxy_code,
+        owner,
+        &init_msg,
+        &[],
+        String::from("Proxy"),
+        None,
+    )
+    .unwrap()
+}
+
+fn instantiate_mirror_protocol(
+    app: &mut TerraApp,
+    owner: Addr,
+    token_code_id: u64,
+    asset_token: &Addr,
+    staking_token: &Addr,
+) -> (Addr, Addr) {
+    let mirror_token_instance = instantiate_token(app, owner.clone(), token_code_id, "MIR", None);
+
+    // Mirror staking
+    let mirror_staking_contract = Box::new(ContractWrapper::new_with_empty(
+        mirror_staking::contract::execute,
+        mirror_staking::contract::instantiate,
+        mirror_staking::contract::query,
+    ));
+
+    let mirror_staking_code_id = app.store_code(mirror_staking_contract);
+
+    let init_msg = MirrorInstantiateMsg {
+        base_denom: String::from("uusd"),
+        mint_contract: String::from(MOCK_CONTRACT_ADDR),
+        mirror_token: mirror_token_instance.to_string(),
+        oracle_contract: String::from(MOCK_CONTRACT_ADDR),
+        owner: owner.to_string(),
+        premium_min_update_interval: 0,
+        short_reward_contract: String::from(MOCK_CONTRACT_ADDR),
+        terraswap_factory: String::from(MOCK_CONTRACT_ADDR),
+    };
+
+    let mirror_staking_instance = app
+        .instantiate_contract(
+            mirror_staking_code_id,
+            owner.clone(),
+            &init_msg,
+            &[],
+            "Mirror staking",
+            None,
+        )
+        .unwrap();
+
+    let msg = MirrorExecuteMsg::RegisterAsset {
+        asset_token: asset_token.to_string(),
+        staking_token: staking_token.to_string(),
+    };
+
+    app.execute_contract(owner, mirror_staking_instance.clone(), &msg, &[])
+        .unwrap();
+
+    (mirror_token_instance, mirror_staking_instance)
 }
 
 // Instantiate
@@ -633,6 +961,169 @@ fn instantiate_all_contracts(
         lockdrop_instance,
         astroport_factory_instance,
         terraswap_factory_instance,
+        update_msg,
+    );
+}
+
+fn instantiate_all_contracts_old(
+    app: &mut TerraApp,
+    owner: Addr,
+) -> (
+    Addr,
+    Addr,
+    Addr,
+    Addr,
+    Addr,
+    Addr,
+    astroport_periphery_v111::lockdrop::UpdateConfigMsg,
+) {
+    let (lockdrop_instance, _lockdrop_instantiate_msg) =
+        instantiate_lockdrop_contract_v111(app, owner.clone());
+
+    let astro_token = instantiate_astro_token(app, owner.clone());
+
+    // Initiate Terraswap
+    let terraswap_factory_instance = instantiate_terraswap(app, owner.clone());
+
+    // Initiate ASTRO-UST Pair on Astroport
+    let astroport_factory_instance = instantiate_astroport(app, owner.clone());
+    let pair_info = [
+        astroport::asset::AssetInfo::Token {
+            contract_addr: astro_token.clone(),
+        },
+        astroport::asset::AssetInfo::NativeToken {
+            denom: "uusd".to_string(),
+        },
+    ];
+    app.execute_contract(
+        Addr::unchecked("user"),
+        astroport_factory_instance.clone(),
+        &astroport::factory::ExecuteMsg::CreatePair {
+            asset_infos: pair_info.clone(),
+            init_params: None,
+            pair_type: astroport::factory::PairType::Xyk {},
+        },
+        &[],
+    )
+    .unwrap();
+    let pair_resp: astroport::asset::PairInfo = app
+        .wrap()
+        .query_wasm_smart(
+            &astroport_factory_instance,
+            &astroport::factory::QueryMsg::Pair {
+                asset_infos: pair_info.clone(),
+            },
+        )
+        .unwrap();
+    let pool_address = pair_resp.contract_addr;
+
+    let (generator_address, _) = instantiate_generator_and_vesting_v120(
+        app,
+        owner.clone(),
+        astro_token.clone(),
+        astroport_factory_instance.clone(),
+    );
+
+    // Airdrop Contract
+    let airdrop_contract = Box::new(ContractWrapper::new_with_empty(
+        astroport_airdrop::contract::execute,
+        astroport_airdrop::contract::instantiate,
+        astroport_airdrop::contract::query,
+    ));
+
+    let airdrop_code_id = app.store_code(airdrop_contract);
+
+    let airdrop_msg = astroport_periphery::airdrop::InstantiateMsg {
+        owner: Some(owner.clone().to_string()),
+        astro_token_address: astro_token.clone().into_string(),
+        merkle_roots: Some(vec!["merkle_roots".to_string()]),
+        from_timestamp: Some(1_000_00),
+        to_timestamp: 10000_000_00,
+    };
+
+    let airdrop_instance = app
+        .instantiate_contract(
+            airdrop_code_id,
+            owner.clone(),
+            &airdrop_msg,
+            &[],
+            String::from("airdrop_instance"),
+            None,
+        )
+        .unwrap();
+
+    // Initiate Auction contract
+    let (auction_contract, _) = instantiate_auction_contract(
+        app,
+        owner.clone(),
+        astro_token.clone(),
+        airdrop_instance.clone(),
+        lockdrop_instance.clone(),
+        pool_address,
+        generator_address.clone(),
+    );
+
+    // Set auction contract in airdrop contract
+    app.execute_contract(
+        owner.clone(),
+        airdrop_instance.clone(),
+        &astroport_periphery::airdrop::ExecuteMsg::UpdateConfig {
+            owner: None,
+            auction_contract_address: Some(auction_contract.clone().to_string()),
+            merkle_roots: None,
+            from_timestamp: None,
+            to_timestamp: None,
+        },
+        &[],
+    )
+    .unwrap();
+
+    let update_msg = astroport_periphery_v111::lockdrop::UpdateConfigMsg {
+        astro_token_address: Some(astro_token.to_string()),
+        auction_contract_address: Some(auction_contract.to_string()),
+        generator_address: Some(generator_address.to_string()),
+    };
+    app.execute_contract(
+        owner.clone(),
+        astro_token.clone(),
+        &Cw20ExecuteMsg::IncreaseAllowance {
+            spender: lockdrop_instance.clone().to_string(),
+            amount: Uint128::new(1000000000u128),
+            expires: None,
+        },
+        &[],
+    )
+    .unwrap();
+
+    app.execute_contract(
+        owner.clone(),
+        lockdrop_instance.clone(),
+        &astroport_periphery_v111::lockdrop::ExecuteMsg::UpdateConfig {
+            new_config: update_msg.clone(),
+        },
+        &[],
+    )
+    .unwrap();
+
+    app.execute_contract(
+        owner.clone(),
+        astro_token.clone(),
+        &Cw20ExecuteMsg::Send {
+            amount: Uint128::from(1000000000u64),
+            contract: lockdrop_instance.to_string(),
+            msg: to_binary(&Cw20HookMsg::IncreaseAstroIncentives {}).unwrap(),
+        },
+        &[],
+    )
+    .unwrap();
+
+    return (
+        astro_token,
+        lockdrop_instance,
+        generator_address,
+        astroport_factory_instance,
+        terraswap_factory_instance,
+        auction_contract,
         update_msg,
     );
 }
@@ -3924,5 +4415,252 @@ fn test_delegate_astro_to_auction() {
     assert_eq!(
         Uint128::from(500000000u64),
         user_info.delegated_astro_rewards
+    );
+}
+
+#[test]
+fn test_migration() {
+    let mut app = mock_app();
+
+    let owner = Addr::unchecked("contract_owner");
+    let user = Addr::unchecked("user");
+
+    // Instantiate test token
+    let token_code_id = store_token_code_id(&mut app);
+
+    let eur_token = instantiate_token(&mut app, owner.clone(), token_code_id, "EUR", None);
+
+    let (
+        _astro_instance,
+        lockdrop_instance_v111,
+        generator_v120_instance,
+        factory_instance,
+        _terraswap_factory_instance,
+        auction_contract,
+        _update_msg,
+    ) = instantiate_all_contracts_old(&mut app, owner.clone());
+
+    // Initialize and migrate liquidity for a pool
+    let (terraswap_token_instance, eur_lp_address, eur_pair_address) =
+        initialize_and_migrate_liquidity_for_pool(
+            &mut app,
+            owner.clone(),
+            eur_token,
+            lockdrop_instance_v111.clone(),
+            factory_instance,
+        );
+
+    let (mirror_token_instance, mirror_staking_instance) = instantiate_mirror_protocol(
+        &mut app,
+        owner.clone(),
+        token_code_id,
+        &eur_pair_address,
+        &eur_lp_address,
+    );
+
+    let proxy_code_id = store_proxy_code(&mut app);
+
+    let proxy_to_mirror_instance = instantiate_proxy(
+        &mut app,
+        owner.clone(),
+        proxy_code_id,
+        &generator_v120_instance,
+        &eur_pair_address,
+        &eur_lp_address,
+        &mirror_staking_instance,
+        &mirror_token_instance,
+    );
+
+    // Add pool to ASTRO Generator
+    app.execute_contract(
+        owner.clone(),
+        generator_v120_instance.clone(),
+        &astroport_package_generator_v120::generator::ExecuteMsg::SetupPools {
+            pools: vec![(eur_lp_address.to_string(), Uint128::from(10u128))],
+        },
+        &[],
+    )
+    .unwrap();
+
+    let msg = Cw20ExecuteMsg::Send {
+        contract: mirror_staking_instance.to_string(),
+        msg: to_binary(&MirrorStakingHookMsg::DepositReward {
+            rewards: vec![(eur_pair_address.to_string(), Uint128::new(50_000000))],
+        })
+        .unwrap(),
+        amount: Uint128::new(50_000000),
+    };
+
+    mint_some_tokens(
+        &mut app,
+        owner.clone(),
+        mirror_token_instance.clone(),
+        Uint128::from(50_000000u64),
+        owner.to_string(),
+    );
+    app.execute_contract(owner.clone(), mirror_token_instance.clone(), &msg, &[])
+        .unwrap();
+
+    // Allow proxy
+    let msg = astroport_package_generator_v120::generator::ExecuteMsg::UpdateAllowedProxies {
+        add: Some(vec![proxy_to_mirror_instance.to_string()]),
+        remove: None,
+    };
+
+    app.execute_contract(owner.clone(), generator_v120_instance.clone(), &msg, &[])
+        .unwrap();
+
+    // Move token to proxy
+    app.execute_contract(
+        owner.clone(),
+        generator_v120_instance.clone(),
+        &astroport_package_generator_v120::generator::ExecuteMsg::MoveToProxy {
+            lp_token: eur_lp_address.to_string(),
+            proxy: proxy_to_mirror_instance.to_string(),
+        },
+        &[],
+    )
+    .unwrap();
+
+    app.update_block(|bi| next_block(bi));
+
+    // Stake LP Tokens with Generator
+    app.execute_contract(
+        Addr::unchecked(owner.clone()),
+        lockdrop_instance_v111.clone(),
+        &astroport_periphery_v111::lockdrop::ExecuteMsg::StakeLpTokens {
+            terraswap_lp_token: terraswap_token_instance.clone(),
+        },
+        &[],
+    )
+    .unwrap();
+
+    app.execute_contract(
+        auction_contract.clone(),
+        lockdrop_instance_v111.clone(),
+        &astroport_periphery_v111::lockdrop::ExecuteMsg::EnableClaims {},
+        &[],
+    )
+    .unwrap();
+
+    app.update_block(|b| {
+        b.height += 17280;
+        b.time = Timestamp::from_seconds(EPOCH_START + 18648000)
+    });
+
+    app.execute_contract(
+        Addr::unchecked(user.clone()),
+        lockdrop_instance_v111.clone(),
+        &astroport_periphery_v111::lockdrop::ExecuteMsg::ClaimRewardsAndOptionallyUnlock {
+            terraswap_lp_token: terraswap_token_instance.clone(),
+            duration: 10u64,
+            withdraw_lp_stake: true,
+        },
+        &[],
+    )
+    .unwrap();
+
+    let user_info: astroport_periphery_v111::lockdrop::UserInfoResponse = app
+        .wrap()
+        .query_wasm_smart(
+            lockdrop_instance_v111.clone(),
+            &astroport_periphery_v111::lockdrop::QueryMsg::UserInfo {
+                address: "user".to_string(),
+            },
+        )
+        .unwrap();
+
+    assert_eq!(
+        user_info.lockup_infos[0],
+        astroport_periphery_v111::lockdrop::LockUpInfoResponse {
+            terraswap_lp_token: Addr::unchecked("contract #12"),
+            lp_units_locked: Uint128::from(1000000000u64),
+            withdrawal_flag: false,
+            astro_rewards: Uint128::from(500000000_u32),
+            duration: 10,
+            generator_astro_debt: Uint128::from(86400000000u64),
+            claimable_generator_astro_debt: Uint128::zero(),
+            generator_proxy_debt: Uint128::zero(),
+            claimable_generator_proxy_debt: Uint128::zero(),
+            unlock_timestamp: 1662654400,
+            astroport_lp_units: Some(Uint128::from(1000000000u64)),
+            astroport_lp_token: Some(Addr::unchecked("contract #14")),
+            astroport_lp_transferred: Some(Uint128::from(1000000000u32))
+        }
+    );
+
+    let new_generator_contract = Box::new(
+        ContractWrapper::new_with_empty(
+            astroport_generator::contract::execute,
+            astroport_generator::contract::instantiate,
+            astroport_generator::contract::query,
+        )
+        .with_migrate_empty(astroport_generator::contract::migrate)
+        .with_reply_empty(astroport_generator::contract::reply),
+    );
+    let new_lockdrop_contract = Box::new(
+        ContractWrapper::new_with_empty(
+            astroport_lockdrop::contract::execute,
+            astroport_lockdrop::contract::instantiate,
+            astroport_lockdrop::contract::query,
+        )
+        .with_migrate_empty(astroport_lockdrop::contract::migrate),
+    );
+
+    let new_generator_code_id = app.store_code(new_generator_contract);
+    let new_lockdrop_code_id = app.store_code(new_lockdrop_contract);
+    let whitelist_code = store_whitelist_code(&mut app);
+
+    app.migrate_contract(
+        owner.clone(),
+        generator_v120_instance.clone(),
+        &astroport::generator::MigrateMsg {
+            factory: None,
+            generator_controller: None,
+            blocked_list_tokens: None,
+            guardian: None,
+            whitelist_code_id: Some(whitelist_code),
+            voting_escrow: None,
+            generator_limit: None,
+        },
+        new_generator_code_id,
+    )
+    .unwrap();
+
+    app.migrate_contract(
+        owner.clone(),
+        lockdrop_instance_v111.clone(),
+        &MigrateMsg {},
+        new_lockdrop_code_id,
+    )
+    .unwrap();
+
+    let user_info: astroport_periphery::lockdrop::UserInfoResponse = app
+        .wrap()
+        .query_wasm_smart(
+            lockdrop_instance_v111,
+            &astroport_periphery_v111::lockdrop::QueryMsg::UserInfo {
+                address: "user".to_string(),
+            },
+        )
+        .unwrap();
+
+    assert_eq!(
+        user_info.lockup_infos[0],
+        astroport_periphery::lockdrop::LockUpInfoResponse {
+            terraswap_lp_token: Addr::unchecked("contract #12"),
+            lp_units_locked: Uint128::from(1000000000u64),
+            withdrawal_flag: false,
+            astro_rewards: Uint128::from(500000000_u32),
+            duration: 10,
+            generator_astro_debt: Uint128::from(86400000000u64),
+            claimable_generator_astro_debt: Uint128::zero(),
+            generator_proxy_debt: RestrictedVector::default(),
+            claimable_generator_proxy_debt: RestrictedVector::default(),
+            unlock_timestamp: 1662654400,
+            astroport_lp_units: Some(Uint128::from(1000000000u64)),
+            astroport_lp_token: Some(Addr::unchecked("contract #14")),
+            astroport_lp_transferred: Some(Uint128::from(1000000000u32))
+        }
     );
 }
