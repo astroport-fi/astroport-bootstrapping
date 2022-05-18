@@ -483,7 +483,7 @@ fn instantiate_generator_and_vesting_v120(
             astroport_generator_v120::contract::instantiate,
             astroport_generator_v120::contract::query,
         )
-        .with_reply_empty(astroport_generator::contract::reply),
+        .with_reply_empty(astroport_generator_v120::contract::reply),
     );
 
     let generator_code_id = app.store_code(generator_contract);
@@ -519,7 +519,7 @@ fn instantiate_generator_and_vesting_v120(
     app.execute_contract(owner.clone(), generator_instance.clone(), &msg, &[])
         .unwrap();
 
-    let msg = astroport::generator::QueryMsg::Config {};
+    let msg = astroport_package_generator_v120::generator::QueryMsg::Config {};
     let res: astroport_package_generator_v120::generator::ConfigResponse = app
         .wrap()
         .query_wasm_smart(&generator_instance, &msg)
@@ -552,20 +552,6 @@ fn instantiate_generator_and_vesting_v120(
 
     app.execute_contract(owner.clone(), astro_token_instance.clone(), &msg, &[])
         .unwrap();
-
-    // let msg = astroport::generator::ExecuteMsg::Add {
-    //     alloc_point: Uint64::from(10u64),
-    //     reward_proxy: None,
-    //     lp_token: lp_token_instance.clone(),
-    //     with_update: true,
-    // };
-    // app.execute_contract(
-    //     Addr::unchecked(owner.clone()),
-    //     generator_instance.clone(),
-    //     &msg,
-    //     &[],
-    // )
-    // .unwrap();
 
     (generator_instance, vesting_instance)
 }
@@ -4482,25 +4468,6 @@ fn test_migration() {
     )
     .unwrap();
 
-    let msg = Cw20ExecuteMsg::Send {
-        contract: mirror_staking_instance.to_string(),
-        msg: to_binary(&MirrorStakingHookMsg::DepositReward {
-            rewards: vec![(eur_pair_address.to_string(), Uint128::new(50_000000))],
-        })
-        .unwrap(),
-        amount: Uint128::new(50_000000),
-    };
-
-    mint_some_tokens(
-        &mut app,
-        owner.clone(),
-        mirror_token_instance.clone(),
-        Uint128::from(50_000000u64),
-        owner.to_string(),
-    );
-    app.execute_contract(owner.clone(), mirror_token_instance.clone(), &msg, &[])
-        .unwrap();
-
     // Allow proxy
     let msg = astroport_package_generator_v120::generator::ExecuteMsg::UpdateAllowedProxies {
         add: Some(vec![proxy_to_mirror_instance.to_string()]),
@@ -4522,8 +4489,6 @@ fn test_migration() {
     )
     .unwrap();
 
-    app.update_block(|bi| next_block(bi));
-
     // Stake LP Tokens with Generator
     app.execute_contract(
         Addr::unchecked(owner.clone()),
@@ -4534,6 +4499,29 @@ fn test_migration() {
         &[],
     )
     .unwrap();
+
+    app.update_block(|bi| next_block(bi));
+
+    let msg = Cw20ExecuteMsg::Send {
+        contract: mirror_staking_instance.to_string(),
+        msg: to_binary(&MirrorStakingHookMsg::DepositReward {
+            rewards: vec![(eur_pair_address.to_string(), Uint128::new(50_000000))],
+        })
+        .unwrap(),
+        amount: Uint128::new(50_000_000),
+    };
+
+    mint_some_tokens(
+        &mut app,
+        owner.clone(),
+        mirror_token_instance.clone(),
+        Uint128::from(50_000_000u64),
+        owner.to_string(),
+    );
+    app.execute_contract(owner.clone(), mirror_token_instance.clone(), &msg, &[])
+        .unwrap();
+
+    app.update_block(|bi| next_block(bi));
 
     app.execute_contract(
         auction_contract.clone(),
@@ -4574,18 +4562,18 @@ fn test_migration() {
         user_info.lockup_infos[0],
         astroport_periphery_v111::lockdrop::LockUpInfoResponse {
             terraswap_lp_token: Addr::unchecked("contract #12"),
-            lp_units_locked: Uint128::from(1000000000u64),
+            lp_units_locked: Uint128::from(1_000_000_000u64),
             withdrawal_flag: false,
-            astro_rewards: Uint128::from(500000000_u32),
+            astro_rewards: Uint128::from(500_000_000_u32),
             duration: 10,
-            generator_astro_debt: Uint128::from(86400000000u64),
+            generator_astro_debt: Uint128::from(86_410_000_000u64),
             claimable_generator_astro_debt: Uint128::zero(),
-            generator_proxy_debt: Uint128::from(1u8),
+            generator_proxy_debt: Uint128::from(25_000_000u32),
             claimable_generator_proxy_debt: Uint128::zero(),
-            unlock_timestamp: 1662654400,
-            astroport_lp_units: Some(Uint128::from(1000000000u64)),
+            unlock_timestamp: 1_662_654_400,
+            astroport_lp_units: Some(Uint128::from(1_000_000_000u64)),
             astroport_lp_token: Some(Addr::unchecked("contract #14")),
-            astroport_lp_transferred: Some(Uint128::from(1000000000u32))
+            astroport_lp_transferred: Some(Uint128::from(1_000_000_000u32))
         }
     );
 
@@ -4649,23 +4637,23 @@ fn test_migration() {
         user_info.lockup_infos[0],
         astroport_periphery::lockdrop::LockUpInfoResponse {
             terraswap_lp_token: Addr::unchecked("contract #12"),
-            lp_units_locked: Uint128::from(1000000000u64),
+            lp_units_locked: Uint128::from(1_000_000_000u64),
             withdrawal_flag: false,
-            astro_rewards: Uint128::from(500000000_u32),
+            astro_rewards: Uint128::from(500_000_000_u32),
             duration: 10,
-            generator_astro_debt: Uint128::from(86400000000u64),
+            generator_astro_debt: Uint128::from(86_410_000_000u64),
             claimable_generator_astro_debt: Uint128::zero(),
             generator_proxy_debt: RestrictedVector::new(
                 AssetInfo::Token {
                     contract_addr: mirror_token_instance
                 },
-                Uint128::from(1u8)
+                Uint128::from(25_000_000u32)
             ),
             claimable_generator_proxy_debt: RestrictedVector::default(),
-            unlock_timestamp: 1662654400,
-            astroport_lp_units: Some(Uint128::from(1000000000u64)),
+            unlock_timestamp: 1_662_654_400,
+            astroport_lp_units: Some(Uint128::from(1_000_000_000u64)),
             astroport_lp_token: Some(Addr::unchecked("contract #14")),
-            astroport_lp_transferred: Some(Uint128::from(1000000000u32))
+            astroport_lp_transferred: Some(Uint128::from(1_000_000_000u32))
         }
     );
 }
