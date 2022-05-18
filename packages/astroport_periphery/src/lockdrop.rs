@@ -1,3 +1,5 @@
+use astroport::asset::{Asset, AssetInfo};
+use astroport::restricted_vector::RestrictedVector;
 use cosmwasm_std::{
     to_binary, Addr, CosmosMsg, Decimal, Env, StdResult, Uint128, Uint256, WasmMsg,
 };
@@ -130,7 +132,7 @@ pub enum CallbackMsg {
     UpdatePoolOnDualRewardsClaim {
         terraswap_lp_token: Addr,
         prev_astro_balance: Uint128,
-        prev_proxy_reward_balance: Option<Uint128>,
+        prev_proxy_reward_balances: Vec<Asset>,
     },
     WithdrawUserLockupRewardsCallback {
         terraswap_lp_token: Addr,
@@ -250,8 +252,8 @@ pub struct PoolResponse {
     pub weighted_amount: Uint256,
     /// Ratio of ASTRO rewards accured to weighted_amount. Used to calculate ASTRO incentives accured by each user
     pub generator_astro_per_share: Decimal,
-    /// Ratio of ASSET rewards accured to weighted. Used to calculate ASSET incentives accured by each user
-    pub generator_proxy_per_share: Decimal,
+    /// Vector of asset ratio rewards accrued to weighted. Used to calculate ASSET incentives accured by each user
+    pub generator_proxy_per_share: RestrictedVector<AssetInfo, Decimal>,
     /// Boolean value indicating if the LP Tokens are staked with the Generator contract or not
     pub is_staked: bool,
 }
@@ -308,9 +310,9 @@ pub struct LockUpInfoResponse {
     /// ASTRO tokens receivable as generator rewards that user can claim
     pub claimable_generator_astro_debt: Uint128,
     /// Generator Proxy tokens lockup received as generator rewards
-    pub generator_proxy_debt: Uint128,
+    pub generator_proxy_debt: RestrictedVector<AssetInfo, Uint128>,
     /// Proxy tokens receivable as generator rewards that user can claim
-    pub claimable_generator_proxy_debt: Uint128,
+    pub claimable_generator_proxy_debt: RestrictedVector<AssetInfo, Uint128>,
     /// Timestamp beyond which this position can be unlocked
     pub unlock_timestamp: u64,
     /// User's Astroport LP units, calculated as lp_units_locked (terraswap) / total LP units locked (terraswap) * Astroport LP units minted post migration
