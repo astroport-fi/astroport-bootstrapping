@@ -2,6 +2,7 @@ target
 /artifacts/*.wasm
 /artifacts/checksums_intermediate.txt
 /artifacts/checksums.txt
+/contracts/**/schema/
 /scripts/node_modules
 /scripts/.env
 /scripts/never_share

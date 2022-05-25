@@ -1,8 +1,6 @@
+use astroport_periphery::airdrop::{Config, State, UserInfo};
 use astroport_periphery::{
-    airdrop::{
-        ClaimResponse, ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, QueryMsg,
-        StateResponse, UserInfoResponse,
-    },
+    airdrop::{ClaimResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, QueryMsg},
     auction::{ExecuteMsg as AuctionExecuteMsg, UpdateConfigMsg},
 };
 use cosmwasm_std::testing::{mock_env, MockApi, MockQuerier, MockStorage};
@@ -138,11 +136,11 @@ fn enable_claims(app: &mut App, airdrop_instance: Addr, owner: Addr) {
     )
     .unwrap();
 
-    let resp: ConfigResponse = app
+    let resp: Config = app
         .wrap()
         .query_wasm_smart(&airdrop_instance, &QueryMsg::Config {})
         .unwrap();
-    assert_eq!(true, resp.are_claims_allowed);
+    assert_eq!(true, resp.are_claims_enabled);
 }
 
 #[test]
@@ -150,7 +148,7 @@ fn proper_initialization() {
     let mut app = mock_app();
     let (airdrop_instance, astro_token_instance, init_msg, _) = init_contracts(&mut app);
 
-    let resp: ConfigResponse = app
+    let resp: Config = app
         .wrap()
         .query_wasm_smart(&airdrop_instance, &QueryMsg::Config {})
         .unwrap();
@@ -164,7 +162,7 @@ fn proper_initialization() {
     assert_eq!(init_msg.to_timestamp, resp.to_timestamp);
 
     // Check state
-    let resp: StateResponse = app
+    let resp: State = app
         .wrap()
         .query_wasm_smart(&airdrop_instance, &QueryMsg::State {})
         .unwrap();
@@ -196,7 +194,7 @@ fn proper_initialization() {
     .unwrap();
 
     // Check state
-    let resp: StateResponse = app
+    let resp: State = app
         .wrap()
         .query_wasm_smart(&airdrop_instance, &QueryMsg::State {})
         .unwrap();
@@ -255,7 +253,7 @@ fn update_config() {
     )
     .unwrap();
 
-    let resp: ConfigResponse = app
+    let resp: Config = app
         .wrap()
         .query_wasm_smart(&airdrop_instance, &QueryMsg::Config {})
         .unwrap();
@@ -386,7 +384,7 @@ fn test_transfer_unclaimed_tokens() {
     )
     .unwrap();
 
-    let state_resp: StateResponse = app
+    let state_resp: State = app
         .wrap()
         .query_wasm_smart(&airdrop_instance, &QueryMsg::State {})
         .unwrap();
@@ -459,7 +457,7 @@ fn test_claim_by_terra_user() {
     )
     .unwrap();
 
-    let resp: ConfigResponse = app
+    let resp: Config = app
         .wrap()
         .query_wasm_smart(&airdrop_instance, &QueryMsg::Config {})
         .unwrap();
@@ -594,7 +592,7 @@ fn test_claim_by_terra_user() {
 
     assert_eq!(
         success_.events[1].attributes[1],
-        attr("action", "Airdrop::ExecuteMsg::Claim")
+        attr("action", "handle_claim")
     );
     assert_eq!(
         success_.events[1].attributes[2],
@@ -618,7 +616,7 @@ fn test_claim_by_terra_user() {
     assert_eq!(true, claim_query_resp.is_claimed);
 
     // Check :: User state
-    let mut user_info_query_resp: UserInfoResponse = app
+    let mut user_info_query_resp: UserInfo = app
         .wrap()
         .query_wasm_smart(
             &airdrop_instance,
@@ -629,13 +627,13 @@ fn test_claim_by_terra_user() {
         .unwrap();
     assert_eq!(
         Uint128::from(250000000u64),
-        user_info_query_resp.airdrop_amount
+        user_info_query_resp.claimed_amount
     );
     assert_eq!(Uint128::from(0u64), user_info_query_resp.delegated_amount);
     assert_eq!(false, user_info_query_resp.tokens_withdrawn);
 
     // Check :: Contract state
-    let mut state_query_resp: StateResponse = app
+    let mut state_query_resp: State = app
         .wrap()
         .query_wasm_smart(&airdrop_instance, &QueryMsg::State {})
         .unwrap();
@@ -769,7 +767,7 @@ fn test_claim_by_terra_user() {
 
     assert_eq!(
         success_.events[1].attributes[1],
-        attr("action", "Airdrop::ExecuteMsg::Claim")
+        attr("action", "handle_claim")
     );
     assert_eq!(
         success_.events[1].attributes[2],
@@ -811,7 +809,7 @@ fn test_claim_by_terra_user() {
             },
         )
         .unwrap();
-    assert_eq!(Uint128::from(1u64), user_info_query_resp.airdrop_amount);
+    assert_eq!(Uint128::from(1u64), user_info_query_resp.claimed_amount);
     assert_eq!(Uint128::from(0u64), user_info_query_resp.delegated_amount);
     assert_eq!(true, user_info_query_resp.tokens_withdrawn);
 
@@ -910,11 +908,11 @@ fn test_enable_claims() {
     )
     .unwrap();
 
-    let resp: ConfigResponse = app
+    let resp: Config = app
         .wrap()
         .query_wasm_smart(&airdrop_instance, &QueryMsg::Config {})
         .unwrap();
-    assert_eq!(true, resp.are_claims_allowed);
+    assert_eq!(true, resp.are_claims_enabled);
 
     // ###### Should give "Claims already enabled" Error ######
 
@@ -989,7 +987,7 @@ fn test_withdraw_airdrop_rewards() {
     )
     .unwrap();
 
-    let resp: ConfigResponse = app
+    let resp: Config = app
         .wrap()
         .query_wasm_smart(&airdrop_instance, &QueryMsg::Config {})
         .unwrap();
@@ -1045,7 +1043,7 @@ fn test_withdraw_airdrop_rewards() {
 
     assert_eq!(
         success_.events[1].attributes[1],
-        attr("action", "Airdrop::ExecuteMsg::Claim")
+        attr("action", "handle_claim")
     );
     assert_eq!(
         success_.events[1].attributes[2],
@@ -1069,7 +1067,7 @@ fn test_withdraw_airdrop_rewards() {
     assert_eq!(true, claim_query_resp.is_claimed);
 
     // Check :: User state
-    let user_info_query_resp: UserInfoResponse = app
+    let user_info_query_resp: UserInfo = app
         .wrap()
         .query_wasm_smart(
             &airdrop_instance,
@@ -1080,13 +1078,13 @@ fn test_withdraw_airdrop_rewards() {
         .unwrap();
     assert_eq!(
         Uint128::from(250000000u64),
-        user_info_query_resp.airdrop_amount
+        user_info_query_resp.claimed_amount
     );
     assert_eq!(Uint128::from(0u64), user_info_query_resp.delegated_amount);
     assert_eq!(false, user_info_query_resp.tokens_withdrawn);
 
     // Check :: Contract state
-    let state_query_resp: StateResponse = app
+    let state_query_resp: State = app
         .wrap()
         .query_wasm_smart(&airdrop_instance, &QueryMsg::State {})
         .unwrap();
@@ -1133,7 +1131,7 @@ fn test_withdraw_airdrop_rewards() {
     .unwrap();
 
     // Check :: User state
-    let user_info_query_resp: UserInfoResponse = app
+    let user_info_query_resp: UserInfo = app
         .wrap()
         .query_wasm_smart(
             &airdrop_instance,
@@ -1144,7 +1142,7 @@ fn test_withdraw_airdrop_rewards() {
         .unwrap();
     assert_eq!(
         Uint128::from(250000000u64),
-        user_info_query_resp.airdrop_amount
+        user_info_query_resp.claimed_amount
     );
     assert_eq!(Uint128::from(0u64), user_info_query_resp.delegated_amount);
     assert_eq!(true, user_info_query_resp.tokens_withdrawn);
@@ -1275,7 +1273,7 @@ fn test_delegate_astro_to_bootstrap_auction() {
     app.execute_contract(owner.clone(), airdrop_instance.clone(), &update_msg, &[])
         .unwrap();
 
-    let resp: ConfigResponse = app
+    let resp: Config = app
         .wrap()
         .query_wasm_smart(&airdrop_instance, &QueryMsg::Config {})
         .unwrap();
@@ -1319,7 +1317,7 @@ fn test_delegate_astro_to_bootstrap_auction() {
 
     assert_eq!(
         success_.events[1].attributes[1],
-        attr("action", "Airdrop::ExecuteMsg::Claim")
+        attr("action", "handle_claim")
     );
     assert_eq!(
         success_.events[1].attributes[2],
@@ -1361,10 +1359,7 @@ fn test_delegate_astro_to_bootstrap_auction() {
         .unwrap();
     assert_eq!(
         delegation_res.events[1].attributes[1],
-        attr(
-            "action",
-            "Airdrop::ExecuteMsg::DelegateAstroToBootstrapAuction"
-        )
+        attr("action", "delegate_astro_to_bootstrap_auction")
     );
     assert_eq!(
         delegation_res.events[1].attributes[2],
@@ -1376,7 +1371,7 @@ fn test_delegate_astro_to_bootstrap_auction() {
     );
 
     // Check :: Airdrop :: User state
-    let user_info_query_resp: UserInfoResponse = app
+    let user_info_query_resp: UserInfo = app
         .wrap()
         .query_wasm_smart(
             &airdrop_instance,
@@ -1387,7 +1382,7 @@ fn test_delegate_astro_to_bootstrap_auction() {
         .unwrap();
     assert_eq!(
         Uint128::from(250000000u64),
-        user_info_query_resp.airdrop_amount
+        user_info_query_resp.claimed_amount
     );
     assert_eq!(
         Uint128::from(250000000u64),
@@ -1396,7 +1391,7 @@ fn test_delegate_astro_to_bootstrap_auction() {
     assert_eq!(false, user_info_query_resp.tokens_withdrawn);
 
     // Check :: Airdrop :: Contract state
-    let state_query_resp: StateResponse = app
+    let state_query_resp: State = app
         .wrap()
         .query_wasm_smart(&airdrop_instance, &QueryMsg::State {})
         .unwrap();

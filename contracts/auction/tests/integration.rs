@@ -1,6 +1,6 @@
 use astroport_periphery::auction::{
-    ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, QueryMsg, StateResponse,
-    UpdateConfigMsg, UserInfoResponse,
+    Config, Cw20HookMsg, ExecuteMsg, InstantiateMsg, QueryMsg, State, UpdateConfigMsg,
+    UserInfoResponse,
 };
 use cosmwasm_std::testing::{mock_env, MockApi, MockQuerier, MockStorage};
 use cosmwasm_std::{attr, to_binary, Addr, Coin, Timestamp, Uint128, Uint64};
@@ -681,7 +681,7 @@ fn proper_initialization_only_auction_astro() {
     let mut app = mock_app();
     let (_, _, auction_instance, _, auction_init_msg) = init_auction_astro_contracts(&mut app);
 
-    let resp: ConfigResponse = app
+    let resp: Config = app
         .wrap()
         .query_wasm_smart(&auction_instance, &QueryMsg::Config {})
         .unwrap();
@@ -705,7 +705,7 @@ fn proper_initialization_only_auction_astro() {
     assert_eq!(auction_init_msg.withdrawal_window, resp.withdrawal_window);
 
     // Check state
-    let resp: StateResponse = app
+    let resp: State = app
         .wrap()
         .query_wasm_smart(&auction_instance, &QueryMsg::State {})
         .unwrap();
@@ -723,7 +723,7 @@ fn proper_initialization_all_contracts() {
     let mut app = mock_app();
     let (auction_instance, _, _, _, _, _, auction_init_msg) = init_all_contracts(&mut app);
 
-    let resp: ConfigResponse = app
+    let resp: Config = app
         .wrap()
         .query_wasm_smart(&auction_instance, &QueryMsg::Config {})
         .unwrap();
@@ -747,7 +747,7 @@ fn proper_initialization_all_contracts() {
     assert_eq!(auction_init_msg.withdrawal_window, resp.withdrawal_window);
 
     // Check state
-    let resp: StateResponse = app
+    let resp: State = app
         .wrap()
         .query_wasm_smart(&auction_instance, &QueryMsg::State {})
         .unwrap();
@@ -849,7 +849,7 @@ fn test_delegate_astro_tokens_from_airdrop() {
     )
     .unwrap();
     // Check state response
-    let state_resp: StateResponse = app
+    let state_resp: State = app
         .wrap()
         .query_wasm_smart(&auction_instance, &QueryMsg::State {})
         .unwrap();
@@ -886,7 +886,7 @@ fn test_delegate_astro_tokens_from_airdrop() {
     )
     .unwrap();
     // Check state response
-    let state_resp: StateResponse = app
+    let state_resp: State = app
         .wrap()
         .query_wasm_smart(&auction_instance, &QueryMsg::State {})
         .unwrap();
@@ -1021,7 +1021,7 @@ fn test_delegate_astro_tokens_from_lockdrop() {
     )
     .unwrap();
     // Check state response
-    let state_resp: StateResponse = app
+    let state_resp: State = app
         .wrap()
         .query_wasm_smart(&auction_instance, &QueryMsg::State {})
         .unwrap();
@@ -1052,7 +1052,7 @@ fn test_delegate_astro_tokens_from_lockdrop() {
     )
     .unwrap();
     // Check state response
-    let state_resp: StateResponse = app
+    let state_resp: State = app
         .wrap()
         .query_wasm_smart(&auction_instance, &QueryMsg::State {})
         .unwrap();
@@ -1130,7 +1130,7 @@ fn test_update_config() {
     )
     .unwrap();
 
-    let resp: ConfigResponse = app
+    let resp: Config = app
         .wrap()
         .query_wasm_smart(&auction_instance, &QueryMsg::Config {})
         .unwrap();
@@ -1208,7 +1208,7 @@ fn test_deposit_ust() {
     )
     .unwrap();
     // Check state response
-    let mut state_resp: StateResponse = app
+    let mut state_resp: State = app
         .wrap()
         .query_wasm_smart(&auction_instance, &QueryMsg::State {})
         .unwrap();
@@ -1359,7 +1359,7 @@ fn test_withdraw_ust() {
     )
     .unwrap();
     // Check state response
-    let mut state_resp: StateResponse = app
+    let mut state_resp: State = app
         .wrap()
         .query_wasm_smart(&auction_instance, &QueryMsg::State {})
         .unwrap();
@@ -1646,7 +1646,7 @@ fn test_add_liquidity_to_astroport_pool() {
     );
 
     // Auction :: Check state response
-    let state_resp: StateResponse = app
+    let state_resp: State = app
         .wrap()
         .query_wasm_smart(&auction_instance, &QueryMsg::State {})
         .unwrap();
@@ -1671,14 +1671,14 @@ fn test_add_liquidity_to_astroport_pool() {
     assert_eq!(Uint128::from(39769057u64), pool_resp.total_share);
 
     // Airdrop :: Check config for claims
-    let airdrop_config_resp: astroport_periphery::airdrop::ConfigResponse = app
+    let airdrop_config_resp: astroport_periphery::airdrop::Config = app
         .wrap()
         .query_wasm_smart(
             &airdrop_instance,
             &astroport_periphery::airdrop::QueryMsg::Config {},
         )
         .unwrap();
-    assert_eq!(true, airdrop_config_resp.are_claims_allowed);
+    assert_eq!(true, airdrop_config_resp.are_claims_enabled);
 
     // Lockdrop :: Check state for claims
     let lockdrop_config_resp: astroport_periphery::lockdrop::StateResponse = app
@@ -1882,7 +1882,7 @@ fn test_stake_lp_tokens() {
     );
 
     // Auction :: Check state response
-    let state_resp: StateResponse = app
+    let state_resp: State = app
         .wrap()
         .query_wasm_smart(&auction_instance, &QueryMsg::State {})
         .unwrap();
@@ -2106,7 +2106,7 @@ fn test_claim_rewards() {
         .unwrap_err();
     assert_eq!(
         err.to_string(),
-        "astroport_auction::state::UserInfo not found"
+        "astroport_periphery::auction::UserInfo not found"
     );
 
     // ######    Sucess :: Initialize ASTRO-UST Pool   ######
@@ -2403,7 +2403,7 @@ fn test_withdraw_unlocked_lp_shares() {
         .unwrap_err();
     assert_eq!(
         err.to_string(),
-        "astroport_auction::state::UserInfo not found"
+        "astroport_periphery::auction::UserInfo not found"
     );
 
     // ######    Sucess :: Initialize ASTRO-UST Pool   ######
