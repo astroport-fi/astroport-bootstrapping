@@ -2,7 +2,7 @@
 name = "phoenix-astroport-airdrop"
 version = "1.0.0"
 authors = ["_astromartian"]
-edition = "2018"
+edition = "2021"
 description = "Contract to facilitate ASTRO Token airdrop to users on Terra Phoenix network"
 
 
