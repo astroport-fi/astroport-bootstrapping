@@ -45,26 +45,6 @@
         }
       },
       "additionalProperties": false
-    },
-    {
-      "type": "object",
-      "required": [
-        "has_user_claimed"
-      ],
-      "properties": {
-        "has_user_claimed": {
-          "type": "object",
-          "required": [
-            "address"
-          ],
-          "properties": {
-            "address": {
-              "type": "string"
-            }
-          }
-        }
-      },
-      "additionalProperties": false
     }
   ]
 }

@@ -2,8 +2,8 @@ use crate::crypto::verify_claim;
 use crate::state::{Config, State, CONFIG, STATE, USERS};
 use astroport_periphery::helpers::{build_transfer_cw20_token_msg, cw20_get_balance};
 use astroport_periphery::simple_airdrop::{
-    ClaimResponse, ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg,
-    StateResponse, UserInfoResponse,
+    ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg, StateResponse,
+    UserInfoResponse,
 };
 use cosmwasm_std::{
     attr, entry_point, from_binary, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response,
@@ -131,7 +131,6 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Config {} => to_binary(&query_config(deps)?),
         QueryMsg::State {} => to_binary(&query_state(deps)?),
-        QueryMsg::HasUserClaimed { address } => to_binary(&query_user_claimed(deps, address)?),
         QueryMsg::UserInfo { address } => to_binary(&query_user_info(deps, address)?),
     }
 }
@@ -254,15 +253,21 @@ pub fn handle_claim(
 
     let mut user_info = USERS.load(deps.storage, &recipient).unwrap_or_default();
 
+    let mut amount_claimable = claim_amount;
+
     // Check if addr has already claimed the tokens
     if !user_info.airdrop_amount.is_zero() {
-        return Err(StdError::generic_err("Already claimed"));
+        amount_claimable = amount_claimable.checked_sub(user_info.airdrop_amount)?;
+    }
+
+    if amount_claimable.is_zero() {
+        return Err(StdError::generic_err("No ASTRO to claim"));
     }
 
     let mut messages = vec![];
 
     // check is sufficient ASTRO available
-    if state.unclaimed_tokens < claim_amount {
+    if state.unclaimed_tokens < amount_claimable {
         return Err(StdError::generic_err("Insufficient ASTRO available"));
     }
 
@@ -270,12 +275,12 @@ pub fn handle_claim(
     messages.push(build_transfer_cw20_token_msg(
         recipient.clone(),
         config.astro_token_address.to_string(),
-        claim_amount,
+        amount_claimable,
     )?);
 
     // Update amounts
-    state.unclaimed_tokens -= claim_amount;
-    user_info.airdrop_amount = claim_amount;
+    state.unclaimed_tokens = state.unclaimed_tokens.checked_sub(amount_claimable)?;
+    user_info.airdrop_amount = user_info.airdrop_amount.checked_add(amount_claimable)?;
 
     USERS.save(deps.storage, &recipient, &user_info)?;
     STATE.save(deps.storage, &state)?;
@@ -375,17 +380,5 @@ fn query_user_info(deps: Deps, user_address: String) -> StdResult<UserInfoRespon
         .unwrap_or_default();
     Ok(UserInfoResponse {
         airdrop_amount: user_info.airdrop_amount,
-    })
-}
-
-/// @dev Returns true if the user has claimed the airdrop [EVM addresses to be provided in lower-case without the '0x' prefix]
-fn query_user_claimed(deps: Deps, address: String) -> StdResult<ClaimResponse> {
-    let user_address = deps.api.addr_validate(&address)?;
-    let user_info = USERS
-        .may_load(deps.storage, &user_address)?
-        .unwrap_or_default();
-
-    Ok(ClaimResponse {
-        is_claimed: !user_info.airdrop_amount.is_zero(),
     })
 }

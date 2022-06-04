@@ -2,7 +2,7 @@
 
 This repo contains the contracts which facilitates ASTRO tokens airdrop, lockdrop and LP Bootstrapping via auction during the intital protocol launch.
 
-![Astroport Launch : Overview](./Astroport-periphery.png?raw=true 'Astroport Launch : Overview')
+![Astroport Launch : Overview](./Astroport-periphery.png?raw=true "Astroport Launch : Overview")
 
 ## Development
 
@@ -50,7 +50,7 @@ cargo build
 docker run --rm -v "$(pwd)":/code \
   --mount type=volume,source="$(basename "$(pwd)")_cache",target=/code/target \
   --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
-  cosmwasm/rust-optimizer:0.11.3
+  cosmwasm/workspace-optimizer:0.12.6
 ```
 
 ## Bug Bounty
