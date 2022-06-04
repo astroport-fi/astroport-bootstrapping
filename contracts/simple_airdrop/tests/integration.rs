@@ -1,20 +1,14 @@
 use astroport_periphery::simple_airdrop::{
-    ClaimResponse, ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, QueryMsg,
-    StateResponse, UserInfoResponse,
+    ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, QueryMsg, StateResponse,
+    UserInfoResponse,
 };
-use cosmwasm_std::testing::{mock_env, MockApi, MockQuerier, MockStorage};
 use cosmwasm_std::{attr, to_binary, Addr, Timestamp, Uint128};
 use cw20::Cw20ExecuteMsg;
-use terra_multi_test::{App, BankKeeper, ContractWrapper, Executor, TerraMockQuerier};
+use cw_multi_test::{App, BasicApp, ContractWrapper, Executor};
 
-fn mock_app() -> App {
-    let api = MockApi::default();
-    let env = mock_env();
-    let bank = BankKeeper::new();
-    let storage = MockStorage::new();
-    let tmq = TerraMockQuerier::new(MockQuerier::new(&[]));
-
-    App::new(api, env.block, bank, storage, tmq)
+type TerraApp = App;
+fn mock_app() -> TerraApp {
+    BasicApp::default()
 }
 
 fn init_contracts(app: &mut App) -> (Addr, Addr, InstantiateMsg, u64) {
@@ -38,6 +32,7 @@ fn init_contracts(app: &mut App) -> (Addr, Addr, InstantiateMsg, u64) {
             minter: owner.to_string(),
             cap: None,
         }),
+        marketing: None,
     };
 
     let astro_token_instance = app
@@ -53,9 +48,9 @@ fn init_contracts(app: &mut App) -> (Addr, Addr, InstantiateMsg, u64) {
 
     // Instantiate Airdrop Contract
     let simple_airdrop_contract = Box::new(ContractWrapper::new(
-        simple_astroport_airdrop::contract::execute,
-        simple_astroport_airdrop::contract::instantiate,
-        simple_astroport_airdrop::contract::query,
+        phoenix_astroport_airdrop::contract::execute,
+        phoenix_astroport_airdrop::contract::instantiate,
+        phoenix_astroport_airdrop::contract::query,
     ));
 
     let simple_airdrop_code_id = app.store_code(simple_airdrop_contract);
@@ -186,7 +181,7 @@ fn update_config() {
         .unwrap_err();
 
     assert_eq!(
-        err.to_string(),
+        err.root_cause().to_string(),
         "Generic error: Only owner can update configuration"
     );
 
@@ -276,7 +271,10 @@ fn test_transfer_unclaimed_tokens() {
         )
         .unwrap_err();
 
-    assert_eq!(err.to_string(), "Generic error: Sender not authorized!");
+    assert_eq!(
+        err.root_cause().to_string(),
+        "Generic error: Sender not authorized!"
+    );
 
     // claim period is not over
     app.update_block(|b| {
@@ -298,7 +296,7 @@ fn test_transfer_unclaimed_tokens() {
         .unwrap_err();
 
     assert_eq!(
-        err.to_string(),
+        err.root_cause().to_string(),
         "Generic error: 9900000 seconds left before unclaimed tokens can be transferred"
     );
 
@@ -322,7 +320,7 @@ fn test_transfer_unclaimed_tokens() {
         .unwrap_err();
 
     assert_eq!(
-        err.to_string(),
+        err.root_cause().to_string(),
         "Generic error: Amount cannot exceed max available ASTRO balance 100000000000"
     );
 
@@ -463,7 +461,10 @@ fn test_claim_by_terra_user() {
             &[],
         )
         .unwrap_err();
-    assert_eq!(claim_f.to_string(), "Generic error: Claim not allowed");
+    assert_eq!(
+        claim_f.root_cause().to_string(),
+        "Generic error: Claim not allowed"
+    );
 
     // Update Block to test successful claim
     app.update_block(|b| {
@@ -489,7 +490,7 @@ fn test_claim_by_terra_user() {
         .unwrap_err();
 
     assert_eq!(
-        claim_f.to_string(),
+        claim_f.root_cause().to_string(),
         "Generic error: Incorrect Merkle Root Index"
     );
 
@@ -503,7 +504,10 @@ fn test_claim_by_terra_user() {
         )
         .unwrap_err();
 
-    assert_eq!(claim_f.to_string(), "Generic error: Incorrect Merkle Proof");
+    assert_eq!(
+        claim_f.root_cause().to_string(),
+        "Generic error: Incorrect Merkle Proof"
+    );
 
     // **** "Incorrect Merkle Proof" Error should be returned ****
     claim_f = app
@@ -515,21 +519,12 @@ fn test_claim_by_terra_user() {
         )
         .unwrap_err();
 
-    assert_eq!(claim_f.to_string(), "Generic error: Incorrect Merkle Proof");
+    assert_eq!(
+        claim_f.root_cause().to_string(),
+        "Generic error: Incorrect Merkle Proof"
+    );
 
     // **** User should successfully claim the Airdrop ****
-
-    // Check :: User hasn't yet claimed the airdrop
-    let resp: ClaimResponse = app
-        .wrap()
-        .query_wasm_smart(
-            &airdrop_instance,
-            &QueryMsg::HasUserClaimed {
-                address: "terra17lmam6zguazs5q5u6z5mmx76uj63gldnse2pdp".to_string(),
-            },
-        )
-        .unwrap();
-    assert_eq!(false, resp.is_claimed);
 
     // Should be a success
     let success_ = app
@@ -553,18 +548,6 @@ fn test_claim_by_terra_user() {
         success_.events[1].attributes[3],
         attr("airdrop", "250000000")
     );
-
-    // Check :: User successfully claimed the airdrop
-    let mut claim_query_resp: ClaimResponse = app
-        .wrap()
-        .query_wasm_smart(
-            &airdrop_instance,
-            &QueryMsg::HasUserClaimed {
-                address: "terra17lmam6zguazs5q5u6z5mmx76uj63gldnse2pdp".to_string(),
-            },
-        )
-        .unwrap();
-    assert_eq!(true, claim_query_resp.is_claimed);
 
     // Check :: User state
     let user_info_query_resp: UserInfoResponse = app
@@ -607,7 +590,7 @@ fn test_claim_by_terra_user() {
         .unwrap();
     assert_eq!(Uint128::from(250000000u64), bal_resp.balance);
 
-    // **** "Already claimed" Error should be returned ****
+    // **** "Generic error: No ASTRO to claim" Error should be returned ****
 
     claim_f = app
         .execute_contract(
@@ -617,19 +600,10 @@ fn test_claim_by_terra_user() {
             &[],
         )
         .unwrap_err();
-    assert_eq!(claim_f.to_string(), "Generic error: Already claimed");
-
-    // Check :: User successfully claimed the airdrop
-    claim_query_resp = app
-        .wrap()
-        .query_wasm_smart(
-            &airdrop_instance,
-            &QueryMsg::HasUserClaimed {
-                address: "terra17lmam6zguazs5q5u6z5mmx76uj63gldnse2pdp".to_string(),
-            },
-        )
-        .unwrap();
-    assert_eq!(true, claim_query_resp.is_claimed);
+    assert_eq!(
+        claim_f.root_cause().to_string(),
+        "Generic error: No ASTRO to claim"
+    );
 
     // Claim period has concluded
     app.update_block(|b| {
@@ -648,7 +622,7 @@ fn test_claim_by_terra_user() {
         )
         .unwrap_err();
     assert_eq!(
-        claim_f.to_string(),
+        claim_f.root_cause().to_string(),
         "Generic error: Claim period has concluded"
     );
 }

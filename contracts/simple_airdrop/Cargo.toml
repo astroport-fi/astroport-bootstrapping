@@ -51,5 +51,5 @@ sha3 = "0.9.1"
 [dev-dependencies]
 cosmwasm-schema = "1.0.0"
 cw-multi-test = "0.13.2"
-# astroport-token = {git = "https://github.com/astroport-fi/astroport.git", branch = "master", package = "astroport-token"}
-# astroport = {git = "https://github.com/astroport-fi/astroport.git", branch = "master"}
+astroport-token = {git = "https://github.com/astroport-fi/astroport.git", branch = "release/terra2", package = "astroport-token"}
+astroport = {git = "https://github.com/astroport-fi/astroport.git", branch = "release/terra2"}
