@@ -722,7 +722,8 @@ pub fn handle_initialize_pool(
         let res: Option<cw20::MinterResponse> = deps
             .querier
             .query_wasm_smart(&terraswap_lp_token, &Cw20QueryMsg::Minter {})?;
-        deps.api.addr_validate(
+        addr_validate_to_lower(
+            deps.api,
             &res.ok_or_else(|| StdError::generic_err("No minter for the LP token!"))?
                 .minter,
         )?
