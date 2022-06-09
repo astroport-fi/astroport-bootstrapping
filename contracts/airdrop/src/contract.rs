@@ -242,7 +242,7 @@ pub fn handle_update_config(
     to_timestamp: Option<u64>,
 ) -> StdResult<Response> {
     let mut config = CONFIG.load(deps.storage)?;
-    let mut attributes = vec![attr("action", "Airdrop::ExecuteMsg::UpdateConfig")];
+    let mut attributes = vec![attr("action", "update_config")];
 
     // CHECK :: ONLY OWNER CAN CALL THIS FUNCTION
     if info.sender != config.owner {
@@ -251,7 +251,7 @@ pub fn handle_update_config(
 
     if let Some(owner) = owner {
         config.owner = addr_validate_to_lower(deps.api, &owner)?;
-        attributes.push(attr("update_config", owner.as_str()))
+        attributes.push(attr("new_owner", owner.as_str()))
     }
 
     if let Some(auction_contract_address) = auction_contract_address {
