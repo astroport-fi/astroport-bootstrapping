@@ -45,7 +45,13 @@ pub fn build_send_cw20_token_msg(
     }))
 }
 
-// CW20
+/// Helper function to get CW20 token balance of the user
+/// ## Params
+/// * **querier** is an object of type [`QuerierWrapper`].
+///
+/// * **token_address** is an object of type [`Addr`].
+///
+/// * **account_addr** is an object of type [`Addr`].
 pub fn cw20_get_balance(
     querier: &QuerierWrapper,
     token_address: Addr,
@@ -61,10 +67,13 @@ pub fn cw20_get_balance(
     Ok(query.balance)
 }
 
-/// @dev Helper function which returns a cosmos wasm msg to approve held cw20 tokens to be transferrable by beneficiary address
-/// @param token_contract_address : Token contract address
-/// @param spender_address : Address to which allowance is being provided to, to allow it to transfer the tokens held by the contract
-/// @param allowance_amount : Allowance amount
+/// Helper function which returns a cosmos wasm msg to approve held cw20 tokens to be transferrable by beneficiary address
+/// ## Params
+/// * **token_contract_address** is an object of type [`String`]. Token contract address
+///
+/// * **spender_address** is an object of type [`String`]. Address to which allowance is being provided to, to allow it to transfer the tokens held by the contract
+///
+/// * **allowance_amount** is an object of type [`Uint128`]. Allowance amount
 pub fn build_approve_cw20_msg(
     token_contract_address: String,
     spender_address: String,

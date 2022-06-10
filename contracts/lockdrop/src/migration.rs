@@ -14,10 +14,15 @@ pub struct PoolInfoV101 {
     pub terraswap_pool: Addr,
     pub terraswap_amount_in_lockups: Uint128,
     pub migration_info: Option<MigrationInfo>,
+    /// Share of total ASTRO incentives allocated to this pool
     pub incentives_share: u64,
+    /// Weighted LP Token balance used to calculate ASTRO rewards a particular user can claim
     pub weighted_amount: Uint256,
+    /// Ratio of Generator ASTRO rewards accured to astroport pool share
     pub generator_astro_per_share: Decimal,
+    /// Ratio of Generator Proxy rewards accured to astroport pool share
     pub generator_proxy_per_share: Decimal,
+    /// Boolean value indicating if the LP Tokens are staked with the Generator contract or not
     pub is_staked: bool,
 }
 

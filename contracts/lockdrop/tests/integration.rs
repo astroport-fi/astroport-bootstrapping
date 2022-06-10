@@ -5,8 +5,8 @@ use astroport_governance::utils::EPOCH_START;
 use astroport_periphery::{
     auction::{ExecuteMsg as AuctionExecuteMsg, UpdateConfigMsg as AuctionUpdateConfigMsg},
     lockdrop::{
-        self, ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, MigrationInfo, PoolResponse,
-        QueryMsg, StateResponse, UpdateConfigMsg, UserInfoResponse,
+        self, Cw20HookMsg, ExecuteMsg, InstantiateMsg, MigrationInfo, QueryMsg, StateResponse,
+        UpdateConfigMsg, UserInfoResponse,
     },
 };
 use cosmwasm_std::testing::{mock_env, MockApi, MockStorage, MOCK_CONTRACT_ADDR};
@@ -19,7 +19,7 @@ use mirror_protocol::staking::{
 };
 
 use astroport::token::InstantiateMsg as TokenInstantiateMsg;
-use astroport_periphery::lockdrop::MigrateMsg;
+use astroport_periphery::lockdrop::{Config, MigrateMsg, PoolInfo};
 use cw20::{Cw20ExecuteMsg, Cw20QueryMsg, MinterResponse};
 use terra_multi_test::{
     next_block, AppBuilder, BankKeeper, ContractWrapper, Executor, SwapQuerier, TerraApp,
@@ -1436,7 +1436,7 @@ fn proper_initialization_lockdrop() {
     let (lockdrop_instance, lockdrop_instantiate_msg) =
         instantiate_lockdrop_contract(&mut app, owner);
 
-    let resp: ConfigResponse = app
+    let resp: Config = app
         .wrap()
         .query_wasm_smart(&lockdrop_instance, &QueryMsg::Config {})
         .unwrap();
@@ -1584,7 +1584,7 @@ fn test_update_config() {
     )
     .unwrap();
 
-    let resp: ConfigResponse = app
+    let resp: Config = app
         .wrap()
         .query_wasm_smart(&lockdrop_instance, &QueryMsg::Config {})
         .unwrap();
@@ -1703,7 +1703,7 @@ fn test_initialize_pool() {
         state_resp.supported_pairs_list
     );
     // check Pool Info
-    let pool_resp: PoolResponse = app
+    let pool_resp: PoolInfo = app
         .wrap()
         .query_wasm_smart(
             &lockdrop_instance,
@@ -1778,7 +1778,7 @@ fn test_initialize_pool() {
         state_resp.supported_pairs_list
     );
     // check Pool Info
-    let pool_resp: PoolResponse = app
+    let pool_resp: PoolInfo = app
         .wrap()
         .query_wasm_smart(
             &lockdrop_instance,
@@ -1897,7 +1897,7 @@ fn test_update_pool() {
         state_resp.supported_pairs_list
     );
     // check Pool Info
-    let pool_resp: PoolResponse = app
+    let pool_resp: PoolInfo = app
         .wrap()
         .query_wasm_smart(
             &lockdrop_instance,
@@ -2074,7 +2074,7 @@ fn test_increase_lockup() {
         .unwrap_err();
     assert_eq!(
         err.to_string(),
-        "astroport_lockdrop::state::PoolInfo not found"
+        "astroport_periphery::lockdrop::PoolInfo not found"
     );
 
     // ######    ERROR :: Deposit window closed (havent opened)   ######
@@ -2148,7 +2148,7 @@ fn test_increase_lockup() {
     .unwrap();
 
     // check Pool Info
-    let pool_resp: PoolResponse = app
+    let pool_resp: PoolInfo = app
         .wrap()
         .query_wasm_smart(
             &lockdrop_instance,
@@ -2217,7 +2217,7 @@ fn test_increase_lockup() {
     .unwrap();
 
     // check Pool Info
-    let pool_resp: PoolResponse = app
+    let pool_resp: PoolInfo = app
         .wrap()
         .query_wasm_smart(
             &lockdrop_instance,
@@ -2286,7 +2286,7 @@ fn test_increase_lockup() {
     .unwrap();
 
     // check Pool Info
-    let pool_resp: PoolResponse = app
+    let pool_resp: PoolInfo = app
         .wrap()
         .query_wasm_smart(
             &lockdrop_instance,
@@ -2453,7 +2453,7 @@ fn test_withdraw_from_lockup() {
         .unwrap_err();
     assert_eq!(
         err.to_string(),
-        "astroport_lockdrop::state::PoolInfo not found"
+        "astroport_periphery::lockdrop::PoolInfo not found"
     );
 
     // ######    ERROR :: Invalid lockup position   ######
@@ -2472,7 +2472,7 @@ fn test_withdraw_from_lockup() {
         .unwrap_err();
     assert_eq!(
         err.to_string(),
-        "astroport_lockdrop::state::LockupInfoV1 not found"
+        "astroport_periphery::lockdrop::LockupInfoV1 not found"
     );
 
     // ######    SUCCESS :: SHOULD SUCCESSFULLY WITHDRAW LP TOKENS FROM POOL     ######
@@ -2489,7 +2489,7 @@ fn test_withdraw_from_lockup() {
     .unwrap();
 
     // check Pool Info
-    let pool_resp: PoolResponse = app
+    let pool_resp: PoolInfo = app
         .wrap()
         .query_wasm_smart(
             &lockdrop_instance,
@@ -2589,7 +2589,7 @@ fn test_withdraw_from_lockup() {
     .unwrap();
 
     // check Pool Info
-    let pool_resp: PoolResponse = app
+    let pool_resp: PoolInfo = app
         .wrap()
         .query_wasm_smart(
             &lockdrop_instance,
@@ -2908,7 +2908,7 @@ fn test_migrate_liquidity() {
         .unwrap();
 
     // Query pool before migration
-    let pool_resp_before_migration: PoolResponse = app
+    let pool_resp_before_migration: PoolInfo = app
         .wrap()
         .query_wasm_smart(
             &lockdrop_instance,
@@ -2954,7 +2954,7 @@ fn test_migrate_liquidity() {
         .unwrap();
 
     // Query pool after migration
-    let pool_resp_after_migration: PoolResponse = app
+    let pool_resp_after_migration: PoolInfo = app
         .wrap()
         .query_wasm_smart(
             &lockdrop_instance,
@@ -3210,7 +3210,7 @@ fn test_migrate_liquidity_uusd_uluna_pool() {
         .unwrap();
 
     // Query pool before migration
-    let pool_resp_before_migration: PoolResponse = app
+    let pool_resp_before_migration: PoolInfo = app
         .wrap()
         .query_wasm_smart(
             &lockdrop_instance,
@@ -3256,7 +3256,7 @@ fn test_migrate_liquidity_uusd_uluna_pool() {
         .unwrap();
 
     // Query pool after migration
-    let pool_resp_after_migration: PoolResponse = app
+    let pool_resp_after_migration: PoolInfo = app
         .wrap()
         .query_wasm_smart(
             &lockdrop_instance,
@@ -3411,7 +3411,7 @@ fn test_stake_lp_tokens() {
     );
 
     // Query pool after migration
-    let pool_resp_after_migration: PoolResponse = app
+    let pool_resp_after_migration: PoolInfo = app
         .wrap()
         .query_wasm_smart(
             &lockdrop_instance,
@@ -3633,7 +3633,7 @@ fn test_claim_rewards() {
 
     assert_eq!(
         err.to_string(),
-        "astroport_lockdrop::state::LockupInfoV1 not found"
+        "astroport_periphery::lockdrop::LockupInfoV1 not found"
     );
 
     // ######    SHOULD SUCCESSFULLY CLAIM REWARDS   ######

@@ -23,28 +23,37 @@ use crate::migration::{
 use crate::raw_queries::{raw_balance, raw_generator_deposit};
 use astroport_periphery::auction::Cw20HookMsg::DelegateAstroTokens;
 use astroport_periphery::lockdrop::{
-    CallbackMsg, ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, LockUpInfoResponse,
-    LockUpInfoSummary, MigrateMsg, MigrationInfo, PendingAssetRewardResponse, PoolResponse,
-    QueryMsg, StateResponse, UpdateConfigMsg, UserInfoResponse, UserInfoWithListResponse,
+    CallbackMsg, Config, Cw20HookMsg, ExecuteMsg, InstantiateMsg, LockUpInfoResponse,
+    LockUpInfoSummary, LockupInfoV2, MigrateMsg, MigrationInfo, PendingAssetRewardResponse,
+    PoolInfo, QueryMsg, State, StateResponse, UpdateConfigMsg, UserInfoResponse,
+    UserInfoWithListResponse,
 };
 
 use crate::state::{
-    CompatibleLoader, Config, LockupInfoV2, PoolInfo, State, ASSET_POOLS, CONFIG, LOCKUP_INFO,
-    OWNERSHIP_PROPOSAL, STATE, TOTAL_ASSET_REWARD_INDEX, USERS_ASSET_REWARD_INDEX, USER_INFO,
+    CompatibleLoader, ASSET_POOLS, CONFIG, LOCKUP_INFO, OWNERSHIP_PROPOSAL, STATE,
+    TOTAL_ASSET_REWARD_INDEX, USERS_ASSET_REWARD_INDEX, USER_INFO,
 };
 
 const SECONDS_PER_WEEK: u64 = 86400 * 7;
 
-// version info for migration info
+/// Contract name that is used for migration.
 const CONTRACT_NAME: &str = "astroport_lockdrop";
+/// Contract version that is used for migration.
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+/// Minimum lockup positions for user.
 const MIN_POSITIONS_PER_USER: u32 = 1;
 
-//----------------------------------------------------------------------------------------
-// Entry Points
-//----------------------------------------------------------------------------------------
-
+/// Creates a new contract with the specified parameters packed in the `msg` variable.
+/// Returns a [`Response`] with the specified attributes if the operation was successful, or a [`ContractError`] if the contract was not created
+/// ## Params
+/// * **deps** is an object of type [`DepsMut`].
+///
+/// * **env** is an object of type [`Env`].
+///
+/// * **info** is an object of type [`MessageInfo`].
+///
+/// * **msg**  is a message of type [`InstantiateMsg`] which contains the parameters used for creating the contract.
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     deps: DepsMut,
@@ -99,17 +108,72 @@ pub fn instantiate(
         max_positions_per_user: msg.max_positions_per_user,
     };
 
-    let state = State {
-        total_incentives_share: 0,
-        total_astro_delegated: Uint128::zero(),
-        are_claims_allowed: false,
-    };
-
     CONFIG.save(deps.storage, &config)?;
-    STATE.save(deps.storage, &state)?;
+    STATE.save(deps.storage, &State::default())?;
     Ok(Response::default())
 }
 
+/// ## Description
+/// Exposes all the execute functions available in the contract.
+/// ## Params
+/// * **deps** is an object of type [`DepsMut`].
+///
+/// * **env** is an object of type [`Env`].
+///
+/// * **info** is an object of type [`MessageInfo`].
+///
+/// * **msg** is an object of type [`ExecuteMsg`].
+///
+/// ## Execute messages
+///
+/// * **ExecuteMsg::Receive(msg)** Parse incoming messages from the ASTRO token.
+///
+/// * **ExecuteMsg::UpdateConfig { new_config }** Admin function to update configuration parameters.
+///
+/// * **ExecuteMsg::InitializePool {
+///     terraswap_lp_token,
+///     incentives_share,
+/// }** Facilitates addition of new Pool (Terraswap Pools) whose LP tokens can then be locked in the lockdrop contract.
+///
+/// * **ExecuteMsg::UpdatePool {
+///     terraswap_lp_token,
+///     incentives_share,
+/// }** Admin function to update any configuraton parameter for a terraswap pool whose LP tokens are currently accepted for the lockdrop.
+///
+/// * **ExecuteMsg::MigrateLiquidity {
+///     terraswap_lp_token,
+///     astroport_pool_addr,
+///     slippage_tolerance,
+/// }** Migrate Liquidity from Terraswap to Astroport.
+///
+/// * **ExecuteMsg::StakeLpTokens { terraswap_lp_token }** Facilitates staking of Astroport LP tokens for a particular LP pool with the generator contract.
+///
+/// * **ExecuteMsg::EnableClaims {}** Enables ASTRO Claims by users.
+///
+/// * **ExecuteMsg::DelegateAstroToAuction { amount }** Facilitates ASTRO tokens delegation to the Bootstrap auction contract during the bootstrap auction phase.
+///
+/// * **ExecuteMsg::WithdrawFromLockup {
+///             terraswap_lp_token,
+///             duration,
+///             amount,
+///         }** Withdraws LP Tokens from an existing Lockup position.
+///
+/// * **ExecuteMsg::ClaimRewardsAndOptionallyUnlock {
+///             terraswap_lp_token,
+///             duration,
+///             withdraw_lp_stake,
+///         }** Claims user Rewards for a particular Lockup position.
+///
+/// * **ExecuteMsg::TogglePoolRewards {
+///             terraswap_lp_token,
+///             enable,
+///         }** Sets `enable` flag for liquidity pool.
+///
+/// * **ExecuteMsg::ProposeNewOwner { owner, expires_in }** Creates a request to change contract ownership.
+///
+/// * **ExecuteMsg::DropOwnershipProposal {}** Removes a request to change contract ownership.
+///
+/// * **ExecuteMsg::ClaimOwnership {}** Claims contract ownership.
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> StdResult<Response> {
     match msg {
@@ -124,7 +188,6 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
             terraswap_lp_token,
             incentives_share,
         } => handle_update_pool(deps, env, info, terraswap_lp_token, incentives_share),
-
         ExecuteMsg::MigrateLiquidity {
             terraswap_lp_token,
             astroport_pool_addr,
@@ -137,7 +200,6 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
             astroport_pool_addr,
             slippage_tolerance,
         ),
-
         ExecuteMsg::StakeLpTokens { terraswap_lp_token } => {
             handle_stake_lp_tokens(deps, env, info, terraswap_lp_token)
         }
@@ -162,7 +224,6 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
             duration,
             withdraw_lp_stake,
         ),
-
         ExecuteMsg::Callback(msg) => _handle_callback(deps, env, info, msg),
         ExecuteMsg::ClaimAssetReward {
             recipient,
@@ -219,6 +280,17 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
     }
 }
 
+/// Receives a message of type [`Cw20ReceiveMsg`] and processes it depending on the received template.
+/// If the template is not found in the received message, then an [`StdError`] is returned,
+/// otherwise it returns the [`Response`] with the specified attributes if the operation was successful.
+/// ## Params
+/// * **deps** is an object of type [`DepsMut`].
+///
+/// * **env** is an object of type [`Env`].
+///
+/// * **info** is an object of type [`MessageInfo`].
+///
+/// * **cw20_msg** is an object of type [`Cw20ReceiveMsg`]. This is the CW20 message that has to be processed.
 pub fn receive_cw20(
     deps: DepsMut,
     env: Env,
@@ -245,6 +317,16 @@ pub fn receive_cw20(
     }
 }
 
+/// ## Description
+/// Handles callback. Returns a [`ContractError`] on failure.
+/// ## Params
+/// * **deps** is an object of type [`DepsMut`].
+///
+/// * **env** is an object of type [`Env`].
+///
+/// * **info** is an object of type [`MessageInfo`].
+///
+/// * **msg** is an object of type [`CallbackMsg`].
 fn _handle_callback(
     deps: DepsMut,
     env: Env,
@@ -313,10 +395,40 @@ fn _handle_callback(
     }
 }
 
+/// Exposes all the queries available in the contract.
+/// ## Params
+/// * **deps** is an object of type [`Deps`].
+///
+/// * **_env** is an object of type [`Env`].
+///
+/// * **msg** is an object of type [`QueryMsg`].
+///
+/// ## Queries
+/// * **QueryMsg::Config {}** Returns the config info.
+///
+/// * **QueryMsg::State {}** Returns the contract's state info.
+///
+/// * **QueryMsg::Pool { terraswap_lp_token }** Returns info regarding a certain supported LP token pool.
+///
+/// * **QueryMsg::UserInfo { address }** Returns info regarding a user (total ASTRO rewards, list of lockup positions).
+///
+/// * **QueryMsg::UserInfoWithLockupsList { address }** Returns info regarding a user with lockups.
+///
+/// * **QueryMsg::LockUpInfo {
+///             user_address,
+///             terraswap_lp_token,
+///             duration,
+///         }** Returns info regarding a particular lockup position with a given duration and identifer for the LP tokens locked.
+///
+/// * **QueryMsg::PendingAssetReward {
+///             user_address,
+///             terraswap_lp_token,
+///             duration,
+///         }** Returns the amount of pending asset rewards for the specified recipient and for a specific lockup position.
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::Config {} => to_binary(&query_config(deps)?),
+        QueryMsg::Config {} => to_binary(&CONFIG.load(deps.storage)?),
         QueryMsg::State {} => to_binary(&query_state(deps)?),
         QueryMsg::Pool { terraswap_lp_token } => to_binary(&query_pool(deps, terraswap_lp_token)?),
         QueryMsg::UserInfo { address } => to_binary(&query_user_info(deps, env, address)?),
@@ -348,6 +460,13 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     }
 }
 
+/// Used for contract migration. Returns a default object of type [`Response`].
+/// ## Params
+/// * **deps** is an object of type [`DepsMut`].
+///
+/// * **_env** is an object of type [`Env`].
+///
+/// * **_msg** is an object of type [`MigrateMsg`].
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response> {
     use std::str;
@@ -355,7 +474,10 @@ pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response
     let contract_version = get_contract_version(deps.storage)?;
 
     let config = CONFIG.load(deps.storage)?;
-    let generator = config.generator.as_ref().expect("Generator should be set!");
+    let generator = config
+        .generator
+        .as_ref()
+        .ok_or_else(|| StdError::generic_err("Generator should be set!"))?;
 
     match contract_version.contract.as_ref() {
         "astroport_lockdrop" => match contract_version.version.as_ref() {
@@ -442,12 +564,13 @@ pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response
     ]))
 }
 
-//----------------------------------------------------------------------------------------
-// Handle Functions
-//----------------------------------------------------------------------------------------
-
-/// @dev Admin function to update Configuration parameters
-/// @param new_config : Same as UpdateConfigMsg struct
+/// Admin function to update Configuration parameters. Returns a default object of type [`Response`].
+/// ## Params
+/// * **deps** is an object of type [`DepsMut`].
+///
+/// * **info** is an object of type [`MessageInfo`].
+///
+/// * **new_config** is an object of type [`UpdateConfigMsg`]. Same as UpdateConfigMsg struct
 pub fn handle_update_config(
     deps: DepsMut,
     info: MessageInfo,
@@ -487,8 +610,8 @@ pub fn handle_update_config(
         if config.generator.is_some() {
             for pool in ASSET_POOLS
                 .keys(deps.storage, None, None, Order::Ascending)
-                .map(|v| {
-                    Addr::unchecked(String::from_utf8(v).expect("Addr deserialization error!"))
+                .map(|addr| {
+                    Addr::unchecked(String::from_utf8(addr).expect("Addr deserialization error!"))
                 })
             {
                 let pool_info = ASSET_POOLS.load(deps.storage, &pool)?;
@@ -509,8 +632,15 @@ pub fn handle_update_config(
     Ok(Response::new().add_attributes(attributes))
 }
 
-/// @dev Facilitates increasing ASTRO incentives that are to be distributed as Lockdrop participation reward
-/// @params amount : Number of ASTRO tokens which are to be added to current incentives
+/// Facilitates increasing ASTRO incentives that are to be distributed as Lockdrop participation reward. Returns a default object of type [`Response`].
+/// ## Params
+/// * **deps** is an object of type [`DepsMut`].
+///
+/// * **env** is an object of type [`Env`].
+///
+/// * **info** is an object of type [`MessageInfo`].
+///
+/// * **amount** is an object of type [`Uint128`]. Number of ASTRO tokens which are to be added to current incentives
 pub fn handle_increasing_astro_incentives(
     deps: DepsMut,
     env: Env,
@@ -543,9 +673,19 @@ pub fn handle_increasing_astro_incentives(
         .add_attribute("amount", amount))
 }
 
-/// @dev Admin function to initialize new LP Pool
-/// @param terraswap_lp_token : terraswap LP token address
-/// @param incentives_share : parameter defining share of total ASTRO incentives are allocated for this pool
+/// Admin function to initialize new LP Pool. Returns a default object of type [`Response`].
+/// ## Params
+/// * **deps** is an object of type [`DepsMut`].
+///
+/// * **env** is an object of type [`Env`].
+///
+/// * **info** is an object of type [`MessageInfo`].
+///
+/// * **amount** is an object of type [`Uint128`]. Number of ASTRO tokens which are to be added to current incentives
+///
+/// * **terraswap_lp_token** is an object of type [`String`]. Terraswap LP token address
+///
+/// * **incentives_share** is an object of type [`u64`]. Parameter defining share of total ASTRO incentives are allocated for this pool
 pub fn handle_initialize_pool(
     deps: DepsMut,
     env: Env,
@@ -582,8 +722,11 @@ pub fn handle_initialize_pool(
         let res: Option<cw20::MinterResponse> = deps
             .querier
             .query_wasm_smart(&terraswap_lp_token, &Cw20QueryMsg::Minter {})?;
-        deps.api
-            .addr_validate(&res.expect("No minter for the LP token!").minter)?
+        addr_validate_to_lower(
+            deps.api,
+            &res.ok_or_else(|| StdError::generic_err("No minter for the LP token!"))?
+                .minter,
+        )?
     };
 
     // POOL INFO :: Initialize new pool
@@ -611,9 +754,19 @@ pub fn handle_initialize_pool(
     ]))
 }
 
-/// @dev Admin function to update LP Pool Configuration
-/// @param terraswap_lp_token : Parameter to identify the pool. Equals pool's terraswap Lp token address
-/// @param incentives_share : parameter defining share of total ASTRO incentives are allocated for this pool
+/// Admin function to update LP Pool Configuration. Returns a default object of type [`Response`].
+/// ## Params
+/// * **deps** is an object of type [`DepsMut`].
+///
+/// * **env** is an object of type [`Env`].
+///
+/// * **info** is an object of type [`MessageInfo`].
+///
+/// * **amount** is an object of type [`Uint128`]. Number of ASTRO tokens which are to be added to current incentives
+///
+/// * **terraswap_lp_token** is an object of type [`String`]. Parameter to identify the pool. Equals pool's terraswap Lp token address
+///
+/// * **incentives_share** is an object of type [`u64`]. Parameter defining share of total ASTRO incentives are allocated for this pool
 pub fn handle_update_pool(
     deps: DepsMut,
     env: Env,
@@ -667,7 +820,13 @@ pub fn handle_update_pool(
     ]))
 }
 
-/// @dev Admin function to enable ASTRO Claims by users. Called along-with Bootstrap Auction contract's LP Pool provide liquidity tx
+/// Enable ASTRO Claims by users. Returns a default object of type [`Response`].
+/// ## Params
+/// * **deps** is an object of type [`DepsMut`].
+///
+/// * **env** is an object of type [`Env`].
+///
+/// * **info** is an object of type [`MessageInfo`].
 pub fn handle_enable_claims(deps: DepsMut, env: Env, info: MessageInfo) -> StdResult<Response> {
     let config = CONFIG.load(deps.storage)?;
     let mut state = STATE.load(deps.storage)?;
@@ -700,9 +859,19 @@ pub fn handle_enable_claims(deps: DepsMut, env: Env, info: MessageInfo) -> StdRe
     Ok(Response::new().add_attribute("action", "allow_claims"))
 }
 
-/// @dev Admin function to migrate Liquidity from Terraswap to Astroport
-/// @param terraswap_lp_token : Parameter to identify the pool
-/// @param astroport_pool_address : Astroport Pool address to which the liquidity is to be migrated
+/// Migrates Liquidity from Terraswap to Astroport. Returns a default object of type [`Response`].
+/// ## Params
+/// * **deps** is an object of type [`DepsMut`].
+///
+/// * **env** is an object of type [`Env`].
+///
+/// * **info** is an object of type [`MessageInfo`].
+///
+/// * **terraswap_lp_token** is an object of type [`String`]. Parameter to identify the pool
+///
+/// * **astroport_pool_addr** is an object of type [`String`].
+///
+/// * **slippage_tolerance** is an optional object of type [`Decimal`]. Astroport Pool address to which the liquidity is to be migrated
 pub fn handle_migrate_liquidity(
     deps: DepsMut,
     env: Env,
@@ -812,8 +981,15 @@ pub fn handle_migrate_liquidity(
     Ok(Response::new().add_messages(cosmos_msgs))
 }
 
-/// @dev Function to stake one of the supported LP Tokens with the Generator contract
-/// @params terraswap_lp_token : Pool's terraswap LP token address whose Astroport LP tokens are to be staked
+/// Stakes one of the supported LP Tokens with the Generator contract. Returns a default object of type [`Response`].
+/// ## Params
+/// * **deps** is an object of type [`DepsMut`].
+///
+/// * **env** is an object of type [`Env`].
+///
+/// * **info** is an object of type [`MessageInfo`].
+///
+/// * **terraswap_lp_token** is an object of type [`String`]. Pool's terraswap LP token address whose Astroport LP tokens are to be staked.
 pub fn handle_stake_lp_tokens(
     deps: DepsMut,
     env: Env,
@@ -839,7 +1015,7 @@ pub fn handle_stake_lp_tokens(
     } = pool_info
         .migration_info
         .as_ref()
-        .expect("Terraswap liquidity hasn't migrated yet!");
+        .ok_or_else(|| StdError::generic_err("Terraswap liquidity hasn't migrated yet!"))?;
 
     let amount = {
         let res: BalanceResponse = deps.querier.query_wasm_smart(
@@ -854,7 +1030,7 @@ pub fn handle_stake_lp_tokens(
     let generator = config
         .generator
         .as_ref()
-        .expect("Generator address hasn't set yet!");
+        .ok_or_else(|| StdError::generic_err("Generator address hasn't set yet!"))?;
 
     cosmos_msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
         contract_addr: astroport_lp_token.to_string(),
@@ -889,10 +1065,19 @@ pub fn handle_stake_lp_tokens(
         ]))
 }
 
-/// @dev ReceiveCW20 Hook function to increase Lockup position size when any of the supported LP Tokens are sent to the contract by the user
-/// @param user_address : User which sent the following LP token
-/// @param duration : Number of weeks the LP token is locked for (lockup period begins post the withdrawal window closure)
-/// @param amount : Number of LP tokens sent by the user
+/// Hook function to increase Lockup position size when any of the supported LP Tokens are sent to the contract by the user. Returns a default object of type [`Response`].
+/// ## Params
+/// * **deps** is an object of type [`DepsMut`].
+///
+/// * **env** is an object of type [`Env`].
+///
+/// * **info** is an object of type [`MessageInfo`].
+///
+/// * **user_address** is an object of type [`Addr`]. User which sent the following LP token
+///
+/// * **duration** is an object of type [`u64`]. Number of weeks the LP token is locked for (lockup period begins post the withdrawal window closure).
+///
+/// * **amount** is an object of type [`Uint128`]. Number of LP tokens sent by the user.
 pub fn handle_increase_lockup(
     deps: DepsMut,
     env: Env,
@@ -979,10 +1164,19 @@ pub fn handle_increase_lockup(
     ]))
 }
 
-/// @dev Function to withdraw LP Tokens from an existing Lockup position
-/// @param terraswap_lp_token : Terraswap Lp token address to identify the LP pool against which withdrawal has to be made
-/// @param duration : Duration of the lockup position from which withdrawal is to be made
-/// @param amount : Number of LP tokens to be withdrawn
+/// Withdraws LP Tokens from an existing Lockup position. Returns a default object of type [`Response`].
+/// ## Params
+/// * **deps** is an object of type [`DepsMut`].
+///
+/// * **env** is an object of type [`Env`].
+///
+/// * **info** is an object of type [`MessageInfo`].
+///
+/// * **terraswap_lp_token** is an object of type [`String`]. Terraswap Lp token address to identify the LP pool against which withdrawal has to be made
+///
+/// * **duration** is an object of type [`u64`]. Duration of the lockup position from which withdrawal is to be made.
+///
+/// * **amount** is an object of type [`Uint128`]. Number of LP tokens to be withdrawn.
 pub fn handle_withdraw_from_lockup(
     deps: DepsMut,
     env: Env,
@@ -1072,8 +1266,15 @@ pub fn handle_withdraw_from_lockup(
     ]))
 }
 
-// @dev Function to delegate part of the ASTRO rewards to be used for LP Bootstrapping via auction
-/// @param amount : Number of ASTRO to delegate
+/// Delegates part of the ASTRO rewards to be used for LP Bootstrapping via auction. Returns a default object of type [`Response`].
+/// ## Params
+/// * **deps** is an object of type [`DepsMut`].
+///
+/// * **env** is an object of type [`Env`].
+///
+/// * **info** is an object of type [`MessageInfo`].
+///
+/// * **amount** is an object of type [`Uint128`]. Number of ASTRO to delegate.
 pub fn handle_delegate_astro_to_auction(
     mut deps: DepsMut,
     env: Env,
@@ -1133,13 +1334,13 @@ pub fn handle_delegate_astro_to_auction(
     let msg = CosmosMsg::Wasm(WasmMsg::Execute {
         contract_addr: config
             .astro_token
-            .expect("Astro token contract hasn't been set yet!")
+            .ok_or_else(|| StdError::generic_err("Astro token contract hasn't been set yet!"))?
             .to_string(),
         funds: vec![],
         msg: to_binary(&Cw20ExecuteMsg::Send {
             contract: config
                 .auction_contract
-                .expect("Auction contract hasn't been set yet!")
+                .ok_or_else(|| StdError::generic_err("Auction contract hasn't been set yet!"))?
                 .to_string(),
             msg: to_binary(&DelegateAstroTokens {
                 user_address: user_address.to_string(),
@@ -1155,10 +1356,19 @@ pub fn handle_delegate_astro_to_auction(
     ]))
 }
 
-/// @dev Function to claim user Rewards for a particular Lockup position
-/// @param terraswap_lp_token : Terraswap LP token to identify the LP pool whose Token is locked in the lockup position
-/// @param duration : Lockup duration (number of weeks)
-/// @param @withdraw_lp_stake : Boolean value indicating if the LP tokens are to be withdrawn or not
+/// Claims user Rewards for a particular Lockup position. Returns a default object of type [`Response`].
+/// ## Params
+/// * **deps** is an object of type [`DepsMut`].
+///
+/// * **env** is an object of type [`Env`].
+///
+/// * **info** is an object of type [`MessageInfo`].
+///
+/// * **terraswap_lp_token** is an object of type [`String`]. Terraswap LP token to identify the LP pool whose Token is locked in the lockup position.
+///
+/// * **duration** is an object of type [`u64`]. Lockup duration (number of weeks).
+///
+/// * **withdraw_lp_stake** is an object of type [`bool`]. Boolean value indicating if the LP tokens are to be withdrawn or not.
 pub fn handle_claim_rewards_and_unlock_for_lockup(
     mut deps: DepsMut,
     env: Env,
@@ -1234,7 +1444,7 @@ pub fn handle_claim_rewards_and_unlock_for_lockup(
             let generator = config
                 .generator
                 .as_ref()
-                .expect("Generator should be set at this moment!");
+                .ok_or_else(|| StdError::generic_err("Generator should be set at this moment!"))?;
 
             // QUERY :: Check if there are any pending staking rewards
             let pending_rewards: PendingTokenResponse = deps.querier.query_wasm_smart(
@@ -1331,9 +1541,19 @@ pub fn handle_claim_rewards_and_unlock_for_lockup(
     Ok(Response::new().add_messages(cosmos_msgs))
 }
 
-/// ## Description
-/// Collects assets reward from LP and distribute reward to user if all requirements are met.
-/// Otherwise returns [`StdError`].
+/// Collects assets reward from LP and distribute reward to user if all requirements are met. Returns a default object of type [`Response`].
+/// ## Params
+/// * **deps** is an object of type [`DepsMut`].
+///
+/// * **env** is an object of type [`Env`].
+///
+/// * **user_address** is an object of type [`Addr`].
+///
+/// * **recipient** is an object of type [`Addr`].
+///
+/// * **terraswap_lp_token** is an object of type [`String`].
+///
+/// * **lock_duration** is an object of type [`u64`].
 fn handle_claim_asset_reward(
     deps: Deps,
     env: Env,
@@ -1377,8 +1597,15 @@ fn handle_claim_asset_reward(
     Ok(Response::default().add_messages(vec![pool_claim_msg, distribute_callback_msg]))
 }
 
-/// ## Description
-/// Sets `enable` flag for liquidity pool
+/// Sets `enable` flag for liquidity pool. Returns a default object of type [`Response`].
+/// ## Params
+/// * **deps** is an object of type [`DepsMut`].
+///
+/// * **info** is an object of type [`MessageInfo`].
+///
+/// * **terraswap_lp_token** is an object of type [`String`].
+///
+/// * **enable** is an object of type [`bool`].
 fn handle_toggle_rewards(
     deps: DepsMut,
     info: MessageInfo,
@@ -1411,14 +1638,17 @@ fn handle_toggle_rewards(
         })
 }
 
-//----------------------------------------------------------------------------------------
-// Callback Functions
-//----------------------------------------------------------------------------------------
-
-/// @dev CALLBACK Function to update contract state after dual staking rewards are claimed from the generator contract
-/// @param terraswap_lp_token : Pool identifier to identify the LP pool whose rewards have been claimed
-/// @param prev_astro_balance : Contract's ASTRO token balance before claim
-/// @param prev_dual_reward_balance : Contract's Generator Proxy reward token balance before claim
+/// Updates contract state after dual staking rewards are claimed from the generator contract. Returns a default object of type [`Response`].
+/// ## Params
+/// * **deps** is an object of type [`DepsMut`].
+///
+/// * **env** is an object of type [`Env`].
+///
+/// * **terraswap_lp_token** is an object of type [`String`]. Pool identifier to identify the LP pool whose rewards have been claimed.
+///
+/// * **prev_astro_balance** is an object of type [`Uint128`]. Contract's ASTRO token balance before claim.
+///
+/// * **prev_proxy_reward_balances** is a vector of type [`Asset`]. Contract's Generator Proxy reward token balance before claim.
 pub fn update_pool_on_dual_rewards_claim(
     deps: DepsMut,
     env: Env,
@@ -1432,13 +1662,13 @@ pub fn update_pool_on_dual_rewards_claim(
     let generator = config
         .generator
         .as_ref()
-        .expect("Generator hasn't been set yet!");
+        .ok_or_else(|| StdError::generic_err("Generator hasn't been set yet!"))?;
     let MigrationInfo {
         astroport_lp_token, ..
     } = pool_info
         .migration_info
         .as_ref()
-        .expect("Pool should be migrated!");
+        .ok_or_else(|| StdError::generic_err("Pool should be migrated!"))?;
 
     let rwi: RewardInfoResponse = deps.querier.query_wasm_smart(
         generator,
@@ -1494,11 +1724,19 @@ pub fn update_pool_on_dual_rewards_claim(
     ]))
 }
 
-/// @dev CALLBACK Function to withdraw user rewards and LP Tokens after claims / unlocks
-/// @param terraswap_lp_token : Pool identifier to identify the LP pool
-/// @param user_address : User address who is claiming the rewards / unlocking his lockup position
-/// @param duration : Duration of the lockup for which rewards have been claimed / position unlocked
-/// @param withdraw_lp_stake : Boolean value indicating if the ASTRO LP Tokens are to be sent to the user or not
+/// Withdraws user rewards and LP Tokens after claims / unlocks. Returns a default object of type [`Response`].
+/// ## Params
+/// * **deps** is an object of type [`DepsMut`].
+///
+/// * **env** is an object of type [`Env`].
+///
+/// * **terraswap_lp_token** is an object of type [`Addr`]. Pool identifier to identify the LP pool.
+///
+/// * **user_address** is an object of type [`Addr`]. User address who is claiming the rewards / unlocking his lockup position.
+///
+/// * **duration** is a vector of type [`u64`]. Duration of the lockup for which rewards have been claimed / position unlocked.
+///
+/// * **withdraw_lp_stake** is an object of type [`bool`]. Boolean value indicating if the ASTRO LP Tokens are to be sent to the user or not.
 pub fn callback_withdraw_user_rewards_for_lockup_optional_withdraw(
     deps: DepsMut,
     env: Env,
@@ -1529,7 +1767,10 @@ pub fn callback_withdraw_user_rewards_for_lockup_optional_withdraw(
         astroport_lp_token, ..
     }) = &pool_info.migration_info
     {
-        let generator = config.generator.as_ref().expect("Generator should be set");
+        let generator = config
+            .generator
+            .as_ref()
+            .ok_or_else(|| StdError::generic_err("Generator should be set"))?;
 
         // Calculate Astro LP share for the lockup position
         let astroport_lp_amount: Uint128 = {
@@ -1698,10 +1939,19 @@ pub fn callback_withdraw_user_rewards_for_lockup_optional_withdraw(
         .add_attributes(attributes))
 }
 
-/// @dev CALLBACK Function to deposit Liquidity in Astroport after its withdrawn from terraswap
-/// @param terraswap_lp_token : Pool identifier to identify the LP pool
-/// @param astroport_pool : Astroport Pool details to which the liquidity is to be migrated
-/// @param prev_assets : balances of terraswap pool assets before liquidity was withdrawn
+/// Deposits Liquidity in Astroport after its withdrawn from terraswap. Returns a default object of type [`Response`].
+/// ## Params
+/// * **deps** is an object of type [`DepsMut`].
+///
+/// * **env** is an object of type [`Env`].
+///
+/// * **terraswap_lp_token** is an object of type [`Addr`]. Pool identifier to identify the LP pool.
+///
+/// * **astroport_pool** is an object of type [`Addr`]. Astroport Pool details to which the liquidity is to be migrated.
+///
+/// * **prev_assets** is a array of type [`terraswap::asset::Asset`]. Balances of terraswap pool assets before liquidity was withdrawn.
+///
+/// * **slippage_tolerance** is an optional object of type [`Decimal`].
 pub fn callback_deposit_liquidity_in_astroport(
     deps: DepsMut,
     env: Env,
@@ -1792,6 +2042,21 @@ pub fn callback_deposit_liquidity_in_astroport(
         ]))
 }
 
+/// Desributes asset rewards. Returns a default object of type [`Response`].
+/// ## Params
+/// * **deps** is an object of type [`DepsMut`].
+///
+/// * **env** is an object of type [`Env`].
+///
+/// * **previous_balance** is an object of type [`Uint128`].
+///
+/// * **terraswap_lp_token** is an object of type [`Addr`].
+///
+/// * **user_address** is an object of type [`Addr`].
+///
+/// * **recipient** is an object of type [`Addr`].
+///
+/// * **lock_duration** is an object of type [`u64`].
 fn callback_distribute_asset_reward(
     deps: DepsMut,
     env: Env,
@@ -1871,32 +2136,9 @@ fn callback_distribute_asset_reward(
     Ok(response.add_attribute("sent_bluna_reward", user_reward))
 }
 
-// //----------------------------------------------------------------------------------------
-// // Query Functions
-// //----------------------------------------------------------------------------------------
-
-/// @dev Returns the contract's configuration
-pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
-    let config = CONFIG.load(deps.storage)?;
-
-    Ok(ConfigResponse {
-        owner: config.owner,
-        auction_contract: config.auction_contract,
-        generator: config.generator,
-        astro_token: config.astro_token,
-        init_timestamp: config.init_timestamp,
-        deposit_window: config.deposit_window,
-        withdrawal_window: config.withdrawal_window,
-        min_lock_duration: config.min_lock_duration,
-        max_lock_duration: config.max_lock_duration,
-        weekly_multiplier: config.weekly_multiplier,
-        weekly_divider: config.weekly_divider,
-        lockdrop_incentives: config.lockdrop_incentives,
-        max_positions_per_user: config.max_positions_per_user,
-    })
-}
-
-/// @dev Returns the contract's State
+/// Returns the contract's State.
+/// ## Params
+/// * **deps** is an object of type [`Deps`].
 pub fn query_state(deps: Deps) -> StdResult<StateResponse> {
     let state: State = STATE.load(deps.storage)?;
     Ok(StateResponse {
@@ -1910,23 +2152,24 @@ pub fn query_state(deps: Deps) -> StdResult<StateResponse> {
     })
 }
 
-/// @dev Returns the pool's State
-pub fn query_pool(deps: Deps, terraswap_lp_token: String) -> StdResult<PoolResponse> {
+/// Returns the pool's State.
+/// ## Params
+/// * **deps** is an object of type [`Deps`].
+///
+/// * **terraswap_lp_token** is an object of type [`String`].
+pub fn query_pool(deps: Deps, terraswap_lp_token: String) -> StdResult<PoolInfo> {
     let terraswap_lp_token = addr_validate_to_lower(deps.api, &terraswap_lp_token)?;
     let pool_info: PoolInfo = ASSET_POOLS.load(deps.storage, &terraswap_lp_token)?;
-    Ok(PoolResponse {
-        terraswap_pool: pool_info.terraswap_pool,
-        terraswap_amount_in_lockups: pool_info.terraswap_amount_in_lockups,
-        migration_info: pool_info.migration_info,
-        incentives_share: pool_info.incentives_share,
-        weighted_amount: pool_info.weighted_amount,
-        generator_astro_per_share: pool_info.generator_astro_per_share,
-        generator_proxy_per_share: pool_info.generator_proxy_per_share,
-        is_staked: pool_info.is_staked,
-    })
+    Ok(pool_info)
 }
 
-/// @dev Returns summarized details regarding the user
+/// Returns summarized details regarding the user.
+/// ## Params
+/// * **deps** is an object of type [`Deps`].
+///
+/// * **env** is an object of type [`Env`].
+///
+/// * **user** is an object of type [`String`].
 pub fn query_user_info(deps: Deps, env: Env, user: String) -> StdResult<UserInfoResponse> {
     let user_address = addr_validate_to_lower(deps.api, &user)?;
     let user_info = USER_INFO
@@ -1963,7 +2206,13 @@ pub fn query_user_info(deps: Deps, env: Env, user: String) -> StdResult<UserInfo
     })
 }
 
-/// @dev Returns summarized details regarding the user with lockups list
+/// Returns summarized details regarding the user with lockups list.
+/// ## Params
+/// * **deps** is an object of type [`Deps`].
+///
+/// * **_env** is an object of type [`Env`].
+///
+/// * **user** is an object of type [`String`].
 pub fn query_user_info_with_lockups_list(
     deps: Deps,
     _env: Env,
@@ -2001,7 +2250,17 @@ pub fn query_user_info_with_lockups_list(
     })
 }
 
-/// @dev Returns summarized details regarding the user
+/// Returns summarized details regarding the user
+/// ## Params
+/// * **deps** is an object of type [`Deps`].
+///
+/// * **env** is an object of type [`Env`].
+///
+/// * **user_address** is an object of type [`&str`].
+///
+/// * **terraswap_lp_token** is an object of type [`String`].
+///
+/// * **duration** is an object of type [`u64`].
 pub fn query_lockup_info(
     deps: Deps,
     env: &Env,
@@ -2037,7 +2296,10 @@ pub fn query_lockup_info(
             pool_astroport_lp_units = if pool_info.is_staked {
                 raw_generator_deposit(
                     deps.querier,
-                    config.generator.as_ref().expect("Should be set!"),
+                    config
+                        .generator
+                        .as_ref()
+                        .ok_or_else(|| StdError::generic_err("Should be set!"))?,
                     astroport_lp_token.as_bytes(),
                     env.contract.address.as_bytes(),
                 )?
@@ -2062,7 +2324,7 @@ pub fn query_lockup_info(
             let generator = config
                 .generator
                 .clone()
-                .expect("Generator should be set at this moment!");
+                .ok_or_else(|| StdError::generic_err("Generator should be set at this moment!"))?;
 
             // QUERY :: Check if there are any pending staking rewards
             let pending_rewards: PendingTokenResponse = deps.querier.query_wasm_smart(
@@ -2136,10 +2398,17 @@ pub fn query_lockup_info(
     })
 }
 
-/// @dev Returns pending asset rewards for a specified lockup position
-/// @param user_address : User address
-/// @param terraswap_lp_token : Pool identifier to identify the LP pool
-/// @param duration : Duration of the lockup
+/// Returns pending asset rewards for a specified lockup position
+/// ## Params
+/// * **deps** is an object of type [`Deps`].
+///
+/// * **env** is an object of type [`Env`].
+///
+/// * **user_address** is an object of type [`&str`]. User address
+///
+/// * **terraswap_lp_token** is an object of type [`String`]. Pool identifier to identify the LP pool
+///
+/// * **duration** is an object of type [`u64`]. Duration of the lockup
 pub fn query_pending_asset_reward(
     deps: Deps,
     env: Env,
@@ -2205,13 +2474,11 @@ pub fn query_pending_asset_reward(
     })
 }
 
-//----------------------------------------------------------------------------------------
-// HELPERS :: BOOLEANS & COMPUTATIONS (Rewards, Indexes etc)
-//----------------------------------------------------------------------------------------
-
-///  @dev Helper function to calculate maximum % of LP balances deposited that can be withdrawn
-/// @params current_timestamp : Current block timestamp
-/// @params config : Contract configuration
+/// Calculates maximum % of LP balances deposited that can be withdrawn
+/// ## Params
+/// * **current_timestamp** is an object of type [`u64`]. Current block timestamp
+///
+/// * **config** is an object of type [`Config`]. Contract configuration
 fn calculate_max_withdrawal_percent_allowed(current_timestamp: u64, config: &Config) -> Decimal {
     let withdrawal_cutoff_init_point = config.init_timestamp + config.deposit_window;
 
@@ -2243,12 +2510,17 @@ fn calculate_max_withdrawal_percent_allowed(current_timestamp: u64, config: &Con
     }
 }
 
-/// @dev Helper function to calculate ASTRO rewards for a particular Lockup position
-/// @params lockup_weighted_balance : Lockup position's weighted terraswap LP balance
-/// @params total_weighted_amount : Total weighted terraswap LP balance of the Pool
-/// @params pool_incentives_share : Share of total ASTRO incentives allocated to this pool
-/// @params total_incentives_share: Calculated total incentives share for allocating among pools
-/// @params total_lockdrop_incentives : Total ASTRO incentives to be distributed among Lockdrop participants
+/// Calculates ASTRO rewards for a particular Lockup position
+/// ## Params
+/// * **lockup_weighted_balance** is an object of type [`Uint256`]. Lockup position's weighted terraswap LP balance
+///
+/// * **total_weighted_amount** is an object of type [`Uint256`]. Total weighted terraswap LP balance of the Pool
+///
+/// * **pool_incentives_share** is an object of type [`u64`]. Share of total ASTRO incentives allocated to this pool
+///
+/// * **total_incentives_share** is an object of type [`u64`]. Calculated total incentives share for allocating among pools
+///
+/// * **total_lockdrop_incentives** is an object of type [`Uint128`]. Total ASTRO incentives to be distributed among Lockdrop participants
 pub fn calculate_astro_incentives_for_lockup(
     lockup_weighted_balance: Uint256,
     total_weighted_amount: Uint256,
@@ -2268,10 +2540,13 @@ pub fn calculate_astro_incentives_for_lockup(
     }
 }
 
-/// @dev Helper function. Returns effective weight for the amount to be used for calculating lockdrop rewards
-/// @params amount : Number of LP tokens
-/// @params duration : Number of weeks
-/// @config : Config with weekly multiplier and divider
+/// Returns effective weight for the amount to be used for calculating lockdrop rewards.
+/// ## Params
+/// * **amount** is an object of type [`Uint128`]. Number of LP tokens.
+///
+/// * **duration** is an object of type [`u64`]. Number of weeks.
+///
+/// * **config** is an object of type [`Config`]. Config with weekly multiplier and divider.
 fn calculate_weight(amount: Uint128, duration: u64, config: &Config) -> Uint256 {
     let lock_weight = Decimal256::one()
         + Decimal256::from_ratio(
@@ -2281,8 +2556,17 @@ fn calculate_weight(amount: Uint128, duration: u64, config: &Config) -> Uint256 
     lock_weight * amount.into()
 }
 
-/// ## Description
-/// Calculates bLuna user reward according to his share in LP  
+/// Calculates bLuna user reward according to his share in LP.
+/// ## Params
+/// * **store** is an object of type [`Storage`].
+///
+/// * **user_index_lp_path** is an object of type [`Path<Decimal256>`].
+///
+/// * **user_lp_amount** is an object of type [`Uint128`].
+///
+/// * **total_lp_amount** is an object of type [`Uint128`].
+///
+/// * **total_reward_index** is an object of type [`Decimal256`].
 fn calc_user_reward(
     store: &dyn Storage,
     user_index_lp_path: &Path<Decimal256>,
@@ -2305,14 +2589,15 @@ fn calc_user_reward(
     Ok(to_distribute_index.checked_mul(Uint256::from(user_lp_amount))?)
 }
 
-//-----------------------------------------------------------
-// HELPER FUNCTIONS :: UPDATE STATE
-//-----------------------------------------------------------
-
-/// @dev Function to calculate ASTRO rewards for each of the user position
-/// @params configuration struct
-/// @params user Info struct
-/// Returns user's total ASTRO rewards
+/// Calculates ASTRO rewards for each of the user position.
+/// ## Params
+/// * **deps** is an object of type [`DepsMut`].
+///
+/// * **config** is an object of type [`Config`].
+///
+/// * **state** is an object of type [`State`].
+///
+/// * **user_address** is an object of type [`Addr`]
 fn update_user_lockup_positions_and_calc_rewards(
     deps: DepsMut,
     config: &Config,
@@ -2522,7 +2807,9 @@ mod unit_tests {
             total_reward_index,
         )
         .unwrap();
-        user1_path.save(&mut deps.storage, &total_reward_index);
+        user1_path
+            .save(&mut deps.storage, &total_reward_index)
+            .unwrap();
         assert_eq!(res.u128(), 100u128);
 
         // the user already received whole reward thus we get 0 here
@@ -2534,7 +2821,9 @@ mod unit_tests {
             total_reward_index,
         )
         .unwrap();
-        user1_path.save(&mut deps.storage, &total_reward_index);
+        user1_path
+            .save(&mut deps.storage, &total_reward_index)
+            .unwrap();
         assert_eq!(res.u128(), 0u128);
 
         let res = calc_user_reward(
@@ -2545,7 +2834,9 @@ mod unit_tests {
             total_reward_index,
         )
         .unwrap();
-        user2_path.save(&mut deps.storage, &total_reward_index);
+        user2_path
+            .save(&mut deps.storage, &total_reward_index)
+            .unwrap();
         assert_eq!(res.u128(), 700u128);
 
         // emulating newly arrived rewards
@@ -2559,7 +2850,9 @@ mod unit_tests {
             total_reward_index,
         )
         .unwrap();
-        user1_path.save(&mut deps.storage, &total_reward_index);
+        user1_path
+            .save(&mut deps.storage, &total_reward_index)
+            .unwrap();
         assert_eq!(res.u128(), 10u128);
 
         // the user already received whole reward thus we get 0 here
@@ -2571,7 +2864,9 @@ mod unit_tests {
             total_reward_index,
         )
         .unwrap();
-        user1_path.save(&mut deps.storage, &total_reward_index);
+        user1_path
+            .save(&mut deps.storage, &total_reward_index)
+            .unwrap();
         assert_eq!(res.u128(), 0u128);
 
         let res = calc_user_reward(
@@ -2582,7 +2877,9 @@ mod unit_tests {
             total_reward_index,
         )
         .unwrap();
-        user2_path.save(&mut deps.storage, &total_reward_index);
+        user2_path
+            .save(&mut deps.storage, &total_reward_index)
+            .unwrap();
         assert_eq!(res.u128(), 70u128);
 
         // this is the first time user3 receives reward
@@ -2594,7 +2891,9 @@ mod unit_tests {
             total_reward_index,
         )
         .unwrap();
-        user3_path.save(&mut deps.storage, &total_reward_index);
+        user3_path
+            .save(&mut deps.storage, &total_reward_index)
+            .unwrap();
         // 200 from the first distribution and 20 from the second one
         assert_eq!(res.u128(), 220u128);
     }

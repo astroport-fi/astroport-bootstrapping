@@ -1,5 +1,5 @@
 use crate::contract::{execute, instantiate, query};
-use astroport_periphery::lockdrop::{ConfigResponse, ExecuteMsg, InstantiateMsg, QueryMsg};
+use astroport_periphery::lockdrop::{Config, ExecuteMsg, InstantiateMsg, QueryMsg};
 use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
 use cosmwasm_std::{from_binary, Addr};
 
@@ -80,7 +80,7 @@ fn update_owner() {
     assert_eq!(0, res.messages.len());
 
     // Let's query the state
-    let config: ConfigResponse =
+    let config: Config =
         from_binary(&query(deps.as_ref(), env.clone(), QueryMsg::Config {}).unwrap()).unwrap();
     assert_eq!(new_owner, config.owner);
 }

@@ -3,7 +3,7 @@ use cosmwasm_std::{from_slice, Addr, Empty, QuerierWrapper, StdError, StdResult,
 use cw_storage_plus::Path;
 use serde::Deserialize;
 
-/// @dev Returns generator deposit of tokens for the specified address
+/// Returns generator deposit of tokens for the specified address
 pub fn raw_generator_deposit(
     querier: QuerierWrapper,
     generator: &Addr,
@@ -24,7 +24,7 @@ pub fn raw_generator_deposit(
     }
 }
 
-/// @dev Returns balance of tokens for the specified address
+/// Returns balance of tokens for the specified address
 pub fn raw_balance(querier: QuerierWrapper, token: &Addr, address: &[u8]) -> StdResult<Uint128> {
     let key: Path<Empty> = Path::new(b"balance", &[address]);
     if let Some(res) = &querier.query_wasm_raw(token, key.to_vec())? {
@@ -35,7 +35,7 @@ pub fn raw_balance(querier: QuerierWrapper, token: &Addr, address: &[u8]) -> Std
     }
 }
 
-/// @dev Returns AssetInfo for the specified proxy address from generator storage
+/// Returns AssetInfo for the specified proxy address from generator storage
 pub fn raw_proxy_asset(
     querier: QuerierWrapper,
     generator: &Addr,

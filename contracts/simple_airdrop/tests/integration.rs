@@ -1,6 +1,6 @@
 use astroport_periphery::simple_airdrop::{
-    ClaimResponse, ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, QueryMsg,
-    StateResponse, UserInfoResponse,
+    ClaimResponse, Config, Cw20HookMsg, ExecuteMsg, InstantiateMsg, QueryMsg, State,
+    UserInfoResponse,
 };
 use cosmwasm_std::testing::{mock_env, MockApi, MockQuerier, MockStorage};
 use cosmwasm_std::{attr, to_binary, Addr, Timestamp, Uint128};
@@ -112,7 +112,7 @@ fn proper_initialization() {
     let mut app = mock_app();
     let (airdrop_instance, astro_token_instance, init_msg, _) = init_contracts(&mut app);
 
-    let resp: ConfigResponse = app
+    let resp: Config = app
         .wrap()
         .query_wasm_smart(&airdrop_instance, &QueryMsg::Config {})
         .unwrap();
@@ -125,7 +125,7 @@ fn proper_initialization() {
     assert_eq!(init_msg.to_timestamp, resp.to_timestamp);
 
     // Check state
-    let resp: StateResponse = app
+    let resp: State = app
         .wrap()
         .query_wasm_smart(&airdrop_instance, &QueryMsg::State {})
         .unwrap();
@@ -156,7 +156,7 @@ fn proper_initialization() {
     .unwrap();
 
     // Check state
-    let resp: StateResponse = app
+    let resp: State = app
         .wrap()
         .query_wasm_smart(&airdrop_instance, &QueryMsg::State {})
         .unwrap();
@@ -211,7 +211,7 @@ fn update_config() {
     )
     .unwrap();
 
-    let resp: ConfigResponse = app
+    let resp: Config = app
         .wrap()
         .query_wasm_smart(&airdrop_instance, &QueryMsg::Config {})
         .unwrap();
@@ -338,7 +338,7 @@ fn test_transfer_unclaimed_tokens() {
     )
     .unwrap();
 
-    let state_resp: StateResponse = app
+    let state_resp: State = app
         .wrap()
         .query_wasm_smart(&airdrop_instance, &QueryMsg::State {})
         .unwrap();
@@ -408,7 +408,7 @@ fn test_claim_by_terra_user() {
     )
     .unwrap();
 
-    let resp: ConfigResponse = app
+    let resp: Config = app
         .wrap()
         .query_wasm_smart(&airdrop_instance, &QueryMsg::Config {})
         .unwrap();
@@ -582,7 +582,7 @@ fn test_claim_by_terra_user() {
     );
 
     // Check :: Contract state
-    let state_query_resp: StateResponse = app
+    let state_query_resp: State = app
         .wrap()
         .query_wasm_smart(&airdrop_instance, &QueryMsg::State {})
         .unwrap();

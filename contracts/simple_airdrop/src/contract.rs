@@ -1,9 +1,10 @@
 use crate::crypto::verify_claim;
-use crate::state::{Config, State, CONFIG, STATE, USERS};
+use crate::state::{CONFIG, STATE, USERS};
+use astroport::asset::addr_validate_to_lower;
 use astroport_periphery::helpers::{build_transfer_cw20_token_msg, cw20_get_balance};
 use astroport_periphery::simple_airdrop::{
-    ClaimResponse, ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg,
-    StateResponse, UserInfoResponse,
+    ClaimResponse, Config, Cw20HookMsg, ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg, State,
+    UserInfoResponse,
 };
 use cosmwasm_std::{
     attr, entry_point, from_binary, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response,
@@ -12,14 +13,21 @@ use cosmwasm_std::{
 use cw2::set_contract_version;
 use cw20::Cw20ReceiveMsg;
 
-// version info for migration info
+/// Contract name that is used for migration.
 const CONTRACT_NAME: &str = "astroport_simple_airdrop";
+/// Contract version that is used for migration.
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-//----------------------------------------------------------------------------------------
-// Entry points
-//----------------------------------------------------------------------------------------
-
+/// Creates a new contract with the specified parameters packed in the `msg` variable.
+/// Returns a [`Response`] with the specified attributes if the operation was successful, or a [`ContractError`] if the contract was not created
+/// ## Params
+/// * **deps** is an object of type [`DepsMut`].
+///
+/// * **env** is an object of type [`Env`].
+///
+/// * **info** is an object of type [`MessageInfo`].
+///
+/// * **msg**  is a message of type [`InstantiateMsg`] which contains the parameters used for creating the contract.
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     deps: DepsMut,
@@ -39,14 +47,14 @@ pub fn instantiate(
     }
 
     let owner = if let Some(owner) = msg.owner {
-        deps.api.addr_validate(&owner)?
+        addr_validate_to_lower(deps.api, &owner)?
     } else {
         info.sender
     };
 
     let config = Config {
         owner,
-        astro_token_address: deps.api.addr_validate(&msg.astro_token_address)?,
+        astro_token_address: addr_validate_to_lower(deps.api, &msg.astro_token_address)?,
         merkle_roots: msg.merkle_roots.unwrap_or_default(),
         from_timestamp,
         to_timestamp: msg.to_timestamp,
@@ -63,6 +71,42 @@ pub fn instantiate(
     Ok(Response::default())
 }
 
+/// ## Description
+/// Exposes all the execute functions available in the contract.
+/// ## Params
+/// * **deps** is an object of type [`DepsMut`].
+///
+/// * **env** is an object of type [`Env`].
+///
+/// * **info** is an object of type [`MessageInfo`].
+///
+/// * **msg** is an object of type [`ExecuteMsg`].
+///
+/// ## Execute messages
+///
+/// * **ExecuteMsg::Receive(msg)** Parse incoming messages from the ASTRO token.
+///
+/// * **ExecuteMsg::UpdateConfig {
+///             owner,
+///             auction_contract_address,
+///             merkle_roots,
+///             from_timestamp,
+///             to_timestamp,
+///         }** Admin function to update any of the configuration parameters.
+///
+/// * **ExecuteMsg::Claim {
+///             claim_amount,
+///             merkle_proof,
+///             root_index,
+///         }** Executes an airdrop claim for Users.
+///
+/// * **ExecuteMsg::DelegateAstroToBootstrapAuction { amount_to_delegate }** Delegates ASTRO to bootstrap auction contract.
+///
+/// * **ExecuteMsg::EnableClaims {}** Enables ASTRO withdrawals by the airdrop recipients.
+///
+/// * **ExecuteMsg::WithdrawAirdropReward {}** Facilitates ASTRO withdrawal for airdrop recipients
+///
+/// * **ExecuteMsg::TransferUnclaimedTokens { recipient, amount }** Transfers unclaimed ASTRO tokens available with the contract to the recipient address.
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(
     deps: DepsMut,
@@ -97,6 +141,17 @@ pub fn execute(
     }
 }
 
+/// Receives a message of type [`Cw20ReceiveMsg`] and processes it depending on the received template.
+/// If the template is not found in the received message, then a [`ContractError`] is returned,
+/// otherwise returns the [`Response`] with the specified attributes if the operation was successful
+/// ## Params
+/// * **deps** is an object of type [`DepsMut`].
+///
+/// * **env** is an object of type [`Env`].
+///
+/// * **info** is an object of type [`MessageInfo`].
+///
+/// * **cw20_msg** is an object of type [`Cw20ReceiveMsg`]. This is the CW20 message to process.
 pub fn receive_cw20(
     deps: DepsMut,
     _env: Env,
@@ -126,27 +181,62 @@ pub fn receive_cw20(
     }
 }
 
+/// Exposes all the queries available in the contract.
+/// ## Params
+/// * **deps** is an object of type [`Deps`].
+///
+/// * **_env** is an object of type [`Env`].
+///
+/// * **msg** is an object of type [`QueryMsg`].
+///
+/// ## Queries
+/// * **QueryMsg::Config {}** Returns the config info.
+///
+/// * **QueryMsg::State {}** Returns the contract's state info.
+///
+/// * **QueryMsg::HasUserClaimed { address }** Returns a boolean value indicating
+/// if the corresponding address have yet claimed their airdrop or not.
+///
+/// * **QueryMsg::UserInfo { address }** Returns user's airdrop claim state.
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::Config {} => to_binary(&query_config(deps)?),
-        QueryMsg::State {} => to_binary(&query_state(deps)?),
+        QueryMsg::Config {} => to_binary(&CONFIG.load(deps.storage)?),
+        QueryMsg::State {} => to_binary(&STATE.load(deps.storage)?),
         QueryMsg::HasUserClaimed { address } => to_binary(&query_user_claimed(deps, address)?),
         QueryMsg::UserInfo { address } => to_binary(&query_user_info(deps, address)?),
     }
 }
 
+/// Used for contract migration. Returns a default object of type [`Response`].
+/// ## Params
+/// * **_deps** is an object of type [`DepsMut`].
+///
+/// * **_env** is an object of type [`Env`].
+///
+/// * **_msg** is an object of type [`MigrateMsg`].
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn migrate(_deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response> {
     Ok(Response::default())
 }
 
-//----------------------------------------------------------------------------------------
-// Handle functions
-//----------------------------------------------------------------------------------------
-
-/// @dev Admin function to update Configuration parameters
-/// @param new_config : Same as InstantiateMsg struct
+/// Admin function to update configuration parameters. Returns a [`StdError`] on failure.
+/// ## Params
+/// * **deps** is an object of type [`DepsMut`].
+///
+/// * **_env** is an object of type [`Env`].
+///
+/// * **info** is an object of type [`MessageInfo`].
+///
+/// * **owner** is an optional object of type [`String`] that contains address of the new owner.
+///
+/// * **auction_contract_address** is an optional object of type [`String`] that contains address of the new auction contract address.
+///
+/// * **merkle_roots** is an optional vector of type [`String`] that contains new Markle roots.
+///
+/// * **from_timestamp** is an optional object of type [`u64`].
+///
+/// * **to_timestamp** is an optional object of type [`u64`].
 pub fn handle_update_config(
     deps: DepsMut,
     env: Env,
@@ -165,7 +255,7 @@ pub fn handle_update_config(
     }
 
     if let Some(owner) = owner {
-        config.owner = deps.api.addr_validate(&owner)?;
+        config.owner = addr_validate_to_lower(deps.api, &owner)?;
         attributes.push(attr("new_owner", owner.as_str()))
     }
 
@@ -201,7 +291,11 @@ pub fn handle_update_config(
     Ok(Response::new().add_attributes(attributes))
 }
 
-/// @dev Facilitates increasing ASTRO airdrop amount
+/// Increases ASTRO incentives. Returns a [`StdError`] on failure.
+/// ## Params
+/// * **deps** is an object of type [`DepsMut`].
+///
+/// * **amount** is an object of type [`Uint128`].
 pub fn handle_increase_astro_incentives(
     deps: DepsMut,
     amount: Uint128,
@@ -216,10 +310,19 @@ pub fn handle_increase_astro_incentives(
         .add_attribute("total_airdrop_size", state.total_airdrop_size))
 }
 
-/// @dev Executes an airdrop claim for a Terra User
-/// @param claim_amount : Airdrop to be claimed by the user
-/// @param merkle_proof : Array of hashes to prove the input is a leaf of the Merkle Tree
-/// @param root_index : Merkle Tree root identifier to be used for verification
+/// Executes an airdrop claim for Users. Returns a [`StdError`] on failure.
+/// ## Params
+/// * **deps** is an object of type [`DepsMut`].
+///
+/// * **env** is an object of type [`Env`].
+///
+/// * **info** is an object of type [`MessageInfo`].
+///
+/// * **claim_amount** is an object of type [`Uint128`]. Airdrop to be claimed by the user
+///
+/// * **merkle_proof** is a vector of type [`String`]. Array of hashes to prove the input is a leaf of the Merkle Tree
+///
+/// * **root_index** is a vector of type [`u32`]. Merkle Tree root identifier to be used for verification
 pub fn handle_claim(
     deps: DepsMut,
     env: Env,
@@ -243,12 +346,12 @@ pub fn handle_claim(
         return Err(StdError::generic_err("Claim period has concluded"));
     }
 
-    let merkle_root = config.merkle_roots.get(root_index as usize);
-    if merkle_root.is_none() {
-        return Err(StdError::generic_err("Incorrect Merkle Root Index"));
-    }
+    let merkle_root = config
+        .merkle_roots
+        .get(root_index as usize)
+        .ok_or_else(|| StdError::generic_err("Incorrect Merkle Root Index"))?;
 
-    if !verify_claim(&recipient, claim_amount, merkle_proof, merkle_root.unwrap()) {
+    if !verify_claim(&recipient, claim_amount, merkle_proof, merkle_root)? {
         return Err(StdError::generic_err("Incorrect Merkle Proof"));
     }
 
@@ -287,9 +390,17 @@ pub fn handle_claim(
     ]))
 }
 
-/// @dev Admin function to transfer ASTRO Tokens to the recipient address
-/// @param recipient Recipient receiving the ASTRO tokens
-/// @param amount Amount of ASTRO to be transferred
+/// Transfers unclaimed tokens. Returns a [`StdError`] on failure.
+/// ## Params
+/// * **deps** is an object of type [`DepsMut`].
+///
+/// * **env** is an object of type [`Env`].
+///
+/// * **info** is an object of type [`MessageInfo`].
+///
+/// * **recipient** is an object of type [`String`]. Recipient receiving the ASTRO tokens
+///
+/// * **amount** is an object of type [`Uint128`]. Amount of ASTRO to be transferred
 pub fn handle_transfer_unclaimed_tokens(
     deps: DepsMut,
     env: Env,
@@ -328,7 +439,7 @@ pub fn handle_transfer_unclaimed_tokens(
 
     // COSMOS MSG :: TRANSFER ASTRO TOKENS
     let transfer_msg = build_transfer_cw20_token_msg(
-        deps.api.addr_validate(&recipient)?,
+        addr_validate_to_lower(deps.api, &recipient)?,
         config.astro_token_address.to_string(),
         amount,
     )?;
@@ -342,34 +453,13 @@ pub fn handle_transfer_unclaimed_tokens(
         ]))
 }
 
-//----------------------------------------------------------------------------------------
-// Query functions
-//----------------------------------------------------------------------------------------
-
-/// @dev Returns the airdrop configuration
-fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
-    let config = CONFIG.load(deps.storage)?;
-    Ok(ConfigResponse {
-        astro_token_address: config.astro_token_address.to_string(),
-        owner: config.owner.to_string(),
-        merkle_roots: config.merkle_roots,
-        from_timestamp: config.from_timestamp,
-        to_timestamp: config.to_timestamp,
-    })
-}
-
-/// @dev Returns the airdrop contract state
-fn query_state(deps: Deps) -> StdResult<StateResponse> {
-    let state = STATE.load(deps.storage)?;
-    Ok(StateResponse {
-        total_airdrop_size: state.total_airdrop_size,
-        unclaimed_tokens: state.unclaimed_tokens,
-    })
-}
-
-/// @dev Returns details around user's ASTRO Airdrop claim
+/// Returns details around user's ASTRO Airdrop claim. Returns a [`StdError`] on failure.
+/// ## Params
+/// * **deps** is an object of type [`Deps`].
+///
+/// * **user_address** is an object of type [`String`].
 fn query_user_info(deps: Deps, user_address: String) -> StdResult<UserInfoResponse> {
-    let user_address = deps.api.addr_validate(&user_address)?;
+    let user_address = addr_validate_to_lower(deps.api, &user_address)?;
     let user_info = USERS
         .may_load(deps.storage, &user_address)?
         .unwrap_or_default();
@@ -378,9 +468,13 @@ fn query_user_info(deps: Deps, user_address: String) -> StdResult<UserInfoRespon
     })
 }
 
-/// @dev Returns true if the user has claimed the airdrop [EVM addresses to be provided in lower-case without the '0x' prefix]
+/// Returns a boolean value indicating if the corresponding address have yet claimed their airdrop or not. Returns a [`StdError`] on failure.
+/// ## Params
+/// * **deps** is an object of type [`Deps`].
+///
+/// * **address** is an object of type [`String`].
 fn query_user_claimed(deps: Deps, address: String) -> StdResult<ClaimResponse> {
-    let user_address = deps.api.addr_validate(&address)?;
+    let user_address = addr_validate_to_lower(deps.api, &address)?;
     let user_info = USERS
         .may_load(deps.storage, &user_address)?
         .unwrap_or_default();
