@@ -9,7 +9,7 @@ use astroport_periphery::auction::Cw20HookMsg::DelegateAstroTokens;
 use astroport_periphery::helpers::{build_send_cw20_token_msg, build_transfer_cw20_token_msg};
 use cosmwasm_std::{
     attr, entry_point, from_binary, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response,
-    StdError, StdResult, Uint128,
+    StdError, StdResult,
 };
 use cw2::set_contract_version;
 use cw20::Cw20ReceiveMsg;
