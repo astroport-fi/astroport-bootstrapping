@@ -2,19 +2,13 @@ use astroport_periphery::auction::{
     Config, Cw20HookMsg, ExecuteMsg, InstantiateMsg, QueryMsg, State, UpdateConfigMsg,
     UserInfoResponse,
 };
-use cosmwasm_std::testing::{mock_env, MockApi, MockQuerier, MockStorage};
+
 use cosmwasm_std::{attr, to_binary, Addr, Coin, Timestamp, Uint128, Uint64};
 use cw20::Cw20ExecuteMsg;
-use terra_multi_test::{App, BankKeeper, ContractWrapper, Executor, TerraMockQuerier};
+use cw_multi_test::{App, ContractWrapper, Executor};
 
 fn mock_app() -> App {
-    let api = MockApi::default();
-    let env = mock_env();
-    let bank = BankKeeper::new();
-    let storage = MockStorage::new();
-    let tmq = TerraMockQuerier::new(MockQuerier::new(&[]));
-
-    App::new(api, env.block, bank, storage, tmq)
+    App::default()
 }
 
 // Instantiate ASTRO Token Contract
@@ -36,6 +30,7 @@ fn instantiate_astro_token(app: &mut App, owner: Addr) -> Addr {
             minter: owner.to_string(),
             cap: None,
         }),
+        marketing: None,
     };
 
     app.instantiate_contract(
@@ -456,6 +451,11 @@ fn instantiate_generator_and_vesting(
         tokens_per_block: Uint128::from(0u128),
         vesting_contract: vesting_instance.clone().to_string(),
         owner: owner.to_string(),
+        factory: "".to_string(),
+        generator_controller: None,
+        voting_escrow: None,
+        guardian: None,
+        whitelist_code_id: 0,
     };
 
     let generator_instance = app

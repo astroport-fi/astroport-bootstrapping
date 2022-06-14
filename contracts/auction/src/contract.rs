@@ -856,7 +856,7 @@ pub fn handle_claim_rewards_and_withdraw_lp_shares(
 
                 if !pending_rewards.pending.is_zero()
                     || (pending_rewards.pending_on_proxy.is_some()
-                        && !pending_rewards.pending_on_proxy.unwrap().is_zero())
+                        && !pending_rewards.pending_on_proxy.unwrap().is_empty())
                 {
                     let rwi: RewardInfoResponse = deps.querier.query_wasm_smart(
                         &generator,
@@ -1192,7 +1192,7 @@ pub fn update_state_on_reward_claim(
         )?;
 
         let base_reward_received;
-        state.generator_astro_per_share = state.generator_astro_per_share + {
+        state.generator_astro_per_share += {
             let res: BalanceResponse = deps.querier.query_wasm_smart(
                 rwi.base_reward_token,
                 &Cw20QueryMsg::Balance {
@@ -1336,8 +1336,8 @@ fn query_user_info(deps: Deps, env: Env, user_address: String) -> StdResult<User
                     },
                 )?;
 
-                state.generator_astro_per_share = state.generator_astro_per_share
-                    + Decimal::from_ratio(pending_rewards.pending, lp_balance);
+                state.generator_astro_per_share +=
+                    Decimal::from_ratio(pending_rewards.pending, lp_balance);
 
                 // Calculated claimable ASTRO staking rewards
                 user_info_response.claimable_generator_astro = (state.generator_astro_per_share

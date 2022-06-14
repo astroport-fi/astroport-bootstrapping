@@ -2,19 +2,12 @@ use astroport_periphery::simple_airdrop::{
     ClaimResponse, Config, Cw20HookMsg, ExecuteMsg, InstantiateMsg, QueryMsg, State,
     UserInfoResponse,
 };
-use cosmwasm_std::testing::{mock_env, MockApi, MockQuerier, MockStorage};
 use cosmwasm_std::{attr, to_binary, Addr, Timestamp, Uint128};
 use cw20::Cw20ExecuteMsg;
-use terra_multi_test::{App, BankKeeper, ContractWrapper, Executor, TerraMockQuerier};
+use cw_multi_test::{App, ContractWrapper, Executor};
 
 fn mock_app() -> App {
-    let api = MockApi::default();
-    let env = mock_env();
-    let bank = BankKeeper::new();
-    let storage = MockStorage::new();
-    let tmq = TerraMockQuerier::new(MockQuerier::new(&[]));
-
-    App::new(api, env.block, bank, storage, tmq)
+    App::default()
 }
 
 fn init_contracts(app: &mut App) -> (Addr, Addr, InstantiateMsg, u64) {
@@ -38,6 +31,7 @@ fn init_contracts(app: &mut App) -> (Addr, Addr, InstantiateMsg, u64) {
             minter: owner.to_string(),
             cap: None,
         }),
+        marketing: None,
     };
 
     let astro_token_instance = app
@@ -186,7 +180,7 @@ fn update_config() {
         .unwrap_err();
 
     assert_eq!(
-        err.to_string(),
+        err.root_cause().to_string(),
         "Generic error: Only owner can update configuration"
     );
 
@@ -276,7 +270,10 @@ fn test_transfer_unclaimed_tokens() {
         )
         .unwrap_err();
 
-    assert_eq!(err.to_string(), "Generic error: Sender not authorized!");
+    assert_eq!(
+        err.root_cause().to_string(),
+        "Generic error: Sender not authorized!"
+    );
 
     // claim period is not over
     app.update_block(|b| {
@@ -298,7 +295,7 @@ fn test_transfer_unclaimed_tokens() {
         .unwrap_err();
 
     assert_eq!(
-        err.to_string(),
+        err.root_cause().to_string(),
         "Generic error: 9900000 seconds left before unclaimed tokens can be transferred"
     );
 
@@ -322,7 +319,7 @@ fn test_transfer_unclaimed_tokens() {
         .unwrap_err();
 
     assert_eq!(
-        err.to_string(),
+        err.root_cause().to_string(),
         "Generic error: Amount cannot exceed max available ASTRO balance 100000000000"
     );
 
@@ -463,7 +460,10 @@ fn test_claim_by_terra_user() {
             &[],
         )
         .unwrap_err();
-    assert_eq!(claim_f.to_string(), "Generic error: Claim not allowed");
+    assert_eq!(
+        claim_f.root_cause().to_string(),
+        "Generic error: Claim not allowed"
+    );
 
     // Update Block to test successful claim
     app.update_block(|b| {
@@ -489,7 +489,7 @@ fn test_claim_by_terra_user() {
         .unwrap_err();
 
     assert_eq!(
-        claim_f.to_string(),
+        claim_f.root_cause().to_string(),
         "Generic error: Incorrect Merkle Root Index"
     );
 
@@ -503,7 +503,10 @@ fn test_claim_by_terra_user() {
         )
         .unwrap_err();
 
-    assert_eq!(claim_f.to_string(), "Generic error: Incorrect Merkle Proof");
+    assert_eq!(
+        claim_f.root_cause().to_string(),
+        "Generic error: Incorrect Merkle Proof"
+    );
 
     // **** "Incorrect Merkle Proof" Error should be returned ****
     claim_f = app
@@ -515,7 +518,10 @@ fn test_claim_by_terra_user() {
         )
         .unwrap_err();
 
-    assert_eq!(claim_f.to_string(), "Generic error: Incorrect Merkle Proof");
+    assert_eq!(
+        claim_f.root_cause().to_string(),
+        "Generic error: Incorrect Merkle Proof"
+    );
 
     // **** User should successfully claim the Airdrop ****
 
@@ -617,7 +623,10 @@ fn test_claim_by_terra_user() {
             &[],
         )
         .unwrap_err();
-    assert_eq!(claim_f.to_string(), "Generic error: Already claimed");
+    assert_eq!(
+        claim_f.root_cause().to_string(),
+        "Generic error: Already claimed"
+    );
 
     // Check :: User successfully claimed the airdrop
     claim_query_resp = app
@@ -648,7 +657,7 @@ fn test_claim_by_terra_user() {
         )
         .unwrap_err();
     assert_eq!(
-        claim_f.to_string(),
+        claim_f.root_cause().to_string(),
         "Generic error: Claim period has concluded"
     );
 }
