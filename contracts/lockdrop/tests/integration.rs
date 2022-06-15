@@ -1,5 +1,4 @@
 use astroport::asset::AssetInfo;
-use astroport::generator_proxy::InstantiateMsg as ProxyInstantiateMsg;
 use astroport::restricted_vector::RestrictedVector;
 use astroport_governance::utils::EPOCH_START;
 use astroport_periphery::{
@@ -9,22 +8,15 @@ use astroport_periphery::{
         UpdateConfigMsg, UserInfoResponse,
     },
 };
-use cosmwasm_std::testing::{mock_env, MockApi, MockStorage, MOCK_CONTRACT_ADDR};
+use cosmwasm_std::testing::{mock_env, MockApi, MockStorage};
 use cosmwasm_std::{
     attr, to_binary, Addr, Coin, Decimal, Timestamp, Uint128, Uint256 as CUint256, Uint64,
 };
-use mirror_protocol::staking::{
-    Cw20HookMsg as MirrorStakingHookMsg, ExecuteMsg as MirrorExecuteMsg,
-    InstantiateMsg as MirrorInstantiateMsg,
-};
 
 use astroport::token::InstantiateMsg as TokenInstantiateMsg;
-use astroport_periphery::lockdrop::{Config, MigrateMsg, PoolInfo};
-use cw20::{Cw20ExecuteMsg, Cw20QueryMsg, MinterResponse};
-use cw_multi_test::ContractWrapper;
-use cw_multi_test::{
-    next_block, App, AppBuilder, BankKeeper, Executor, SwapQuerier, TerraMock, TreasuryQuerier,
-};
+use astroport_periphery::lockdrop::{Config, PoolInfo};
+use cw20::{Cw20ExecuteMsg, Cw20QueryMsg};
+use cw_multi_test::{App, AppBuilder, BankKeeper, ContractWrapper, Executor};
 
 fn mock_app() -> App {
     let mut env = mock_env();
@@ -39,63 +31,6 @@ fn mock_app() -> App {
         .with_bank(bank)
         .with_storage(storage)
         .build(|_, _, _| {})
-}
-
-fn store_token_code_id(app: &mut App) -> u64 {
-    let token_contract = Box::new(ContractWrapper::new_with_empty(
-        astroport_token::contract::execute,
-        astroport_token::contract::instantiate,
-        astroport_token::contract::query,
-    ));
-
-    let token_code = app.store_code(token_contract);
-
-    token_code
-}
-
-fn store_proxy_code(app: &mut App) -> u64 {
-    let generator_proxy_to_mirror_contract = Box::new(ContractWrapper::new_with_empty(
-        astroport_generator_proxy_to_mirror::contract::execute,
-        astroport_generator_proxy_to_mirror::contract::instantiate,
-        astroport_generator_proxy_to_mirror::contract::query,
-    ));
-
-    app.store_code(generator_proxy_to_mirror_contract)
-}
-
-fn store_whitelist_code(app: &mut App) -> u64 {
-    let whitelist_contract = Box::new(ContractWrapper::new_with_empty(
-        astroport_whitelist::contract::execute,
-        astroport_whitelist::contract::instantiate,
-        astroport_whitelist::contract::query,
-    ));
-
-    app.store_code(whitelist_contract)
-}
-
-fn instantiate_token(
-    app: &mut App,
-    owner: Addr,
-    token_code_id: u64,
-    name: &str,
-    cap: Option<u128>,
-) -> Addr {
-    let name = String::from(name);
-
-    let msg = TokenInstantiateMsg {
-        name: name.clone(),
-        symbol: name.clone(),
-        decimals: 6,
-        initial_balances: vec![],
-        mint: Some(MinterResponse {
-            minter: owner.to_string(),
-            cap: cap.map(|v| Uint128::from(v)),
-        }),
-        marketing: None,
-    };
-
-    app.instantiate_contract(token_code_id, owner, &msg, &[], name, None)
-        .unwrap()
 }
 
 // Instantiate ASTRO Token Contract
@@ -145,9 +80,9 @@ fn instantiate_terraswap(app: &mut App, owner: Addr) -> Addr {
 
     // Terraswap LP Token
     let terraswap_token_contract = Box::new(ContractWrapper::new_with_empty(
-        terraswap_token::contract::execute,
-        terraswap_token::contract::instantiate,
-        terraswap_token::contract::query,
+        cw20_base::contract::execute,
+        cw20_base::contract::instantiate,
+        cw20_base::contract::query,
     ));
     let terraswap_token_code_id = app.store_code(terraswap_token_contract);
 
@@ -407,149 +342,6 @@ fn instantiate_generator_and_vesting(
     app.execute_contract(owner.clone(), astro_token_instance.clone(), &msg, &[])
         .unwrap();
 
-    // let msg = astroport::generator::ExecuteMsg::Add {
-    //     alloc_point: Uint64::from(10u64),
-    //     reward_proxy: None,
-    //     lp_token: lp_token_instance.clone(),
-    //     with_update: true,
-    // };
-    // app.execute_contract(
-    //     Addr::unchecked(owner.clone()),
-    //     generator_instance.clone(),
-    //     &msg,
-    //     &[],
-    // )
-    // .unwrap();
-
-    (generator_instance, vesting_instance)
-}
-
-fn instantiate_generator_and_vesting_v120(
-    app: &mut App,
-    owner: Addr,
-    astro_token_instance: Addr,
-    astro_factory_instance: Addr,
-) -> (Addr, Addr) {
-    // Vesting
-    let vesting_contract = Box::new(ContractWrapper::new_with_empty(
-        astroport_vesting::contract::execute,
-        astroport_vesting::contract::instantiate,
-        astroport_vesting::contract::query,
-    ));
-    let vesting_code_id = app.store_code(vesting_contract);
-
-    let init_msg = astroport::vesting::InstantiateMsg {
-        owner: owner.to_string(),
-        token_addr: astro_token_instance.clone().to_string(),
-    };
-
-    let vesting_instance = app
-        .instantiate_contract(
-            vesting_code_id,
-            owner.clone(),
-            &init_msg,
-            &[],
-            "Vesting",
-            None,
-        )
-        .unwrap();
-
-    mint_some_tokens(
-        app,
-        owner.clone(),
-        astro_token_instance.clone(),
-        Uint128::new(900_000_000_000),
-        owner.to_string(),
-    );
-    app.execute_contract(
-        owner.clone(),
-        astro_token_instance.clone(),
-        &Cw20ExecuteMsg::IncreaseAllowance {
-            spender: vesting_instance.clone().to_string(),
-            amount: Uint128::new(900_000_000_000),
-            expires: None,
-        },
-        &[],
-    )
-    .unwrap();
-
-    // Generator
-    let generator_contract = Box::new(
-        ContractWrapper::new_with_empty(
-            astroport_generator_v120::contract::execute,
-            astroport_generator_v120::contract::instantiate,
-            astroport_generator_v120::contract::query,
-        )
-        .with_reply_empty(astroport_generator_v120::contract::reply),
-    );
-
-    let generator_code_id = app.store_code(generator_contract);
-
-    let init_msg = astroport_package_generator_v120::generator::InstantiateMsg {
-        allowed_reward_proxies: vec![],
-        start_block: Uint64::from(app.block_info().height),
-        astro_token: astro_token_instance.to_string(),
-        tokens_per_block: Uint128::from(0u128),
-        vesting_contract: vesting_instance.clone().to_string(),
-        owner: owner.to_string(),
-        factory: astro_factory_instance.to_string(),
-        generator_controller: None,
-        guardian: None,
-    };
-
-    let generator_instance = app
-        .instantiate_contract(
-            generator_code_id,
-            owner.clone(),
-            &init_msg,
-            &[],
-            "Generator",
-            Some(owner.to_string()),
-        )
-        .unwrap();
-
-    let tokens_per_block = Uint128::new(10_000000);
-
-    let msg = astroport::generator::ExecuteMsg::SetTokensPerBlock {
-        amount: tokens_per_block,
-    };
-    app.execute_contract(owner.clone(), generator_instance.clone(), &msg, &[])
-        .unwrap();
-
-    let msg = astroport_package_generator_v120::generator::QueryMsg::Config {};
-    let res: astroport_package_generator_v120::generator::ConfigResponse = app
-        .wrap()
-        .query_wasm_smart(&generator_instance, &msg)
-        .unwrap();
-    assert_eq!(res.tokens_per_block, tokens_per_block);
-
-    // vesting to generator:
-
-    let current_block = app.block_info();
-
-    let amount = Uint128::new(630720000000);
-
-    let msg = Cw20ExecuteMsg::Send {
-        contract: vesting_instance.to_string(),
-        amount,
-        msg: to_binary(&astroport::vesting::Cw20HookMsg::RegisterVestingAccounts {
-            vesting_accounts: vec![astroport::vesting::VestingAccount {
-                address: generator_instance.to_string(),
-                schedules: vec![astroport::vesting::VestingSchedule {
-                    start_point: astroport::vesting::VestingSchedulePoint {
-                        time: current_block.time.seconds(),
-                        amount,
-                    },
-                    end_point: None,
-                }],
-            }],
-        })
-        .unwrap(),
-    };
-
-    app.execute_contract(owner.clone(), astro_token_instance.clone(), &msg, &[])
-        .unwrap();
-
     (generator_instance, vesting_instance)
 }
 
@@ -663,129 +455,6 @@ fn instantiate_lockdrop_contract(app: &mut App, owner: Addr) -> (Addr, Instantia
         )
         .unwrap();
     (lockdrop_instance, lockdrop_instantiate_msg)
-}
-
-fn instantiate_lockdrop_contract_v111(
-    app: &mut App,
-    owner: Addr,
-) -> (Addr, astroport_periphery_v111::lockdrop::InstantiateMsg) {
-    let lockdrop_contract = Box::new(ContractWrapper::new_with_empty(
-        astroport_lockdrop_v111::contract::execute,
-        astroport_lockdrop_v111::contract::instantiate,
-        astroport_lockdrop_v111::contract::query,
-    ));
-
-    let lockdrop_code_id = app.store_code(lockdrop_contract);
-
-    let lockdrop_instantiate_msg = astroport_periphery_v111::lockdrop::InstantiateMsg {
-        owner: Some(owner.clone().to_string()),
-        init_timestamp: EPOCH_START + 100_000,
-        deposit_window: 10_000_000,
-        withdrawal_window: 500_000,
-        min_lock_duration: 1u64,
-        max_lock_duration: 52u64,
-        weekly_multiplier: 1u64,
-        weekly_divider: 12u64,
-        max_positions_per_user: 14,
-    };
-
-    app.update_block(|b| {
-        b.height += 17280;
-        b.time = Timestamp::from_seconds(EPOCH_START + 900_00)
-    });
-
-    // Init contract
-    let lockdrop_instance = app
-        .instantiate_contract(
-            lockdrop_code_id,
-            owner.clone(),
-            &lockdrop_instantiate_msg,
-            &[],
-            "lockdrop",
-            Some(owner.to_string()),
-        )
-        .unwrap();
-    (lockdrop_instance, lockdrop_instantiate_msg)
-}
-
-fn instantiate_proxy(
-    app: &mut App,
-    owner: Addr,
-    proxy_code: u64,
-    generator_instance: &Addr,
-    pair: &Addr,
-    lp_token: &Addr,
-    mirror_staking_instance: &Addr,
-    mirror_token_instance: &Addr,
-) -> Addr {
-    let init_msg = ProxyInstantiateMsg {
-        generator_contract_addr: generator_instance.to_string(),
-        pair_addr: pair.to_string(),
-        lp_token_addr: lp_token.to_string(),
-        reward_contract_addr: mirror_staking_instance.to_string(),
-        reward_token_addr: mirror_token_instance.to_string(),
-    };
-
-    app.instantiate_contract(
-        proxy_code,
-        owner,
-        &init_msg,
-        &[],
-        String::from("Proxy"),
-        None,
-    )
-    .unwrap()
-}
-
-fn instantiate_mirror_protocol(
-    app: &mut App,
-    owner: Addr,
-    token_code_id: u64,
-    asset_token: &Addr,
-    staking_token: &Addr,
-) -> (Addr, Addr) {
-    let mirror_token_instance = instantiate_token(app, owner.clone(), token_code_id, "MIR", None);
-
-    // Mirror staking
-    let mirror_staking_contract = Box::new(ContractWrapper::new_with_empty(
-        mirror_staking::contract::execute,
-        mirror_staking::contract::instantiate,
-        mirror_staking::contract::query,
-    ));
-
-    let mirror_staking_code_id = app.store_code(mirror_staking_contract);
-
-    let init_msg = MirrorInstantiateMsg {
-        base_denom: String::from("uusd"),
-        mint_contract: String::from(MOCK_CONTRACT_ADDR),
-        mirror_token: mirror_token_instance.to_string(),
-        oracle_contract: String::from(MOCK_CONTRACT_ADDR),
-        owner: owner.to_string(),
-        premium_min_update_interval: 0,
-        short_reward_contract: String::from(MOCK_CONTRACT_ADDR),
-        terraswap_factory: String::from(MOCK_CONTRACT_ADDR),
-    };
-
-    let mirror_staking_instance = app
-        .instantiate_contract(
-            mirror_staking_code_id,
-            owner.clone(),
-            &init_msg,
-            &[],
-            "Mirror staking",
-            None,
-        )
-        .unwrap();
-
-    let msg = MirrorExecuteMsg::RegisterAsset {
-        asset_token: asset_token.to_string(),
-        staking_token: staking_token.to_string(),
-    };
-
-    app.execute_contract(owner, mirror_staking_instance.clone(), &msg, &[])
-        .unwrap();
-
-    (mirror_token_instance, mirror_staking_instance)
 }
 
 // Instantiate
@@ -942,169 +611,6 @@ fn instantiate_all_contracts(
     );
 }
 
-fn instantiate_all_contracts_old(
-    app: &mut App,
-    owner: Addr,
-) -> (
-    Addr,
-    Addr,
-    Addr,
-    Addr,
-    Addr,
-    Addr,
-    astroport_periphery_v111::lockdrop::UpdateConfigMsg,
-) {
-    let (lockdrop_instance, _lockdrop_instantiate_msg) =
-        instantiate_lockdrop_contract_v111(app, owner.clone());
-
-    let astro_token = instantiate_astro_token(app, owner.clone());
-
-    // Initiate Terraswap
-    let terraswap_factory_instance = instantiate_terraswap(app, owner.clone());
-
-    // Initiate ASTRO-UST Pair on Astroport
-    let astroport_factory_instance = instantiate_astroport(app, owner.clone());
-    let pair_info = [
-        astroport::asset::AssetInfo::Token {
-            contract_addr: astro_token.clone(),
-        },
-        astroport::asset::AssetInfo::NativeToken {
-            denom: "uusd".to_string(),
-        },
-    ];
-    app.execute_contract(
-        Addr::unchecked("user"),
-        astroport_factory_instance.clone(),
-        &astroport::factory::ExecuteMsg::CreatePair {
-            asset_infos: pair_info.clone(),
-            init_params: None,
-            pair_type: astroport::factory::PairType::Xyk {},
-        },
-        &[],
-    )
-    .unwrap();
-    let pair_resp: astroport::asset::PairInfo = app
-        .wrap()
-        .query_wasm_smart(
-            &astroport_factory_instance,
-            &astroport::factory::QueryMsg::Pair {
-                asset_infos: pair_info.clone(),
-            },
-        )
-        .unwrap();
-    let pool_address = pair_resp.contract_addr;
-
-    let (generator_address, _) = instantiate_generator_and_vesting_v120(
-        app,
-        owner.clone(),
-        astro_token.clone(),
-        astroport_factory_instance.clone(),
-    );
-
-    // Airdrop Contract
-    let airdrop_contract = Box::new(ContractWrapper::new_with_empty(
-        astroport_airdrop::contract::execute,
-        astroport_airdrop::contract::instantiate,
-        astroport_airdrop::contract::query,
-    ));
-
-    let airdrop_code_id = app.store_code(airdrop_contract);
-
-    let airdrop_msg = astroport_periphery::airdrop::InstantiateMsg {
-        owner: Some(owner.clone().to_string()),
-        astro_token_address: astro_token.clone().into_string(),
-        merkle_roots: Some(vec!["merkle_roots".to_string()]),
-        from_timestamp: Some(1_000_00),
-        to_timestamp: 10000_000_00,
-    };
-
-    let airdrop_instance = app
-        .instantiate_contract(
-            airdrop_code_id,
-            owner.clone(),
-            &airdrop_msg,
-            &[],
-            String::from("airdrop_instance"),
-            None,
-        )
-        .unwrap();
-
-    // Initiate Auction contract
-    let (auction_contract, _) = instantiate_auction_contract(
-        app,
-        owner.clone(),
-        astro_token.clone(),
-        airdrop_instance.clone(),
-        lockdrop_instance.clone(),
-        pool_address,
-        generator_address.clone(),
-    );
-
-    // Set auction contract in airdrop contract
-    app.execute_contract(
-        owner.clone(),
-        airdrop_instance.clone(),
-        &astroport_periphery::airdrop::ExecuteMsg::UpdateConfig {
-            owner: None,
-            auction_contract_address: Some(auction_contract.clone().to_string()),
-            merkle_roots: None,
-            from_timestamp: None,
-            to_timestamp: None,
-        },
-        &[],
-    )
-    .unwrap();
-
-    let update_msg = astroport_periphery_v111::lockdrop::UpdateConfigMsg {
-        astro_token_address: Some(astro_token.to_string()),
-        auction_contract_address: Some(auction_contract.to_string()),
-        generator_address: Some(generator_address.to_string()),
-    };
-    app.execute_contract(
-        owner.clone(),
-        astro_token.clone(),
-        &Cw20ExecuteMsg::IncreaseAllowance {
-            spender: lockdrop_instance.clone().to_string(),
-            amount: Uint128::new(1000000000u128),
-            expires: None,
-        },
-        &[],
-    )
-    .unwrap();
-
-    app.execute_contract(
-        owner.clone(),
-        lockdrop_instance.clone(),
-        &astroport_periphery_v111::lockdrop::ExecuteMsg::UpdateConfig {
-            new_config: update_msg.clone(),
-        },
-        &[],
-    )
-    .unwrap();
-
-    app.execute_contract(
-        owner.clone(),
-        astro_token.clone(),
-        &Cw20ExecuteMsg::Send {
-            amount: Uint128::from(1000000000u64),
-            contract: lockdrop_instance.to_string(),
-            msg: to_binary(&Cw20HookMsg::IncreaseAstroIncentives {}).unwrap(),
-        },
-        &[],
-    )
-    .unwrap();
-
-    return (
-        astro_token,
-        lockdrop_instance,
-        generator_address,
-        astroport_factory_instance,
-        terraswap_factory_instance,
-        auction_contract,
-        update_msg,
-    );
-}
-
 // Instantiate Pools and Migrate Liquidity to Astroport
 fn initialize_and_migrate_liquidity_for_pool(
     app: &mut App,
@@ -1115,9 +621,9 @@ fn initialize_and_migrate_liquidity_for_pool(
 ) -> (String, Addr, Addr) {
     // Terraswap LP Token
     let terraswap_token_contract = Box::new(ContractWrapper::new_with_empty(
-        terraswap_token::contract::execute,
-        terraswap_token::contract::instantiate,
-        terraswap_token::contract::query,
+        cw20_base::contract::execute,
+        cw20_base::contract::instantiate,
+        cw20_base::contract::query,
     ));
     let terraswap_token_code_id = app.store_code(terraswap_token_contract);
 
@@ -1204,16 +710,22 @@ fn initialize_and_migrate_liquidity_for_pool(
 
     // Set UST user balances
     app.init_modules(|router, _, storage| {
-        router.bank.init_balance(
-            storage,
-            &Addr::unchecked(user_address.clone()),
-            vec![Coin::new(1000000_000000, "uusd")],
-        ).unwrap();
-        router.bank.init_balance(
-            storage,
-            &Addr::unchecked(user2_address.clone()),
-            vec![Coin::new(1000000_000000, "uusd")],
-        ).unwrap();
+        router
+            .bank
+            .init_balance(
+                storage,
+                &Addr::unchecked(user_address.clone()),
+                vec![Coin::new(1000000_000000, "uusd")],
+            )
+            .unwrap();
+        router
+            .bank
+            .init_balance(
+                storage,
+                &Addr::unchecked(user2_address.clone()),
+                vec![Coin::new(1000000_000000, "uusd")],
+            )
+            .unwrap();
     });
 
     // user#1 adds liquidity to Terraswap Pool and locks that in Lockdrop contract
@@ -1424,8 +936,8 @@ fn initialize_and_migrate_liquidity_for_pool(
 
 #[test]
 fn proper_initialization_lockdrop() {
-    let mut app = mock_app();
     let owner = Addr::unchecked("contract_owner");
+    let mut app = mock_app();
 
     let (lockdrop_instance, lockdrop_instantiate_msg) =
         instantiate_lockdrop_contract(&mut app, owner);
@@ -1552,7 +1064,7 @@ fn test_update_config() {
             &[],
         )
         .unwrap_err();
-    assert_eq!(err.to_string(), "Generic error: Unauthorized");
+    assert_eq!(err.root_cause().to_string(), "Generic error: Unauthorized");
 
     // ######    SUCCESS :: Should have successfully updated   ######
 
@@ -1621,7 +1133,10 @@ fn test_update_config() {
             &[],
         )
         .unwrap_err();
-    assert_eq!(err.to_string(), "Generic error: ASTRO token already set");
+    assert_eq!(
+        err.root_cause().to_string(),
+        "Generic error: ASTRO token already set"
+    );
 }
 
 #[test]
@@ -1634,9 +1149,9 @@ fn test_initialize_pool() {
 
     // Terraswap LP Token
     let terraswap_token_contract = Box::new(ContractWrapper::new_with_empty(
-        terraswap_token::contract::execute,
-        terraswap_token::contract::instantiate,
-        terraswap_token::contract::query,
+        cw20_base::contract::execute,
+        cw20_base::contract::instantiate,
+        cw20_base::contract::query,
     ));
     let terraswap_token_code_id = app.store_code(terraswap_token_contract);
 
@@ -1674,7 +1189,7 @@ fn test_initialize_pool() {
             &[],
         )
         .unwrap_err();
-    assert_eq!(err.to_string(), "Generic error: Unauthorized");
+    assert_eq!(err.root_cause().to_string(), "Generic error: Unauthorized");
 
     // ######    SUCCESS :: SHOULD SUCCESSFULLY INITIALIZE     ######
     app.execute_contract(
@@ -1724,7 +1239,10 @@ fn test_initialize_pool() {
             &[],
         )
         .unwrap_err();
-    assert_eq!(err.to_string(), "Generic error: Already supported");
+    assert_eq!(
+        err.root_cause().to_string(),
+        "Generic error: Already supported"
+    );
 
     // ######    SUCCESS :: SHOULD SUCCESSFULLY INITIALIZE #2    ######
 
@@ -1800,7 +1318,7 @@ fn test_initialize_pool() {
         )
         .unwrap_err();
     assert_eq!(
-        err.to_string(),
+        err.root_cause().to_string(),
         "Generic error: Pools cannot be added post deposit window closure"
     );
 }
@@ -1815,9 +1333,9 @@ fn test_update_pool() {
 
     // Terraswap LP Token
     let terraswap_token_contract = Box::new(ContractWrapper::new_with_empty(
-        terraswap_token::contract::execute,
-        terraswap_token::contract::instantiate,
-        terraswap_token::contract::query,
+        cw20_base::contract::execute,
+        cw20_base::contract::instantiate,
+        cw20_base::contract::query,
     ));
     let terraswap_token_code_id = app.store_code(terraswap_token_contract);
 
@@ -1865,7 +1383,7 @@ fn test_update_pool() {
             &[],
         )
         .unwrap_err();
-    assert_eq!(err.to_string(), "Generic error: Unauthorized");
+    assert_eq!(err.root_cause().to_string(), "Generic error: Unauthorized");
 
     // ######    SUCCESS :: SHOULD SUCCESSFULLY UPDATE POOL     ######
     app.execute_contract(
@@ -1932,7 +1450,7 @@ fn test_update_pool() {
         )
         .unwrap_err();
     assert_eq!(
-        err.to_string(),
+        err.root_cause().to_string(),
         "Generic error: Pools cannot be updated post deposit window closure"
     );
 }
@@ -1946,9 +1464,9 @@ fn test_increase_lockup() {
 
     // Terraswap LP Token
     let terraswap_token_contract = Box::new(ContractWrapper::new_with_empty(
-        terraswap_token::contract::execute,
-        terraswap_token::contract::instantiate,
-        terraswap_token::contract::query,
+        cw20_base::contract::execute,
+        cw20_base::contract::instantiate,
+        cw20_base::contract::query,
     ));
     let terraswap_token_code_id = app.store_code(terraswap_token_contract);
 
@@ -2067,7 +1585,7 @@ fn test_increase_lockup() {
         )
         .unwrap_err();
     assert_eq!(
-        err.to_string(),
+        err.root_cause().to_string(),
         "astroport_periphery::lockdrop::PoolInfo not found"
     );
 
@@ -2085,7 +1603,10 @@ fn test_increase_lockup() {
             &[],
         )
         .unwrap_err();
-    assert_eq!(err.to_string(), "Generic error: Deposit window closed");
+    assert_eq!(
+        err.root_cause().to_string(),
+        "Generic error: Deposit window closed"
+    );
 
     // ######    ERROR :: Lockup duration needs to be between 1 and 52   ######
 
@@ -2107,7 +1628,7 @@ fn test_increase_lockup() {
         )
         .unwrap_err();
     assert_eq!(
-        err.to_string(),
+        err.root_cause().to_string(),
         "Generic error: Lockup duration needs to be between 1 and 52"
     );
 
@@ -2124,7 +1645,7 @@ fn test_increase_lockup() {
         )
         .unwrap_err();
     assert_eq!(
-        err.to_string(),
+        err.root_cause().to_string(),
         "Generic error: Lockup duration needs to be between 1 and 52"
     );
 
@@ -2329,7 +1850,10 @@ fn test_increase_lockup() {
             &[],
         )
         .unwrap_err();
-    assert_eq!(err.to_string(), "Generic error: Deposit window closed");
+    assert_eq!(
+        err.root_cause().to_string(),
+        "Generic error: Deposit window closed"
+    );
 }
 
 #[test]
@@ -2342,9 +1866,9 @@ fn test_withdraw_from_lockup() {
 
     // Terraswap LP Token
     let terraswap_token_contract = Box::new(ContractWrapper::new_with_empty(
-        terraswap_token::contract::execute,
-        terraswap_token::contract::instantiate,
-        terraswap_token::contract::query,
+        cw20_base::contract::execute,
+        cw20_base::contract::instantiate,
+        cw20_base::contract::query,
     ));
     let terraswap_token_code_id = app.store_code(terraswap_token_contract);
 
@@ -2429,7 +1953,10 @@ fn test_withdraw_from_lockup() {
             &[],
         )
         .unwrap_err();
-    assert_eq!(err.to_string(), "Generic error: Invalid withdrawal request");
+    assert_eq!(
+        err.root_cause().to_string(),
+        "Generic error: Invalid withdrawal request"
+    );
 
     // ######    ERROR :: LP Token not supported   ######
 
@@ -2446,7 +1973,7 @@ fn test_withdraw_from_lockup() {
         )
         .unwrap_err();
     assert_eq!(
-        err.to_string(),
+        err.root_cause().to_string(),
         "astroport_periphery::lockdrop::PoolInfo not found"
     );
 
@@ -2465,7 +1992,7 @@ fn test_withdraw_from_lockup() {
         )
         .unwrap_err();
     assert_eq!(
-        err.to_string(),
+        err.root_cause().to_string(),
         "astroport_periphery::lockdrop::LockupInfoV1 not found"
     );
 
@@ -2542,7 +2069,7 @@ fn test_withdraw_from_lockup() {
         )
         .unwrap_err();
     assert_eq!(
-        err.to_string(),
+        err.root_cause().to_string(),
         "Generic error: Amount exceeds maximum allowed withdrawal limit of 5000000"
     );
 
@@ -2565,7 +2092,7 @@ fn test_withdraw_from_lockup() {
         )
         .unwrap_err();
     assert_eq!(
-        err.to_string(),
+        err.root_cause().to_string(),
         "Generic error: Amount exceeds maximum allowed withdrawal limit of 4200000"
     );
 
@@ -2632,15 +2159,15 @@ fn test_withdraw_from_lockup() {
         )
         .unwrap_err();
     assert_eq!(
-        err.to_string(),
+        err.root_cause().to_string(),
         "Generic error: Withdrawal already happened. No more withdrawals accepted"
     );
 }
 
 #[test]
 fn test_migrate_liquidity() {
-    let mut app = mock_app();
     let owner = Addr::unchecked("contract_owner");
+    let mut app = mock_app();
 
     let (_, lockdrop_instance, astroport_factory_instance, _, _) =
         instantiate_all_contracts(&mut app, owner.clone());
@@ -2677,9 +2204,9 @@ fn test_migrate_liquidity() {
 
     // Terraswap LP Token
     let terraswap_token_contract = Box::new(ContractWrapper::new_with_empty(
-        terraswap_token::contract::execute,
-        terraswap_token::contract::instantiate,
-        terraswap_token::contract::query,
+        cw20_base::contract::execute,
+        cw20_base::contract::instantiate,
+        cw20_base::contract::query,
     ));
     let terraswap_token_code_id = app.store_code(terraswap_token_contract);
 
@@ -2766,16 +2293,22 @@ fn test_migrate_liquidity() {
 
     // Set UST user balances
     app.init_modules(|router, _, storage| {
-        router.bank.init_balance(
-            storage,
-            &Addr::unchecked(user_address.clone()),
-            vec![Coin::new(1000000_000000, "uusd")],
-        ).unwrap();
-        router.bank.init_balance(
-            storage,
-            &Addr::unchecked(user2_address.clone()),
-            vec![Coin::new(1000000_000000, "uusd")],
-        ).unwrap();
+        router
+            .bank
+            .init_balance(
+                storage,
+                &Addr::unchecked(user_address.clone()),
+                vec![Coin::new(1000000_000000, "uusd")],
+            )
+            .unwrap();
+        router
+            .bank
+            .init_balance(
+                storage,
+                &Addr::unchecked(user2_address.clone()),
+                vec![Coin::new(1000000_000000, "uusd")],
+            )
+            .unwrap();
     });
 
     // user#1 adds liquidity to Terraswap Pool and locks that in Lockdrop contract
@@ -3006,9 +2539,9 @@ fn test_migrate_liquidity_uusd_uluna_pool() {
 
     // Terraswap LP Token
     let terraswap_token_contract = Box::new(ContractWrapper::new_with_empty(
-        terraswap_token::contract::execute,
-        terraswap_token::contract::instantiate,
-        terraswap_token::contract::query,
+        cw20_base::contract::execute,
+        cw20_base::contract::instantiate,
+        cw20_base::contract::query,
     ));
     let terraswap_token_code_id = app.store_code(terraswap_token_contract);
 
@@ -3073,16 +2606,28 @@ fn test_migrate_liquidity_uusd_uluna_pool() {
 
     // Set UST user balances
     app.init_modules(|router, _, storage| {
-        router.bank.init_balance(
-            storage,
-            &Addr::unchecked(user_address.clone()),
-            vec![Coin::new(1000000_000000, "uusd")],
-        ).unwrap();
-        router.bank.init_balance(
-            storage,
-            &Addr::unchecked(user2_address.clone()),
-            vec![Coin::new(1000000_000000, "uusd")],
-        ).unwrap();
+        router
+            .bank
+            .init_balance(
+                storage,
+                &Addr::unchecked(user_address.clone()),
+                vec![
+                    Coin::new(1000000_000000, "uusd"),
+                    Coin::new(1000000_000000, "uluna"),
+                ],
+            )
+            .unwrap();
+        router
+            .bank
+            .init_balance(
+                storage,
+                &Addr::unchecked(user2_address.clone()),
+                vec![
+                    Coin::new(1000000_000000, "uusd"),
+                    Coin::new(1000000_000000, "uluna"),
+                ],
+            )
+            .unwrap();
     });
 
     // user#1 adds liquidity to Terraswap Pool and locks that in Lockdrop contract
@@ -3365,7 +2910,7 @@ fn test_stake_lp_tokens() {
         )
         .unwrap_err();
 
-    assert_eq!(err.to_string(), "Generic error: Unauthorized");
+    assert_eq!(err.root_cause().to_string(), "Generic error: Unauthorized");
 
     // ######    SHOULD SUCCESSFULLY STAKE LP TOKENS WITH GENERATOR   ######
 
@@ -3597,7 +3142,10 @@ fn test_claim_rewards() {
         )
         .unwrap_err();
 
-    assert_eq!(err.to_string(), "Generic error: Reward claim not allowed");
+    assert_eq!(
+        err.root_cause().to_string(),
+        "Generic error: Reward claim not allowed"
+    );
 
     app.update_block(|b| {
         b.height += 17280;
@@ -3629,7 +3177,7 @@ fn test_claim_rewards() {
         .unwrap_err();
 
     assert_eq!(
-        err.to_string(),
+        err.root_cause().to_string(),
         "astroport_periphery::lockdrop::LockupInfoV1 not found"
     );
 
