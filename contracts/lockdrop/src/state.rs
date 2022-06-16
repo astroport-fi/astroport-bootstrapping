@@ -5,8 +5,9 @@ use astroport::restricted_vector::RestrictedVector;
 use astroport_periphery::lockdrop::{
     Config, LockupInfoV1, LockupInfoV2, PoolInfo, State, UserInfo,
 };
+use astroport_periphery::U64Key;
 use cosmwasm_std::{Addr, Decimal256, Deps, StdError, StdResult};
-use cw_storage_plus::{Item, Map, U64Key};
+use cw_storage_plus::{Item, Map};
 
 use crate::raw_queries::raw_proxy_asset;
 

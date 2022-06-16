@@ -2,11 +2,11 @@ use cosmwasm_std::{Decimal256, Fraction, OverflowError, Uint128, Uint256, Uint51
 use std::convert::TryInto;
 
 pub trait Decimal256CheckedOps {
-    fn checked_mul(self, other: Uint256) -> Result<Uint128, OverflowError>;
+    fn checked_mul_uint256(self, other: Uint256) -> Result<Uint128, OverflowError>;
 }
 
 impl Decimal256CheckedOps for Decimal256 {
-    fn checked_mul(self, other: Uint256) -> Result<Uint128, OverflowError> {
+    fn checked_mul_uint256(self, other: Uint256) -> Result<Uint128, OverflowError> {
         if self.is_zero() || other.is_zero() {
             return Ok(Uint128::zero());
         }

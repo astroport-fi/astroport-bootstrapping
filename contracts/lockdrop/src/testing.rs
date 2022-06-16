@@ -5,7 +5,7 @@ use cosmwasm_std::{from_binary, Addr};
 
 #[test]
 fn update_owner() {
-    let mut deps = mock_dependencies(&[]);
+    let mut deps = mock_dependencies();
     let info = mock_info("addr0000", &[]);
 
     let owner = Addr::unchecked("owner");
