@@ -1,14 +1,115 @@
+use astroport::asset::{AssetInfo, PairInfo};
+use astroport::factory::{
+    ExecuteMsg as FactoryExecuteMsg, InstantiateMsg as FactoryInstantiateMsg, PairConfig, PairType,
+    QueryMsg as FactoryQueryMsg,
+};
+use astroport::generator::ExecuteMsg as GeneratorExecuteMsg;
 use astroport_periphery::auction::{
     Config, Cw20HookMsg, ExecuteMsg, InstantiateMsg, QueryMsg, State, UpdateConfigMsg,
     UserInfoResponse,
 };
 
-use cosmwasm_std::{attr, to_binary, Addr, Coin, Timestamp, Uint128, Uint64};
+use cosmwasm_std::{attr, to_binary, Addr, Binary, Coin, Timestamp, Uint128, Uint64};
 use cw20::Cw20ExecuteMsg;
 use cw_multi_test::{App, ContractWrapper, Executor};
 
-fn mock_app() -> App {
-    App::default()
+const OWNER: &str = "owner";
+
+struct PoolWithProxy {
+    pool: (String, Uint128),
+    proxy: Option<Addr>,
+}
+
+fn mock_app(owner: Addr, coins: Vec<Coin>) -> App {
+    App::new(|router, _, storage| {
+        // initialization moved to App construction
+        router.bank.init_balance(storage, &owner, coins).unwrap();
+    })
+}
+
+fn validate_and_send_funds(router: &mut App, sender: &Addr, recipient: &Addr, funds: Vec<Coin>) {
+    // When dealing with native tokens transfer should happen before contract call, which cw-multitest doesn't support
+    for fund in funds.clone() {
+        // we cannot transfer zero coins
+        if !fund.amount.is_zero() {
+            router
+                .send_tokens(sender.clone(), recipient.clone(), &[fund])
+                .unwrap();
+        }
+    }
+}
+
+fn register_lp_tokens_in_generator(
+    app: &mut App,
+    generator_instance: &Addr,
+    pools_with_proxy: Vec<PoolWithProxy>,
+) {
+    let pools: Vec<(String, Uint128)> = pools_with_proxy.iter().map(|p| p.pool.clone()).collect();
+
+    app.execute_contract(
+        Addr::unchecked(OWNER),
+        generator_instance.clone(),
+        &GeneratorExecuteMsg::SetupPools { pools },
+        &[],
+    )
+    .unwrap();
+
+    for pool_with_proxy in &pools_with_proxy {
+        if let Some(proxy) = &pool_with_proxy.proxy {
+            app.execute_contract(
+                Addr::unchecked(OWNER),
+                generator_instance.clone(),
+                &GeneratorExecuteMsg::MoveToProxy {
+                    lp_token: pool_with_proxy.pool.0.clone(),
+                    proxy: proxy.to_string(),
+                },
+                &[],
+            )
+            .unwrap();
+        }
+    }
+}
+
+fn create_pair(
+    app: &mut App,
+    factory: &Addr,
+    pair_type: Option<PairType>,
+    init_param: Option<Binary>,
+    assets: [AssetInfo; 2],
+) -> (Addr, Addr) {
+    app.execute_contract(
+        Addr::unchecked(OWNER),
+        factory.clone(),
+        &FactoryExecuteMsg::CreatePair {
+            pair_type: pair_type.unwrap_or_else(|| PairType::Xyk {}),
+            asset_infos: assets.clone(),
+            init_params: init_param,
+        },
+        &[],
+    )
+    .unwrap();
+
+    let res: PairInfo = app
+        .wrap()
+        .query_wasm_smart(
+            factory,
+            &FactoryQueryMsg::Pair {
+                asset_infos: assets,
+            },
+        )
+        .unwrap();
+
+    (res.contract_addr, res.liquidity_token)
+}
+
+fn store_whitelist_code(app: &mut App) -> u64 {
+    let whitelist_contract = Box::new(ContractWrapper::new_with_empty(
+        astroport_whitelist::contract::execute,
+        astroport_whitelist::contract::instantiate,
+        astroport_whitelist::contract::query,
+    ));
+
+    app.store_code(whitelist_contract)
 }
 
 // Instantiate ASTRO Token Contract
@@ -105,7 +206,8 @@ fn init_auction_astro_contracts(app: &mut App) -> (Addr, Addr, Addr, Addr, Insta
     let astro_token_instance = instantiate_astro_token(app, owner.clone());
 
     // Instantiate LP Pair &  Airdrop / Lockdrop Contracts
-    let (pair_instance, _) = instantiate_pair(app, owner.clone(), astro_token_instance.clone());
+    let (pair_instance, _, _, _) =
+        instantiate_pair(app, owner.clone(), astro_token_instance.clone());
     let (airdrop_instance, lockdrop_instance) =
         instantiate_airdrop_lockdrop_contracts(app, owner.clone(), astro_token_instance.clone());
 
@@ -129,12 +231,14 @@ fn init_auction_astro_contracts(app: &mut App) -> (Addr, Addr, Addr, Addr, Insta
 }
 
 // Initiates Auction, Astro token, Airdrop, Lockdrop and Astroport Pair contracts
-fn init_all_contracts(app: &mut App) -> (Addr, Addr, Addr, Addr, Addr, Addr, InstantiateMsg) {
-    let owner = Addr::unchecked("contract_owner");
+fn init_all_contracts(
+    app: &mut App,
+) -> (Addr, Addr, Addr, Addr, Addr, Addr, InstantiateMsg, u64, u64) {
+    let owner = Addr::unchecked(OWNER);
     let astro_token_instance = instantiate_astro_token(app, owner.clone());
 
     // Instantiate LP Pair &  Airdrop / Lockdrop Contracts
-    let (pair_instance, lp_token_instance) =
+    let (pair_instance, lp_token_instance, lp_token_code_id, pair_code_id) =
         instantiate_pair(app, owner.clone(), astro_token_instance.clone());
     let (airdrop_instance, lockdrop_instance) =
         instantiate_airdrop_lockdrop_contracts(app, owner.clone(), astro_token_instance.clone());
@@ -186,11 +290,17 @@ fn init_all_contracts(app: &mut App) -> (Addr, Addr, Addr, Addr, Addr, Addr, Ins
         pair_instance,
         lp_token_instance,
         auction_instantiate_msg,
+        lp_token_code_id,
+        pair_code_id,
     )
 }
 
 // Initiates Astroport Pair for ASTRO-UST Pool
-fn instantiate_pair(app: &mut App, owner: Addr, astro_token_instance: Addr) -> (Addr, Addr) {
+fn instantiate_pair(
+    app: &mut App,
+    owner: Addr,
+    astro_token_instance: Addr,
+) -> (Addr, Addr, u64, u64) {
     let lp_token_contract = Box::new(ContractWrapper::new(
         astroport_token::contract::execute,
         astroport_token::contract::instantiate,
@@ -240,7 +350,12 @@ fn instantiate_pair(app: &mut App, owner: Addr, astro_token_instance: Addr) -> (
         .unwrap();
     let lp_token_instance = resp.liquidity_token;
 
-    (pair_instance, lp_token_instance)
+    (
+        pair_instance,
+        lp_token_instance,
+        lp_token_code_id,
+        pair_code_id,
+    )
 }
 
 // Initiates Airdrop and lockdrop contracts
@@ -382,12 +497,72 @@ fn instantiate_airdrop_lockdrop_contracts(
     (airdrop_instance, lockdrop_instance)
 }
 
+fn store_factory_code(app: &mut App) -> u64 {
+    let factory_contract = Box::new(
+        ContractWrapper::new_with_empty(
+            astroport_factory::contract::execute,
+            astroport_factory::contract::instantiate,
+            astroport_factory::contract::query,
+        )
+        .with_reply_empty(astroport_factory::contract::reply),
+    );
+
+    app.store_code(factory_contract)
+}
+
+fn instantiate_factory(
+    app: &mut App,
+    factory_code_id: u64,
+    token_code_id: u64,
+    pair_code_id: u64,
+    pair_stable_code_id: Option<u64>,
+) -> Addr {
+    let mut msg = FactoryInstantiateMsg {
+        pair_configs: vec![PairConfig {
+            code_id: pair_code_id,
+            pair_type: PairType::Xyk {},
+            total_fee_bps: 100,
+            maker_fee_bps: 10,
+            is_disabled: false,
+            is_generator_disabled: false,
+        }],
+        token_code_id,
+        fee_address: None,
+        generator_address: None,
+        owner: String::from("owner"),
+        whitelist_code_id: 0,
+    };
+
+    if let Some(pair_stable_code_id) = pair_stable_code_id {
+        msg.pair_configs.push(PairConfig {
+            code_id: pair_stable_code_id,
+            pair_type: PairType::Stable {},
+            total_fee_bps: 100,
+            maker_fee_bps: 10,
+            is_disabled: false,
+            is_generator_disabled: false,
+        });
+    }
+
+    app.instantiate_contract(
+        factory_code_id,
+        Addr::unchecked("owner"),
+        &msg,
+        &[],
+        "Factory",
+        None,
+    )
+    .unwrap()
+}
+
 // Instantiate Astroport's generator and vesting contracts
 fn instantiate_generator_and_vesting(
     mut app: &mut App,
     owner: Addr,
     astro_token_instance: Addr,
     lp_token_instance: Addr,
+    token_code_id: u64,
+    pair_code_id: u64,
 ) -> (Addr, Addr) {
     // Vesting
     let vesting_contract = Box::new(ContractWrapper::new(
@@ -443,6 +618,11 @@ fn instantiate_generator_and_vesting(
     );
 
     let generator_code_id = app.store_code(generator_contract);
+    let whitelist_code_id = store_whitelist_code(&mut app);
+    let factory_code_id = store_factory_code(&mut app);
+
+    let factory_instance =
+        instantiate_factory(&mut app, factory_code_id, token_code_id, pair_code_id, None);
 
     let init_msg = astroport::generator::InstantiateMsg {
         allowed_reward_proxies: vec![],
@@ -451,11 +631,11 @@ fn instantiate_generator_and_vesting(
         tokens_per_block: Uint128::from(0u128),
         vesting_contract: vesting_instance.clone().to_string(),
         owner: owner.to_string(),
-        factory: "".to_string(),
+        factory: factory_instance.to_string(),
         generator_controller: None,
         voting_escrow: None,
         guardian: None,
-        whitelist_code_id: 0,
+        whitelist_code_id,
     };
 
     let generator_instance = app
@@ -478,7 +658,7 @@ fn instantiate_generator_and_vesting(
         .unwrap();
 
     let msg = astroport::generator::QueryMsg::Config {};
-    let res: astroport::generator::ConfigResponse = app
+    let res: astroport::generator::Config = app
         .wrap()
         .query_wasm_smart(&generator_instance, &msg)
         .unwrap();
@@ -511,18 +691,30 @@ fn instantiate_generator_and_vesting(
     app.execute_contract(owner.clone(), astro_token_instance.clone(), &msg, &[])
         .unwrap();
 
-    let msg = astroport::generator::ExecuteMsg::Add {
-        alloc_point: Uint64::from(10u64),
-        reward_proxy: None,
-        lp_token: lp_token_instance.to_string(),
-    };
-    app.execute_contract(
-        Addr::unchecked(owner.clone()),
-        generator_instance.clone(),
-        &msg,
-        &[],
-    )
-    .unwrap();
+    let (_, _) = create_pair(
+        &mut app,
+        &factory_instance,
+        None,
+        None,
+        [
+            AssetInfo::NativeToken {
+                denom: "uusd".to_string(),
+            },
+            AssetInfo::Token {
+                contract_addr: astro_token_instance.clone(),
+            },
+        ],
+    );
+
+    // Set pool alloc points
+    register_lp_tokens_in_generator(
+        &mut app,
+        &generator_instance,
+        vec![PoolWithProxy {
+            pool: (lp_token_instance.to_string(), Uint128::new(10)),
+            proxy: None,
+        }],
+    );
 
     (generator_instance, vesting_instance)
 }
@@ -549,7 +741,7 @@ fn mint_some_astro(
 
 // Makes ASTRO & UST deposits into Auction contract
 fn make_astro_ust_deposits(
-    app: &mut App,
+    mut app: &mut App,
     auction_instance: Addr,
     auction_init_msg: InstantiateMsg,
     astro_token_instance: Addr,
@@ -611,30 +803,35 @@ fn make_astro_ust_deposits(
     .unwrap();
 
     // Set user balances
-    app.init_bank_balance(
-        &user1_address.clone(),
+    validate_and_send_funds(
+        &mut app,
+        &Addr::unchecked(OWNER),
+        &user1_address,
         vec![Coin {
             denom: "uusd".to_string(),
             amount: Uint128::new(20000000u128),
         }],
-    )
-    .unwrap();
-    app.init_bank_balance(
-        &user2_address.clone(),
+    );
+
+    validate_and_send_funds(
+        &mut app,
+        &Addr::unchecked(OWNER),
+        &user2_address,
         vec![Coin {
             denom: "uusd".to_string(),
             amount: Uint128::new(5435435u128),
         }],
-    )
-    .unwrap();
-    app.init_bank_balance(
-        &user3_address.clone(),
+    );
+
+    validate_and_send_funds(
+        &mut app,
+        &Addr::unchecked(OWNER),
+        &user3_address,
         vec![Coin {
             denom: "uusd".to_string(),
             amount: Uint128::new(43534534u128),
         }],
-    )
-    .unwrap();
+    );
 
     // deposit UST Msg
     let deposit_ust_msg = &ExecuteMsg::DepositUst {};
@@ -678,7 +875,20 @@ fn make_astro_ust_deposits(
 
 #[test]
 fn proper_initialization_only_auction_astro() {
-    let mut app = mock_app();
+    let owner = Addr::unchecked(OWNER);
+    let mut app = mock_app(
+        owner.clone(),
+        vec![
+            Coin {
+                denom: "uusd".to_string(),
+                amount: Uint128::new(100_000_000_000u128),
+            },
+            Coin {
+                denom: "uluna".to_string(),
+                amount: Uint128::new(100_000_000_000u128),
+            },
+        ],
+    );
     let (_, _, auction_instance, _, auction_init_msg) = init_auction_astro_contracts(&mut app);
 
     let resp: Config = app
@@ -720,8 +930,21 @@ fn proper_initialization_only_auction_astro() {
 
 #[test]
 fn proper_initialization_all_contracts() {
-    let mut app = mock_app();
-    let (auction_instance, _, _, _, _, _, auction_init_msg) = init_all_contracts(&mut app);
+    let owner = Addr::unchecked(OWNER);
+    let mut app = mock_app(
+        owner.clone(),
+        vec![
+            Coin {
+                denom: "uusd".to_string(),
+                amount: Uint128::new(100_000_000_000u128),
+            },
+            Coin {
+                denom: "uluna".to_string(),
+                amount: Uint128::new(100_000_000_000u128),
+            },
+        ],
+    );
+    let (auction_instance, _, _, _, _, _, auction_init_msg, _, _) = init_all_contracts(&mut app);
 
     let resp: Config = app
         .wrap()
@@ -762,7 +985,20 @@ fn proper_initialization_all_contracts() {
 
 #[test]
 fn test_delegate_astro_tokens_from_airdrop() {
-    let mut app = mock_app();
+    let owner = Addr::unchecked(OWNER);
+    let mut app = mock_app(
+        owner.clone(),
+        vec![
+            Coin {
+                denom: "uusd".to_string(),
+                amount: Uint128::new(100_000_000_000u128),
+            },
+            Coin {
+                denom: "uluna".to_string(),
+                amount: Uint128::new(100_000_000_000u128),
+            },
+        ],
+    );
     let (airdrop_instance, _, auction_instance, astro_token_instance, auction_init_msg) =
         init_auction_astro_contracts(&mut app);
 
@@ -803,7 +1039,7 @@ fn test_delegate_astro_tokens_from_airdrop() {
             &[],
         )
         .unwrap_err();
-    assert_eq!(err.to_string(), "Generic error: Unauthorized");
+    assert_eq!(err.root_cause().to_string(), "Generic error: Unauthorized");
 
     // ######    ERROR :: Amount must be greater than 0     ######
     err = app
@@ -821,7 +1057,7 @@ fn test_delegate_astro_tokens_from_airdrop() {
             &[],
         )
         .unwrap_err();
-    assert_eq!(err.to_string(), "Invalid zero amount");
+    assert_eq!(err.root_cause().to_string(), "Invalid zero amount");
 
     // ######    ERROR :: Deposit window closed     ######
     err = app
@@ -832,7 +1068,10 @@ fn test_delegate_astro_tokens_from_airdrop() {
             &[],
         )
         .unwrap_err();
-    assert_eq!(err.to_string(), "Generic error: Deposit window closed");
+    assert_eq!(
+        err.root_cause().to_string(),
+        "Generic error: Deposit window closed"
+    );
 
     // open claim period for successful deposit
     app.update_block(|b| {
@@ -929,12 +1168,28 @@ fn test_delegate_astro_tokens_from_airdrop() {
             &[],
         )
         .unwrap_err();
-    assert_eq!(err.to_string(), "Generic error: Deposit window closed");
+    assert_eq!(
+        err.root_cause().to_string(),
+        "Generic error: Deposit window closed"
+    );
 }
 
 #[test]
 fn test_delegate_astro_tokens_from_lockdrop() {
-    let mut app = mock_app();
+    let owner = Addr::unchecked(OWNER);
+    let mut app = mock_app(
+        owner.clone(),
+        vec![
+            Coin {
+                denom: "uusd".to_string(),
+                amount: Uint128::new(100_000_000_000u128),
+            },
+            Coin {
+                denom: "uluna".to_string(),
+                amount: Uint128::new(100_000_000_000u128),
+            },
+        ],
+    );
     let (_, lockdrop_instance, auction_instance, astro_token_instance, auction_init_msg) =
         init_auction_astro_contracts(&mut app);
 
@@ -975,7 +1230,7 @@ fn test_delegate_astro_tokens_from_lockdrop() {
             &[],
         )
         .unwrap_err();
-    assert_eq!(err.to_string(), "Generic error: Unauthorized");
+    assert_eq!(err.root_cause().to_string(), "Generic error: Unauthorized");
 
     // ######    ERROR :: Amount must be greater than 0     ######
     err = app
@@ -993,7 +1248,7 @@ fn test_delegate_astro_tokens_from_lockdrop() {
             &[],
         )
         .unwrap_err();
-    assert_eq!(err.to_string(), "Invalid zero amount");
+    assert_eq!(err.root_cause().to_string(), "Invalid zero amount");
 
     // ######    ERROR :: Deposit window closed     ######
     err = app
@@ -1004,7 +1259,10 @@ fn test_delegate_astro_tokens_from_lockdrop() {
             &[],
         )
         .unwrap_err();
-    assert_eq!(err.to_string(), "Generic error: Deposit window closed");
+    assert_eq!(
+        err.root_cause().to_string(),
+        "Generic error: Deposit window closed"
+    );
 
     // open claim period for successful deposit
     app.update_block(|b| {
@@ -1089,12 +1347,28 @@ fn test_delegate_astro_tokens_from_lockdrop() {
             &[],
         )
         .unwrap_err();
-    assert_eq!(err.to_string(), "Generic error: Deposit window closed");
+    assert_eq!(
+        err.root_cause().to_string(),
+        "Generic error: Deposit window closed"
+    );
 }
 
 #[test]
 fn test_update_config() {
-    let mut app = mock_app();
+    let owner = Addr::unchecked("owner");
+    let mut app = mock_app(
+        owner.clone(),
+        vec![
+            Coin {
+                denom: "uusd".to_string(),
+                amount: Uint128::new(100_000_000_000u128),
+            },
+            Coin {
+                denom: "uluna".to_string(),
+                amount: Uint128::new(100_000_000_000u128),
+            },
+        ],
+    );
     let (_, _, auction_instance, _, auction_init_msg) = init_auction_astro_contracts(&mut app);
 
     let update_msg = UpdateConfigMsg {
@@ -1115,7 +1389,7 @@ fn test_update_config() {
         )
         .unwrap_err();
     assert_eq!(
-        err.to_string(),
+        err.root_cause().to_string(),
         "Generic error: Only owner can update configuration"
     );
 
@@ -1144,19 +1418,33 @@ fn test_update_config() {
 
 #[test]
 fn test_deposit_ust() {
-    let mut app = mock_app();
+    let owner = Addr::unchecked("owner");
+    let mut app = mock_app(
+        owner.clone(),
+        vec![
+            Coin {
+                denom: "uusd".to_string(),
+                amount: Uint128::new(100_000_000_000u128),
+            },
+            Coin {
+                denom: "uluna".to_string(),
+                amount: Uint128::new(100_000_000_000u128),
+            },
+        ],
+    );
     let (_, _, auction_instance, _, _) = init_auction_astro_contracts(&mut app);
     let user_address = Addr::unchecked("user");
 
     // Set user balances
-    app.init_bank_balance(
-        &user_address.clone(),
+    validate_and_send_funds(
+        &mut app,
+        &owner,
+        &user_address,
         vec![Coin {
             denom: "uusd".to_string(),
-            amount: Uint128::new(20000000u128),
+            amount: Uint128::new(20_000_000u128),
         }],
-    )
-    .unwrap();
+    );
 
     // deposit UST Msg
     let deposit_ust_msg = &ExecuteMsg::DepositUst {};
@@ -1174,7 +1462,10 @@ fn test_deposit_ust() {
             &coins,
         )
         .unwrap_err();
-    assert_eq!(err.to_string(), "Generic error: Deposit window closed");
+    assert_eq!(
+        err.root_cause().to_string(),
+        "Generic error: Deposit window closed"
+    );
 
     // open claim period for successful deposit
     app.update_block(|b| {
@@ -1195,8 +1486,8 @@ fn test_deposit_ust() {
         )
         .unwrap_err();
     assert_eq!(
-        err.to_string(),
-        "Generic error: Amount must be greater than 0"
+        err.root_cause().to_string(),
+        "Cannot transfer empty coins amount"
     );
 
     // ######    SUCCESS :: UST Successfully deposited     ######
@@ -1275,42 +1566,63 @@ fn test_deposit_ust() {
             &coins,
         )
         .unwrap_err();
-    assert_eq!(err.to_string(), "Generic error: Deposit window closed");
+    assert_eq!(
+        err.root_cause().to_string(),
+        "Generic error: Deposit window closed"
+    );
 }
 
 #[test]
 fn test_withdraw_ust() {
-    let mut app = mock_app();
+    let owner = Addr::unchecked("owner");
+    let mut app = mock_app(
+        owner.clone(),
+        vec![
+            Coin {
+                denom: "uusd".to_string(),
+                amount: Uint128::new(100_000_000_000u128),
+            },
+            Coin {
+                denom: "uluna".to_string(),
+                amount: Uint128::new(100_000_000_000u128),
+            },
+        ],
+    );
     let (_, _, auction_instance, _, _) = init_auction_astro_contracts(&mut app);
     let user1_address = Addr::unchecked("user1");
     let user2_address = Addr::unchecked("user2");
     let user3_address = Addr::unchecked("user3");
 
     // Set user balances
-    app.init_bank_balance(
-        &user1_address.clone(),
+    validate_and_send_funds(
+        &mut app,
+        &owner,
+        &user1_address,
         vec![Coin {
             denom: "uusd".to_string(),
-            amount: Uint128::new(20000000u128),
+            amount: Uint128::new(20_000_000u128),
         }],
-    )
-    .unwrap();
-    app.init_bank_balance(
-        &user2_address.clone(),
+    );
+
+    validate_and_send_funds(
+        &mut app,
+        &owner,
+        &user2_address,
         vec![Coin {
             denom: "uusd".to_string(),
-            amount: Uint128::new(20000000u128),
+            amount: Uint128::new(20_000_000u128),
         }],
-    )
-    .unwrap();
-    app.init_bank_balance(
-        &user3_address.clone(),
+    );
+
+    validate_and_send_funds(
+        &mut app,
+        &owner,
+        &user3_address,
         vec![Coin {
             denom: "uusd".to_string(),
-            amount: Uint128::new(20000000u128),
+            amount: Uint128::new(20_000_000u128),
         }],
-    )
-    .unwrap();
+    );
 
     // deposit UST Msg
     let deposit_ust_msg = &ExecuteMsg::DepositUst {};
@@ -1404,7 +1716,7 @@ fn test_withdraw_ust() {
         )
         .unwrap_err();
     assert_eq!(
-        err.to_string(),
+        err.root_cause().to_string(),
         "Generic error: Amount exceeds maximum allowed withdrawal limit of 0.5"
     );
 
@@ -1450,7 +1762,10 @@ fn test_withdraw_ust() {
             &[],
         )
         .unwrap_err();
-    assert_eq!(err.to_string(), "Generic error: Max 1 withdrawal allowed");
+    assert_eq!(
+        err.root_cause().to_string(),
+        "Generic error: Max 1 withdrawal allowed"
+    );
 
     // 50% of withdrawal window over. Max withdrawal % decreasing linearly now
     app.update_block(|b| {
@@ -1471,7 +1786,7 @@ fn test_withdraw_ust() {
         )
         .unwrap_err();
     assert_eq!(
-        err.to_string(),
+        err.root_cause().to_string(),
         "Generic error: Amount exceeds maximum allowed withdrawal limit of 0.497998"
     );
 
@@ -1517,7 +1832,10 @@ fn test_withdraw_ust() {
             &[],
         )
         .unwrap_err();
-    assert_eq!(err.to_string(), "Generic error: Max 1 withdrawal allowed");
+    assert_eq!(
+        err.root_cause().to_string(),
+        "Generic error: Max 1 withdrawal allowed"
+    );
 
     // finish deposit period for deposit failure
     app.update_block(|b| {
@@ -1536,14 +1854,27 @@ fn test_withdraw_ust() {
         )
         .unwrap_err();
     assert_eq!(
-        err.to_string(),
+        err.root_cause().to_string(),
         "Generic error: Amount exceeds maximum allowed withdrawal limit of 0"
     );
 }
 
 #[test]
 fn test_add_liquidity_to_astroport_pool() {
-    let mut app = mock_app();
+    let owner = Addr::unchecked("owner");
+    let mut app = mock_app(
+        owner.clone(),
+        vec![
+            Coin {
+                denom: "uusd".to_string(),
+                amount: Uint128::new(100_000_000_000u128),
+            },
+            Coin {
+                denom: "uluna".to_string(),
+                amount: Uint128::new(100_000_000_000u128),
+            },
+        ],
+    );
     let (
         auction_instance,
         astro_token_instance,
@@ -1552,6 +1883,8 @@ fn test_add_liquidity_to_astroport_pool() {
         pair_instance,
         _,
         auction_init_msg,
+        _,
+        _,
     ) = init_all_contracts(&mut app);
 
     // mint ASTRO to Lockdrop Contract
@@ -1580,7 +1913,7 @@ fn test_add_liquidity_to_astroport_pool() {
             &[],
         )
         .unwrap_err();
-    assert_eq!(err.to_string(), "Generic error: Unauthorized");
+    assert_eq!(err.root_cause().to_string(), "Generic error: Unauthorized");
 
     // ######    ERROR :: Deposit/withdrawal windows are still open   ######
 
@@ -1593,7 +1926,7 @@ fn test_add_liquidity_to_astroport_pool() {
         )
         .unwrap_err();
     assert_eq!(
-        err.to_string(),
+        err.root_cause().to_string(),
         "Generic error: Deposit/withdrawal windows are still open"
     );
 
@@ -1772,14 +2105,39 @@ fn test_add_liquidity_to_astroport_pool() {
             &[],
         )
         .unwrap_err();
-    assert_eq!(err.to_string(), "Generic error: Liquidity already added");
+    assert_eq!(
+        err.root_cause().to_string(),
+        "Generic error: Liquidity already added"
+    );
 }
 
 #[test]
 fn test_stake_lp_tokens() {
-    let mut app = mock_app();
-    let (auction_instance, astro_token_instance, _, _, _, lp_token_instance, auction_init_msg) =
-        init_all_contracts(&mut app);
+    let owner = Addr::unchecked("owner");
+    let mut app = mock_app(
+        owner.clone(),
+        vec![
+            Coin {
+                denom: "uusd".to_string(),
+                amount: Uint128::new(100_000_000_000u128),
+            },
+            Coin {
+                denom: "uluna".to_string(),
+                amount: Uint128::new(100_000_000_000u128),
+            },
+        ],
+    );
+    let (
+        auction_instance,
+        astro_token_instance,
+        _,
+        _,
+        _,
+        lp_token_instance,
+        auction_init_msg,
+        token_code_id,
+        pair_code_id,
+    ) = init_all_contracts(&mut app);
 
     let owner = Addr::unchecked(auction_init_msg.owner.clone().unwrap());
 
@@ -1805,6 +2163,8 @@ fn test_stake_lp_tokens() {
         Addr::unchecked(auction_init_msg.owner.clone().unwrap()),
         astro_token_instance.clone(),
         lp_token_instance.clone(),
+        token_code_id,
+        pair_code_id,
     );
 
     let update_msg = UpdateConfigMsg {
@@ -1860,7 +2220,7 @@ fn test_stake_lp_tokens() {
             &[],
         )
         .unwrap_err();
-    assert_eq!(err.to_string(), "Generic error: Unauthorized");
+    assert_eq!(err.root_cause().to_string(), "Generic error: Unauthorized");
 
     // ######    SUCCESS :: Stake successfully   ######
 
@@ -1982,14 +2342,39 @@ fn test_stake_lp_tokens() {
             &[],
         )
         .unwrap_err();
-    assert_eq!(err.to_string(), "Generic error: Already staked");
+    assert_eq!(
+        err.root_cause().to_string(),
+        "Generic error: Already staked"
+    );
 }
 
 #[test]
 fn test_claim_rewards() {
-    let mut app = mock_app();
-    let (auction_instance, astro_token_instance, _, _, _, lp_token_instance, auction_init_msg) =
-        init_all_contracts(&mut app);
+    let owner = Addr::unchecked("owner");
+    let mut app = mock_app(
+        owner.clone(),
+        vec![
+            Coin {
+                denom: "uusd".to_string(),
+                amount: Uint128::new(100_000_000_000u128),
+            },
+            Coin {
+                denom: "uluna".to_string(),
+                amount: Uint128::new(100_000_000_000u128),
+            },
+        ],
+    );
+    let (
+        auction_instance,
+        astro_token_instance,
+        _,
+        _,
+        _,
+        lp_token_instance,
+        auction_init_msg,
+        token_code_id,
+        pair_code_id,
+    ) = init_all_contracts(&mut app);
 
     let owner = Addr::unchecked(auction_init_msg.owner.clone().unwrap());
 
@@ -2028,6 +2413,8 @@ fn test_claim_rewards() {
         Addr::unchecked(auction_init_msg.owner.clone().unwrap()),
         astro_token_instance.clone(),
         lp_token_instance.clone(),
+        token_code_id,
+        pair_code_id,
     );
 
     let update_msg = UpdateConfigMsg {
@@ -2069,7 +2456,7 @@ fn test_claim_rewards() {
         )
         .unwrap_err();
     assert_eq!(
-        err.to_string(),
+        err.root_cause().to_string(),
         "Generic error: Deposit/withdrawal windows are still open"
     );
 
@@ -2084,7 +2471,7 @@ fn test_claim_rewards() {
         )
         .unwrap_err();
     assert_eq!(
-        err.to_string(),
+        err.root_cause().to_string(),
         "Generic error: Astro/USD should be provided to the pool!"
     );
 
@@ -2105,7 +2492,7 @@ fn test_claim_rewards() {
         )
         .unwrap_err();
     assert_eq!(
-        err.to_string(),
+        err.root_cause().to_string(),
         "astroport_periphery::auction::UserInfo not found"
     );
 
@@ -2311,9 +2698,31 @@ fn test_claim_rewards() {
 
 #[test]
 fn test_withdraw_unlocked_lp_shares() {
-    let mut app = mock_app();
-    let (auction_instance, astro_token_instance, _, _, _, lp_token_instance, auction_init_msg) =
-        init_all_contracts(&mut app);
+    let owner = Addr::unchecked(OWNER);
+    let mut app = mock_app(
+        owner.clone(),
+        vec![
+            Coin {
+                denom: "uusd".to_string(),
+                amount: Uint128::new(100_000_000_000_000u128),
+            },
+            Coin {
+                denom: "uluna".to_string(),
+                amount: Uint128::new(100_000_000_000_000u128),
+            },
+        ],
+    );
+    let (
+        auction_instance,
+        astro_token_instance,
+        _,
+        _,
+        _,
+        lp_token_instance,
+        auction_init_msg,
+        token_code_id,
+        pair_code_id,
+    ) = init_all_contracts(&mut app);
 
     let owner = Addr::unchecked(auction_init_msg.owner.clone().unwrap());
 
@@ -2352,6 +2761,8 @@ fn test_withdraw_unlocked_lp_shares() {
         Addr::unchecked(auction_init_msg.owner.clone().unwrap()),
         astro_token_instance.clone(),
         lp_token_instance.clone(),
+        token_code_id,
+        pair_code_id,
     );
 
     let update_msg = UpdateConfigMsg {
@@ -2381,7 +2792,7 @@ fn test_withdraw_unlocked_lp_shares() {
         )
         .unwrap_err();
     assert_eq!(
-        err.to_string(),
+        err.root_cause().to_string(),
         "Generic error: Astro/USD should be provided to the pool!"
     );
 
@@ -2402,7 +2813,7 @@ fn test_withdraw_unlocked_lp_shares() {
         )
         .unwrap_err();
     assert_eq!(
-        err.to_string(),
+        err.root_cause().to_string(),
         "astroport_periphery::auction::UserInfo not found"
     );
 
