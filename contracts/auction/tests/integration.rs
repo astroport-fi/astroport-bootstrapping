@@ -28,7 +28,6 @@ fn mock_app(owner: Addr, coins: Vec<Coin>) -> App {
 }
 
 fn validate_and_send_funds(router: &mut App, sender: &Addr, recipient: &Addr, funds: Vec<Coin>) {
-    // When dealing with native tokens transfer should happen before contract call, which cw-multitest doesn't support
     for fund in funds.clone() {
         // we cannot transfer zero coins
         if !fund.amount.is_zero() {

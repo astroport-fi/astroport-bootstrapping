@@ -593,7 +593,7 @@ pub fn handle_update_config(
         if config.generator.is_some() {
             for pool in ASSET_POOLS
                 .keys(deps.storage, None, None, Order::Ascending)
-                .map(|addr| Addr::unchecked(addr.expect("Addr deserialization error!")))
+                .collect::<Result<Vec<Addr>, StdError>>()?
             {
                 let pool_info = ASSET_POOLS.load(deps.storage, &pool)?;
                 if pool_info.is_staked {
@@ -1092,7 +1092,7 @@ pub fn handle_increase_lockup(
         )));
     }
 
-    pool_info.weighted_amount += calculate_weight(amount, duration, &config);
+    pool_info.weighted_amount += calculate_weight(amount, duration, &config)?;
     pool_info.terraswap_amount_in_lockups += amount;
 
     let lockup_key = (&terraswap_lp_token, &user_address, U64Key::new(duration));
@@ -1209,7 +1209,7 @@ pub fn handle_withdraw_from_lockup(
 
     // STATE :: RETRIEVE --> UPDATE
     lockup_info.lp_units_locked -= amount;
-    pool_info.weighted_amount -= calculate_weight(amount, duration, &config);
+    pool_info.weighted_amount -= calculate_weight(amount, duration, &config)?;
     pool_info.terraswap_amount_in_lockups -= amount;
 
     // Remove Lockup position from the list of user positions if Lp_Locked balance == 0
@@ -2128,8 +2128,7 @@ pub fn query_state(deps: Deps) -> StdResult<StateResponse> {
         are_claims_allowed: state.are_claims_allowed,
         supported_pairs_list: ASSET_POOLS
             .keys(deps.storage, None, None, Order::Ascending)
-            .map(|v| v.expect("Addr deserialization error!"))
-            .collect(),
+            .collect::<Result<Vec<Addr>, StdError>>()?,
     })
 }
 
@@ -2163,12 +2162,12 @@ pub fn query_user_info(deps: Deps, env: Env, user: String) -> StdResult<UserInfo
     let mut claimable_generator_astro_debt = Uint128::zero();
     for pool in ASSET_POOLS
         .keys(deps.storage, None, None, Order::Ascending)
-        .map(|v| v.expect("Addr deserialization error!"))
+        .collect::<Result<Vec<Addr>, StdError>>()?
     {
         for duration in LOCKUP_INFO
             .prefix((&pool, &user_address))
             .keys(deps.storage, None, None, Order::Ascending)
-            .map(|v| v.expect("Duration deserialization error!"))
+            .collect::<Result<Vec<u64>, StdError>>()?
         {
             let lockup_info = query_lockup_info(deps, &env, &user, pool.to_string(), duration)?;
             total_astro_rewards += lockup_info.astro_rewards;
@@ -2208,12 +2207,12 @@ pub fn query_user_info_with_lockups_list(
 
     for pool in ASSET_POOLS
         .keys(deps.storage, None, None, Order::Ascending)
-        .map(|v| v.expect("Addr deserialization error!"))
+        .collect::<Result<Vec<Addr>, StdError>>()?
     {
         for duration in LOCKUP_INFO
             .prefix((&pool, &user_address))
             .keys(deps.storage, None, None, Order::Ascending)
-            .map(|v| v.expect("Duration deserialization error!"))
+            .collect::<Result<Vec<u64>, StdError>>()?
         {
             lockup_infos.push(LockUpInfoSummary {
                 pool_address: pool.to_string(),
@@ -2352,14 +2351,14 @@ pub fn query_lockup_info(
     // Calculate currently expected ASTRO Rewards if not finalized
     if lockup_info.astro_rewards == Uint128::zero() {
         let weighted_lockup_balance =
-            calculate_weight(lockup_info.lp_units_locked, duration, &config);
+            calculate_weight(lockup_info.lp_units_locked, duration, &config)?;
         lockup_info.astro_rewards = calculate_astro_incentives_for_lockup(
             weighted_lockup_balance,
             pool_info.weighted_amount,
             pool_info.incentives_share,
             state.total_incentives_share,
             config.lockdrop_incentives,
-        );
+        )?;
     }
 
     Ok(LockUpInfoResponse {
@@ -2508,16 +2507,15 @@ pub fn calculate_astro_incentives_for_lockup(
     pool_incentives_share: u64,
     total_incentives_share: u64,
     total_lockdrop_incentives: Uint128,
-) -> Uint128 {
+) -> StdResult<Uint128> {
     if total_incentives_share == 0u64 || total_weighted_amount == Uint256::zero() {
-        Uint128::zero()
+        Ok(Uint128::zero())
     } else {
-        Decimal256::from_ratio(
+        Ok(Decimal256::from_ratio(
             Uint256::from(pool_incentives_share) * lockup_weighted_balance,
             Uint256::from(total_incentives_share) * total_weighted_amount,
         )
-        .checked_mul_uint256(total_lockdrop_incentives.into())
-        .unwrap_or_default()
+        .checked_mul_uint256(total_lockdrop_incentives.into())?)
     }
 }
 
@@ -2528,16 +2526,13 @@ pub fn calculate_astro_incentives_for_lockup(
 /// * **duration** is an object of type [`u64`]. Number of weeks.
 ///
 /// * **config** is an object of type [`Config`]. Config with weekly multiplier and divider.
-fn calculate_weight(amount: Uint128, duration: u64, config: &Config) -> Uint256 {
+fn calculate_weight(amount: Uint128, duration: u64, config: &Config) -> StdResult<Uint256> {
     let lock_weight = Decimal256::one()
         + Decimal256::from_ratio(
             (duration - 1) * config.weekly_multiplier,
             config.weekly_divider,
         );
-    lock_weight
-        .checked_mul_uint256(amount.into())
-        .unwrap_or_default()
-        .into()
+    Ok(lock_weight.checked_mul_uint256(amount.into())?.into())
 }
 
 /// Calculates bLuna user reward according to his share in LP.
@@ -2613,7 +2608,7 @@ fn update_user_lockup_positions_and_calc_rewards(
         if lockup_info.astro_rewards == Uint128::zero() {
             // Weighted lockup balance (using terraswap LP units to calculate as pool's total weighted balance is calculated on terraswap LP deposits summed over each deposit tx)
             let weighted_lockup_balance =
-                calculate_weight(lockup_info.lp_units_locked, duration, config);
+                calculate_weight(lockup_info.lp_units_locked, duration, config)?;
 
             // Calculate ASTRO Lockdrop rewards for the lockup position
             lockup_info.astro_rewards = calculate_astro_incentives_for_lockup(
@@ -2622,7 +2617,7 @@ fn update_user_lockup_positions_and_calc_rewards(
                 pool_info.incentives_share,
                 state.total_incentives_share,
                 config.lockdrop_incentives,
-            );
+            )?;
 
             LOCKUP_INFO.save(deps.storage, lockup_key, &lockup_info)?;
         };
