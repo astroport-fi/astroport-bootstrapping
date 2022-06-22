@@ -2589,7 +2589,7 @@ fn update_user_lockup_positions_and_calc_rewards(
 
     for pool_key in ASSET_POOLS
         .keys(deps.storage, None, None, Order::Ascending)
-        .map(|v| Addr::unchecked(v.expect("Addr deserialization error!")))
+        .collect::<Result<Vec<Addr>, StdError>>()?
     {
         for duration in LOCKUP_INFO
             .prefix((&pool_key, user_address))
