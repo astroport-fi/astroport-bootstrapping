@@ -2594,7 +2594,7 @@ fn update_user_lockup_positions_and_calc_rewards(
         for duration in LOCKUP_INFO
             .prefix((&pool_key, user_address))
             .keys(deps.storage, None, None, Order::Ascending)
-            .map(|v| v.expect("Duration deserialization error!"))
+            .collect::<Result<Vec<u64>, StdError>>()?
         {
             keys.push((pool_key.clone(), duration));
         }
