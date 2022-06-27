@@ -15,7 +15,7 @@ use cosmwasm_std::{
 };
 use cw2::{get_contract_version, set_contract_version};
 use cw20::{BalanceResponse, Cw20ExecuteMsg, Cw20QueryMsg, Cw20ReceiveMsg};
-use cw_storage_plus::{Path, U64Key};
+use cw_storage_plus::Path;
 
 use crate::migration::{
     migrate_generator_proxy_per_share_to_v120, ASSET_POOLS_V101, ASSET_POOLS_V111,
@@ -28,6 +28,7 @@ use astroport_periphery::lockdrop::{
     PoolInfo, QueryMsg, State, StateResponse, UpdateConfigMsg, UserInfoResponse,
     UserInfoWithListResponse,
 };
+use astroport_periphery::U64Key;
 
 use crate::state::{
     CompatibleLoader, ASSET_POOLS, CONFIG, LOCKUP_INFO, OWNERSHIP_PROPOSAL, STATE,
@@ -469,8 +470,6 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
 /// * **_msg** is an object of type [`MigrateMsg`].
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response> {
-    use std::str;
-
     let contract_version = get_contract_version(deps.storage)?;
 
     let config = CONFIG.load(deps.storage)?;
@@ -484,14 +483,6 @@ pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response
             "1.0.1" => {
                 let pools = ASSET_POOLS_V101
                     .range(deps.storage, None, None, Order::Ascending)
-                    .map(|pair_result| {
-                        pair_result.map(|(addr_serialized, pool_info)| {
-                            let addr_str = str::from_utf8(&addr_serialized)
-                                .map_err(|_| StdError::generic_err("Deserialization error"))?;
-                            let addr = addr_validate_to_lower(deps.as_ref().api, addr_str)?;
-                            Ok((addr, pool_info))
-                        })?
-                    })
                     .collect::<StdResult<Vec<_>>>()?;
                 for (key, pool) in pools {
                     let generator_proxy_per_share = migrate_generator_proxy_per_share_to_v120(
@@ -518,14 +509,6 @@ pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response
             "1.1.0" | "1.1.1" => {
                 let pools = ASSET_POOLS_V111
                     .range(deps.storage, None, None, Order::Ascending)
-                    .map(|result| {
-                        result.map(|(addr_serialized, pool_info)| {
-                            let addr_str = str::from_utf8(&addr_serialized)
-                                .map_err(|_| StdError::generic_err("Deserialization error"))?;
-                            let addr = addr_validate_to_lower(deps.as_ref().api, addr_str)?;
-                            Ok((addr, pool_info))
-                        })?
-                    })
                     .collect::<StdResult<Vec<_>>>()?;
                 for (key, pool) in pools {
                     let generator_proxy_per_share = migrate_generator_proxy_per_share_to_v120(
@@ -610,9 +593,7 @@ pub fn handle_update_config(
         if config.generator.is_some() {
             for pool in ASSET_POOLS
                 .keys(deps.storage, None, None, Order::Ascending)
-                .map(|addr| {
-                    Addr::unchecked(String::from_utf8(addr).expect("Addr deserialization error!"))
-                })
+                .collect::<Result<Vec<Addr>, StdError>>()?
             {
                 let pool_info = ASSET_POOLS.load(deps.storage, &pool)?;
                 if pool_info.is_staked {
@@ -1111,7 +1092,7 @@ pub fn handle_increase_lockup(
         )));
     }
 
-    pool_info.weighted_amount += calculate_weight(amount, duration, &config);
+    pool_info.weighted_amount += calculate_weight(amount, duration, &config)?;
     pool_info.terraswap_amount_in_lockups += amount;
 
     let lockup_key = (&terraswap_lp_token, &user_address, U64Key::new(duration));
@@ -1228,7 +1209,7 @@ pub fn handle_withdraw_from_lockup(
 
     // STATE :: RETRIEVE --> UPDATE
     lockup_info.lp_units_locked -= amount;
-    pool_info.weighted_amount -= calculate_weight(amount, duration, &config);
+    pool_info.weighted_amount -= calculate_weight(amount, duration, &config)?;
     pool_info.terraswap_amount_in_lockups -= amount;
 
     // Remove Lockup position from the list of user positions if Lp_Locked balance == 0
@@ -1572,7 +1553,7 @@ fn handle_claim_asset_reward(
     let migration_info = pool_info
         .migration_info
         .ok_or_else(|| StdError::generic_err("The pool was not migrated to astroport"))?;
-    let pair_info = pair_info_by_pool(deps, migration_info.astroport_lp_token)?;
+    let pair_info = pair_info_by_pool(&deps.querier, migration_info.astroport_lp_token)?;
     let pool_claim_msg = CosmosMsg::Wasm(WasmMsg::Execute {
         contract_addr: pair_info.contract_addr.to_string(),
         msg: to_binary(&astroport::pair_stable_bluna::ExecuteMsg::ClaimReward { receiver: None })?,
@@ -1687,7 +1668,7 @@ pub fn update_pool_on_dual_rewards_claim(
 
     let base_reward_received;
     // Increment claimed Astro rewards per LP share
-    pool_info.generator_astro_per_share = pool_info.generator_astro_per_share + {
+    pool_info.generator_astro_per_share += {
         let res: BalanceResponse = deps.querier.query_wasm_smart(
             rwi.base_reward_token,
             &Cw20QueryMsg::Balance {
@@ -1841,7 +1822,7 @@ pub fn callback_withdraw_user_rewards_for_lockup_optional_withdraw(
                         .load(asset)
                         .unwrap_or_default();
                     let total_lockup_proxy_reward =
-                        generator_proxy_per_share.checked_mul(astroport_lp_amount)?;
+                        generator_proxy_per_share.checked_mul_uint128(astroport_lp_amount)?;
                     let pending_proxy_reward: Uint128 =
                         total_lockup_proxy_reward.checked_sub(*debt)?;
 
@@ -2147,8 +2128,7 @@ pub fn query_state(deps: Deps) -> StdResult<StateResponse> {
         are_claims_allowed: state.are_claims_allowed,
         supported_pairs_list: ASSET_POOLS
             .keys(deps.storage, None, None, Order::Ascending)
-            .map(|v| Addr::unchecked(String::from_utf8(v).expect("Addr deserialization error!")))
-            .collect(),
+            .collect::<Result<Vec<Addr>, StdError>>()?,
     })
 }
 
@@ -2182,12 +2162,12 @@ pub fn query_user_info(deps: Deps, env: Env, user: String) -> StdResult<UserInfo
     let mut claimable_generator_astro_debt = Uint128::zero();
     for pool in ASSET_POOLS
         .keys(deps.storage, None, None, Order::Ascending)
-        .map(|v| Addr::unchecked(String::from_utf8(v).expect("Addr deserialization error!")))
+        .collect::<Result<Vec<Addr>, StdError>>()?
     {
         for duration in LOCKUP_INFO
             .prefix((&pool, &user_address))
             .keys(deps.storage, None, None, Order::Ascending)
-            .map(|v| u64::from_be_bytes(v.try_into().expect("Duration deserialization error!")))
+            .collect::<Result<Vec<u64>, StdError>>()?
         {
             let lockup_info = query_lockup_info(deps, &env, &user, pool.to_string(), duration)?;
             total_astro_rewards += lockup_info.astro_rewards;
@@ -2227,12 +2207,12 @@ pub fn query_user_info_with_lockups_list(
 
     for pool in ASSET_POOLS
         .keys(deps.storage, None, None, Order::Ascending)
-        .map(|v| Addr::unchecked(String::from_utf8(v).expect("Addr deserialization error!")))
+        .collect::<Result<Vec<Addr>, StdError>>()?
     {
         for duration in LOCKUP_INFO
             .prefix((&pool, &user_address))
             .keys(deps.storage, None, None, Order::Ascending)
-            .map(|v| u64::from_be_bytes(v.try_into().expect("Duration deserialization error!")))
+            .collect::<Result<Vec<u64>, StdError>>()?
         {
             lockup_infos.push(LockUpInfoSummary {
                 pool_address: pool.to_string(),
@@ -2336,8 +2316,8 @@ pub fn query_lockup_info(
             )?;
 
             // Calculate claimable Astro staking rewards for this lockup
-            pool_info.generator_astro_per_share = pool_info.generator_astro_per_share
-                + Decimal::from_ratio(pending_rewards.pending, pool_astroport_lp_units);
+            pool_info.generator_astro_per_share +=
+                Decimal::from_ratio(pending_rewards.pending, pool_astroport_lp_units);
 
             let total_lockup_astro_rewards =
                 pool_info.generator_astro_per_share * lockup_astroport_lp_units;
@@ -2353,7 +2333,7 @@ pub fn query_lockup_info(
                     )?;
 
                     let debt = generator_proxy_per_share
-                        .checked_mul(lockup_astroport_lp_units)?
+                        .checked_mul_uint128(lockup_astroport_lp_units)?
                         .checked_sub(
                             lockup_info
                                 .generator_proxy_debt
@@ -2371,14 +2351,14 @@ pub fn query_lockup_info(
     // Calculate currently expected ASTRO Rewards if not finalized
     if lockup_info.astro_rewards == Uint128::zero() {
         let weighted_lockup_balance =
-            calculate_weight(lockup_info.lp_units_locked, duration, &config);
+            calculate_weight(lockup_info.lp_units_locked, duration, &config)?;
         lockup_info.astro_rewards = calculate_astro_incentives_for_lockup(
             weighted_lockup_balance,
             pool_info.weighted_amount,
             pool_info.incentives_share,
             state.total_incentives_share,
             config.lockdrop_incentives,
-        );
+        )?;
     }
 
     Ok(LockUpInfoResponse {
@@ -2440,7 +2420,7 @@ pub fn query_pending_asset_reward(
             .migration_info
             .as_ref()
             .ok_or_else(|| StdError::generic_err("The pool was not migrated to astroport"))?;
-        let pair_info = pair_info_by_pool(deps, astroport_lp_token.clone())?;
+        let pair_info = pair_info_by_pool(&deps.querier, astroport_lp_token.clone())?;
         let pending_rewards: Asset = deps.querier.query_wasm_smart(
             pair_info.contract_addr,
             &astroport::pair_stable_bluna::QueryMsg::PendingReward {
@@ -2527,16 +2507,15 @@ pub fn calculate_astro_incentives_for_lockup(
     pool_incentives_share: u64,
     total_incentives_share: u64,
     total_lockdrop_incentives: Uint128,
-) -> Uint128 {
+) -> StdResult<Uint128> {
     if total_incentives_share == 0u64 || total_weighted_amount == Uint256::zero() {
-        Uint128::zero()
+        Ok(Uint128::zero())
     } else {
-        (Decimal256::from_ratio(
+        Ok(Decimal256::from_ratio(
             Uint256::from(pool_incentives_share) * lockup_weighted_balance,
             Uint256::from(total_incentives_share) * total_weighted_amount,
-        ) * total_lockdrop_incentives.into())
-        .try_into()
-        .unwrap()
+        )
+        .checked_mul_uint256(total_lockdrop_incentives.into())?)
     }
 }
 
@@ -2547,13 +2526,13 @@ pub fn calculate_astro_incentives_for_lockup(
 /// * **duration** is an object of type [`u64`]. Number of weeks.
 ///
 /// * **config** is an object of type [`Config`]. Config with weekly multiplier and divider.
-fn calculate_weight(amount: Uint128, duration: u64, config: &Config) -> Uint256 {
+fn calculate_weight(amount: Uint128, duration: u64, config: &Config) -> StdResult<Uint256> {
     let lock_weight = Decimal256::one()
         + Decimal256::from_ratio(
             (duration - 1) * config.weekly_multiplier,
             config.weekly_divider,
         );
-    lock_weight * amount.into()
+    Ok(lock_weight.checked_mul_uint256(amount.into())?.into())
 }
 
 /// Calculates bLuna user reward according to his share in LP.
@@ -2586,7 +2565,7 @@ fn calc_user_reward(
         _ => return Ok(Uint128::zero()),
     };
 
-    Ok(to_distribute_index.checked_mul(Uint256::from(user_lp_amount))?)
+    Ok(to_distribute_index.checked_mul_uint256(Uint256::from(user_lp_amount))?)
 }
 
 /// Calculates ASTRO rewards for each of the user position.
@@ -2610,12 +2589,12 @@ fn update_user_lockup_positions_and_calc_rewards(
 
     for pool_key in ASSET_POOLS
         .keys(deps.storage, None, None, Order::Ascending)
-        .map(|v| Addr::unchecked(String::from_utf8(v).expect("Addr deserialization error!")))
+        .collect::<Result<Vec<Addr>, StdError>>()?
     {
         for duration in LOCKUP_INFO
             .prefix((&pool_key, user_address))
             .keys(deps.storage, None, None, Order::Ascending)
-            .map(|v| u64::from_be_bytes(v.try_into().expect("Duration deserialization error!")))
+            .collect::<Result<Vec<u64>, StdError>>()?
         {
             keys.push((pool_key.clone(), duration));
         }
@@ -2629,7 +2608,7 @@ fn update_user_lockup_positions_and_calc_rewards(
         if lockup_info.astro_rewards == Uint128::zero() {
             // Weighted lockup balance (using terraswap LP units to calculate as pool's total weighted balance is calculated on terraswap LP deposits summed over each deposit tx)
             let weighted_lockup_balance =
-                calculate_weight(lockup_info.lp_units_locked, duration, config);
+                calculate_weight(lockup_info.lp_units_locked, duration, config)?;
 
             // Calculate ASTRO Lockdrop rewards for the lockup position
             lockup_info.astro_rewards = calculate_astro_incentives_for_lockup(
@@ -2638,7 +2617,7 @@ fn update_user_lockup_positions_and_calc_rewards(
                 pool_info.incentives_share,
                 state.total_incentives_share,
                 config.lockdrop_incentives,
-            );
+            )?;
 
             LOCKUP_INFO.save(deps.storage, lockup_key, &lockup_info)?;
         };
