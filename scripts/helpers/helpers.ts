@@ -85,9 +85,7 @@ export async function performTransaction(
   memo?: string
 ) {
   let options: CreateTxOptions = {
-    msgs: [msg],
-    gasPrices: [new Coin("uusd", 0.15)],
-    memo: memo,
+    msgs: [msg]
   };
 
   const tx = await wallet.createAndSignTx(options);
@@ -115,7 +113,7 @@ export async function createTransaction(
     memo: memo,
   };
 
-  return await wallet.createTx(options);
+  return await wallet.createAndSignTx(options);
 }
 
 export async function uploadContract(
@@ -150,18 +148,18 @@ export async function instantiateContract(
   wallet: Wallet,
   codeId: number,
   msg: object,
-  memo?: string
+  label?: string
 ) {
   const instantiateMsg = new MsgInstantiateContract(
     wallet.key.accAddress,
     wallet.key.accAddress,
     codeId,
     msg,
-    undefined
+    undefined,
+      label
   );
-  let result = await performTransaction(terra, wallet, instantiateMsg, memo);
-  const attributes = result.logs[0].events[0].attributes;
-  return attributes[attributes.length - 1].value; // contract address
+  let result = await performTransaction(terra, wallet, instantiateMsg);
+  return result.logs[0].events.filter(el => el.type == 'instantiate').map(x => x.attributes.filter(element => element.key == '_contract_address' ).map(x => x.value))[0][0];
 }
 
 export async function executeContract(
@@ -222,10 +220,10 @@ export async function deployContract(
   wallet: Wallet,
   filepath: string,
   initMsg: object,
-  memo?: string
+  label?: string
 ) {
   const codeId = await uploadContract(terra, wallet, filepath);
-  return await instantiateContract(terra, wallet, codeId, initMsg, memo);
+  return await instantiateContract(terra, wallet, codeId, initMsg, label);
 }
 
 export async function migrate(

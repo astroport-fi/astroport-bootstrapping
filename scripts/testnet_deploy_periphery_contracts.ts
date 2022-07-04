@@ -13,8 +13,7 @@ import {
   writeArtifact,
   Client,
 } from "./helpers/helpers.js";
-import { getMerkleRoots } from "./helpers/merkle_tree_utils.js";
-import { bombay_testnet, mainnet, Config } from "./deploy_configs.js";
+import { pisco_testnet, mainnet, Config } from "./deploy_configs.js";
 import { join } from "path";
 import { writeFileSync } from "fs";
 
@@ -37,7 +36,7 @@ const APOLLO_UST_ASTRO_INCENTIVES = 2_250_000_000000;
 const ARTIFACTS_PATH = "../artifacts";
 
 async function main() {
-  let CONFIGURATION: Config = bombay_testnet;
+  let CONFIGURATION: Config = pisco_testnet;
 
   // terra, wallet
   const { terra, wallet } = newClient();
@@ -49,7 +48,7 @@ async function main() {
   let network = readArtifact(terra.config.chainID);
   console.log("network:", network);
 
-  if (terra.config.chainID != "bombay-12") {
+  if (terra.config.chainID != "pisco-1") {
     console.log("Network is not testnet. Wrong script... terminating ... ");
     return;
   }
@@ -123,7 +122,7 @@ async function main() {
     console.log(`${terra.config.chainID} :: Deploying Airdrop Contract`);
     // Set configuration
     CONFIGURATION.airdrop_InitMsg.config.owner = wallet.key.accAddress;
-    CONFIGURATION.airdrop_InitMsg.config.merkle_roots = await getMerkleRoots();
+    CONFIGURATION.airdrop_InitMsg.config.merkle_roots = [];
     CONFIGURATION.airdrop_InitMsg.config.astro_token_address =
       network.astro_token_address;
     // deploy airdrop contract
@@ -224,359 +223,359 @@ async function main() {
     writeArtifact(network, terra.config.chainID);
   }
 
-  // ASTRO::Send::Lockdrop::IncreaseAstroIncentives:: Transfer ASTRO to Lockdrop and set total incentives
-  if (!network.lockdrop_astro_token_transferred) {
-    let transfer_msg = {
-      send: {
-        contract: network.lockdrop_address,
-        amount: String(LOCKDROP_INCENTIVES),
-        msg: Buffer.from(
-          JSON.stringify({ increase_astro_incentives: {} })
-        ).toString("base64"),
-      },
-    };
-    let increase_astro_incentives = await executeContract(
-      terra,
-      wallet,
-      network.astro_token_address,
-      transfer_msg,
-      [],
-      "Transfer ASTRO to Lockdrop for Incentives"
-    );
-    console.log(
-      `${terra.config.chainID} :: Transferring ASTRO token and setting incentives in Lockdrop... ${increase_astro_incentives.txhash}`
-    );
-    network.lockdrop_astro_token_transferred = true;
-    writeArtifact(network, terra.config.chainID);
-  }
-
-  // ASTRO::Send::Airdrop::IncreaseAstroIncentives:: Transfer ASTRO to Airdrop
-  if (!network.airdrop_astro_token_transferred) {
-    // Transfer ASTRO Tx
-    let tx = await executeContract(
-      terra,
-      wallet,
-      network.astro_token_address,
-      {
-        send: {
-          contract: network.airdrop_address,
-          amount: String(AIRDROP_INCENTIVES),
-          msg: Buffer.from(
-            JSON.stringify({ increase_astro_incentives: {} })
-          ).toString("base64"),
-        },
-      },
-      [],
-      " Airdrop : Transferring ASTRO "
-    );
-    console.log(
-      `${terra.config.chainID} :: Transferring ASTRO token and setting tokens in Airdrop... ${tx.txhash}`
-    );
-    network.airdrop_astro_token_transferred = true;
-    writeArtifact(network, terra.config.chainID);
-  }
-
-  // Set Auction incentives
-  if (!network.auction_astro_token_transferred) {
-    // Transfer ASTRO Tx
-    let msg = {
-      send: {
-        contract: network.auction_address,
-        amount: String(AUCTION_INCENTIVES),
-        msg: Buffer.from(
-          JSON.stringify({ increase_astro_incentives: {} })
-        ).toString("base64"),
-      },
-    };
-    let out = await executeContract(
-      terra,
-      wallet,
-      network.astro_token_address,
-      msg,
-      [],
-      " Transferring ASTRO token to Auction for auction participation incentives"
-    );
-    console.log(
-      `${terra.config.chainID} :: Transferring ASTRO token and setting incentives in Auction... ${out.txhash}`
-    );
-    network.auction_astro_token_transferred = true;
-    writeArtifact(network, terra.config.chainID);
-  }
-
-  // Lockdrop -::- Initialize LUNA-UST Pool
-  if (!network.luna_ust_lockdrop_pool_initialized) {
-    let luna_ust_init_msg = {
-      initialize_pool: {
-        terraswap_lp_token: network.luna_ust_terraswap_lp_token_address,
-        incentives_share: LUNA_UST_ASTRO_INCENTIVES,
-      },
-    };
-    console.log(
-      `${terra.config.chainID} :: Initializing LUNA-UST LP Token Pool in Lockdrop...`
-    );
-    let luna_ust_pool_init = await executeContract(
-      terra,
-      wallet,
-      network.lockdrop_address,
-      luna_ust_init_msg,
-      [],
-      "Lockdrop -::- Initialize LUNA-UST Pool"
-    );
-    console.log(luna_ust_pool_init.txhash);
-    console.log(
-      `Lockdrop :: Luna-ust Pool successfully initialized with Lockdrop \n`
-    );
-    network.luna_ust_lockdrop_pool_initialized = true;
-    writeArtifact(network, terra.config.chainID);
-  }
-
-  // Initialize LUNA-BLUNA Pool in Lockdrop
-  if (!network.bluna_luna_lockdrop_pool_initialized) {
-    let bluna_luna_init_msg = {
-      initialize_pool: {
-        terraswap_lp_token: network.bluna_luna_terraswap_lp_token_address,
-        incentives_share: LUNA_BLUNA_ASTRO_INCENTIVES,
-      },
-    };
-
-    console.log(
-      `${terra.config.chainID} :: Lockdrop -::- Initialize LUNA-BLUNA LP Pool...`
-    );
-    let bluna_luna_pool_init = await executeContract(
-      terra,
-      wallet,
-      network.lockdrop_address,
-      bluna_luna_init_msg,
-      [],
-      "Lockdrop -::- Initialize LUNA-BLUNA LP Pool"
-    );
-    console.log(bluna_luna_pool_init.txhash);
-    console.log(
-      `Lockdrop :: LUNA-BLUNA Pool successfully initialized with Lockdrop \n`
-    );
-    network.bluna_luna_lockdrop_pool_initialized = true;
-    writeArtifact(network, terra.config.chainID);
-  }
-
-  // Initialize ANC-UST Pool in Lockdrop
-  if (!network.anc_ust_lockdrop_pool_initialized) {
-    let anc_ust_init_msg = {
-      initialize_pool: {
-        terraswap_lp_token: network.anc_ust_terraswap_lp_token_address,
-        incentives_share: ANC_UST_ASTRO_INCENTIVES,
-      },
-    };
-    console.log(
-      `${terra.config.chainID} :: Lockdrop -::- Initialize ANC-UST LP Pool...`
-    );
-    let anc_ust_pool_init = await executeContract(
-      terra,
-      wallet,
-      network.lockdrop_address,
-      anc_ust_init_msg,
-      [],
-      "Lockdrop -::- Initialize ANC-UST LP Pool"
-    );
-    console.log(anc_ust_pool_init.txhash);
-    console.log(
-      `Lockdrop :: ANC-UST Pool successfully initialized with Lockdrop \n`
-    );
-    network.anc_ust_lockdrop_pool_initialized = true;
-    writeArtifact(network, terra.config.chainID);
-  }
-
-  // Initialize MIR-UST Pool in Lockdrop
-  // Initialize MIR-UST Pool in Lockdrop
-  if (!network.mir_ust_lockdrop_pool_initialized) {
-    let mir_ust_init_msg = {
-      initialize_pool: {
-        terraswap_lp_token: network.mir_ust_terraswap_lp_token_address,
-        incentives_share: MIR_UST_ASTRO_INCENTIVES,
-      },
-    };
-    console.log(
-      `${terra.config.chainID} :: Lockdrop -::- Initialize MIR-UST LP Pool...`
-    );
-    let mir_ust_pool_init = await executeContract(
-      terra,
-      wallet,
-      network.lockdrop_address,
-      mir_ust_init_msg,
-      [],
-      "Lockdrop -::- Initialize MIR-UST LP Pool"
-    );
-    console.log(mir_ust_pool_init.txhash);
-    console.log(
-      `Lockdrop :: MIR-UST Pool successfully initialized with Lockdrop \n`
-    );
-    network.mir_ust_lockdrop_pool_initialized = true;
-    writeArtifact(network, terra.config.chainID);
-  }
-
-  // Initialize ORION-UST Pool in Lockdrop
-  if (!network.orion_ust_lockdrop_pool_initialized) {
-    let orion_ust_init_msg = {
-      initialize_pool: {
-        terraswap_lp_token: network.orion_ust_terraswap_lp_token_address,
-        incentives_share: ORION_UST_ASTRO_INCENTIVES,
-      },
-    };
-    console.log(
-      `${terra.config.chainID} :: Lockdrop -::- Initialize ORION-UST LP Pool...`
-    );
-    let orion_ust_pool_init = await executeContract(
-      terra,
-      wallet,
-      network.lockdrop_address,
-      orion_ust_init_msg,
-      [],
-      "Lockdrop -::- Initialize ORION-UST LP Pool"
-    );
-    console.log(orion_ust_pool_init.txhash);
-    console.log(
-      `Lockdrop :: ORION-UST Pool successfully initialized with Lockdrop \n`
-    );
-    network.orion_ust_lockdrop_pool_initialized = true;
-    writeArtifact(network, terra.config.chainID);
-  }
-
-  // Initialize STT-UST Pool in Lockdrop
-  if (!network.stt_ust_lockdrop_pool_initialized) {
-    let stt_ust_init_msg = {
-      initialize_pool: {
-        terraswap_lp_token: network.stt_ust_terraswap_lp_token_address,
-        incentives_share: STT_UST_ASTRO_INCENTIVES,
-      },
-    };
-    console.log(
-      `${terra.config.chainID} :: Lockdrop -::- Initialize STT-UST LP Pool...`
-    );
-    let stt_ust_pool_init = await executeContract(
-      terra,
-      wallet,
-      network.lockdrop_address,
-      stt_ust_init_msg,
-      [],
-      "Lockdrop -::- Initialize STT-UST LP Pool"
-    );
-    console.log(stt_ust_pool_init.txhash);
-    console.log(
-      `Lockdrop :: STT-UST Pool successfully initialized with Lockdrop \n`
-    );
-    network.stt_ust_lockdrop_pool_initialized = true;
-    writeArtifact(network, terra.config.chainID);
-  }
-
-  // Initialize VKR-UST Pool in Lockdrop
-  if (!network.vkr_ust_lockdrop_pool_initialized) {
-    let vkr_ust_init_msg = {
-      initialize_pool: {
-        terraswap_lp_token: network.vkr_ust_terraswap_lp_token_address,
-        incentives_share: VKR_UST_ASTRO_INCENTIVES,
-      },
-    };
-
-    console.log(
-      `${terra.config.chainID} :: Lockdrop -::- Initialize VKR-UST LP Pool...`
-    );
-    let vkr_ust_pool_init = await executeContract(
-      terra,
-      wallet,
-      network.lockdrop_address,
-      vkr_ust_init_msg,
-      [],
-      "Lockdrop -::- Initialize VKR-UST LP Pool"
-    );
-    console.log(vkr_ust_pool_init.txhash);
-    console.log(
-      `Lockdrop :: VKR-UST Pool successfully initialized with Lockdrop \n`
-    );
-    network.vkr_ust_lockdrop_pool_initialized = true;
-    writeArtifact(network, terra.config.chainID);
-  }
-
-  // Initialize MINE-UST Pool in Lockdrop
-  if (!network.mine_ust_lockdrop_pool_initialized) {
-    let mine_ust_init_msg = {
-      initialize_pool: {
-        terraswap_lp_token: network.mine_ust_terraswap_lp_token_address,
-        incentives_share: MINE_UST_ASTRO_INCENTIVES,
-      },
-    };
-
-    console.log(
-      `${terra.config.chainID} :: Lockdrop -::- Initialize MINE-UST LP Pool...`
-    );
-    let mine_ust_pool_init = await executeContract(
-      terra,
-      wallet,
-      network.lockdrop_address,
-      mine_ust_init_msg,
-      [],
-      "Lockdrop -::- Initialize MINE-UST LP Pool"
-    );
-    console.log(mine_ust_pool_init.txhash);
-    console.log(
-      `Lockdrop :: MINE-UST Pool successfully initialized with Lockdrop \n`
-    );
-    network.mine_ust_lockdrop_pool_initialized = true;
-    writeArtifact(network, terra.config.chainID);
-  }
-
-  // Initialize PSI-UST Pool in Lockdrop
-  if (!network.psi_ust_lockdrop_pool_initialized) {
-    let psi_ust_init_msg = {
-      initialize_pool: {
-        terraswap_lp_token: network.psi_ust_terraswap_lp_token_address,
-        incentives_share: PSI_UST_ASTRO_INCENTIVES,
-      },
-    };
-
-    console.log(
-      `${terra.config.chainID} :: Lockdrop -::- Initialize PSI-UST LP Pool...`
-    );
-    let psi_ust_pool_init = await executeContract(
-      terra,
-      wallet,
-      network.lockdrop_address,
-      psi_ust_init_msg,
-      [],
-      " Lockdrop -::- Initialize PSI-UST LP Pool"
-    );
-    console.log(psi_ust_pool_init.txhash);
-    console.log(
-      `Lockdrop :: PSI-UST Pool successfully initialized with Lockdrop \n`
-    );
-    network.psi_ust_lockdrop_pool_initialized = true;
-    writeArtifact(network, terra.config.chainID);
-  }
-
-  // Initialize APOLLO-UST Pool with incentive
-  if (!network.apollo_ust_lockdrop_pool_initialized) {
-    let apollo_ust_init_msg = {
-      initialize_pool: {
-        terraswap_lp_token: network.apollo_ust_terraswap_lp_token_address,
-        incentives_share: APOLLO_UST_ASTRO_INCENTIVES,
-      },
-    };
-    console.log(
-      `${terra.config.chainID} :: Lockdrop -::- Initialize APOLLO-UST LP Pool...`
-    );
-    let apollo_ust_pool_init = await executeContract(
-      terra,
-      wallet,
-      network.lockdrop_address,
-      apollo_ust_init_msg,
-      [],
-      "Lockdrop -::- Initialize APOLLO-UST LP Pool"
-    );
-    console.log(apollo_ust_pool_init.txhash);
-    console.log(
-      `Lockdrop :: APOLLO-UST Pool successfully initialized with Lockdrop \n`
-    );
-    network.apollo_ust_lockdrop_pool_initialized = true;
-    writeArtifact(network, terra.config.chainID);
-  }
+  // // ASTRO::Send::Lockdrop::IncreaseAstroIncentives:: Transfer ASTRO to Lockdrop and set total incentives
+  // if (!network.lockdrop_astro_token_transferred) {
+  //   let transfer_msg = {
+  //     send: {
+  //       contract: network.lockdrop_address,
+  //       amount: String(LOCKDROP_INCENTIVES),
+  //       msg: Buffer.from(
+  //         JSON.stringify({ increase_astro_incentives: {} })
+  //       ).toString("base64"),
+  //     },
+  //   };
+  //   let increase_astro_incentives = await executeContract(
+  //     terra,
+  //     wallet,
+  //     network.astro_token_address,
+  //     transfer_msg,
+  //     [],
+  //     "Transfer ASTRO to Lockdrop for Incentives"
+  //   );
+  //   console.log(
+  //     `${terra.config.chainID} :: Transferring ASTRO token and setting incentives in Lockdrop... ${increase_astro_incentives.txhash}`
+  //   );
+  //   network.lockdrop_astro_token_transferred = true;
+  //   writeArtifact(network, terra.config.chainID);
+  // }
+  //
+  // // ASTRO::Send::Airdrop::IncreaseAstroIncentives:: Transfer ASTRO to Airdrop
+  // if (!network.airdrop_astro_token_transferred) {
+  //   // Transfer ASTRO Tx
+  //   let tx = await executeContract(
+  //     terra,
+  //     wallet,
+  //     network.astro_token_address,
+  //     {
+  //       send: {
+  //         contract: network.airdrop_address,
+  //         amount: String(AIRDROP_INCENTIVES),
+  //         msg: Buffer.from(
+  //           JSON.stringify({ increase_astro_incentives: {} })
+  //         ).toString("base64"),
+  //       },
+  //     },
+  //     [],
+  //     " Airdrop : Transferring ASTRO "
+  //   );
+  //   console.log(
+  //     `${terra.config.chainID} :: Transferring ASTRO token and setting tokens in Airdrop... ${tx.txhash}`
+  //   );
+  //   network.airdrop_astro_token_transferred = true;
+  //   writeArtifact(network, terra.config.chainID);
+  // }
+  //
+  // // Set Auction incentives
+  // if (!network.auction_astro_token_transferred) {
+  //   // Transfer ASTRO Tx
+  //   let msg = {
+  //     send: {
+  //       contract: network.auction_address,
+  //       amount: String(AUCTION_INCENTIVES),
+  //       msg: Buffer.from(
+  //         JSON.stringify({ increase_astro_incentives: {} })
+  //       ).toString("base64"),
+  //     },
+  //   };
+  //   let out = await executeContract(
+  //     terra,
+  //     wallet,
+  //     network.astro_token_address,
+  //     msg,
+  //     [],
+  //     " Transferring ASTRO token to Auction for auction participation incentives"
+  //   );
+  //   console.log(
+  //     `${terra.config.chainID} :: Transferring ASTRO token and setting incentives in Auction... ${out.txhash}`
+  //   );
+  //   network.auction_astro_token_transferred = true;
+  //   writeArtifact(network, terra.config.chainID);
+  // }
+  //
+  // // Lockdrop -::- Initialize LUNA-UST Pool
+  // if (!network.luna_ust_lockdrop_pool_initialized) {
+  //   let luna_ust_init_msg = {
+  //     initialize_pool: {
+  //       terraswap_lp_token: network.luna_ust_terraswap_lp_token_address,
+  //       incentives_share: LUNA_UST_ASTRO_INCENTIVES,
+  //     },
+  //   };
+  //   console.log(
+  //     `${terra.config.chainID} :: Initializing LUNA-UST LP Token Pool in Lockdrop...`
+  //   );
+  //   let luna_ust_pool_init = await executeContract(
+  //     terra,
+  //     wallet,
+  //     network.lockdrop_address,
+  //     luna_ust_init_msg,
+  //     [],
+  //     "Lockdrop -::- Initialize LUNA-UST Pool"
+  //   );
+  //   console.log(luna_ust_pool_init.txhash);
+  //   console.log(
+  //     `Lockdrop :: Luna-ust Pool successfully initialized with Lockdrop \n`
+  //   );
+  //   network.luna_ust_lockdrop_pool_initialized = true;
+  //   writeArtifact(network, terra.config.chainID);
+  // }
+  //
+  // // Initialize LUNA-BLUNA Pool in Lockdrop
+  // if (!network.bluna_luna_lockdrop_pool_initialized) {
+  //   let bluna_luna_init_msg = {
+  //     initialize_pool: {
+  //       terraswap_lp_token: network.bluna_luna_terraswap_lp_token_address,
+  //       incentives_share: LUNA_BLUNA_ASTRO_INCENTIVES,
+  //     },
+  //   };
+  //
+  //   console.log(
+  //     `${terra.config.chainID} :: Lockdrop -::- Initialize LUNA-BLUNA LP Pool...`
+  //   );
+  //   let bluna_luna_pool_init = await executeContract(
+  //     terra,
+  //     wallet,
+  //     network.lockdrop_address,
+  //     bluna_luna_init_msg,
+  //     [],
+  //     "Lockdrop -::- Initialize LUNA-BLUNA LP Pool"
+  //   );
+  //   console.log(bluna_luna_pool_init.txhash);
+  //   console.log(
+  //     `Lockdrop :: LUNA-BLUNA Pool successfully initialized with Lockdrop \n`
+  //   );
+  //   network.bluna_luna_lockdrop_pool_initialized = true;
+  //   writeArtifact(network, terra.config.chainID);
+  // }
+  //
+  // // Initialize ANC-UST Pool in Lockdrop
+  // if (!network.anc_ust_lockdrop_pool_initialized) {
+  //   let anc_ust_init_msg = {
+  //     initialize_pool: {
+  //       terraswap_lp_token: network.anc_ust_terraswap_lp_token_address,
+  //       incentives_share: ANC_UST_ASTRO_INCENTIVES,
+  //     },
+  //   };
+  //   console.log(
+  //     `${terra.config.chainID} :: Lockdrop -::- Initialize ANC-UST LP Pool...`
+  //   );
+  //   let anc_ust_pool_init = await executeContract(
+  //     terra,
+  //     wallet,
+  //     network.lockdrop_address,
+  //     anc_ust_init_msg,
+  //     [],
+  //     "Lockdrop -::- Initialize ANC-UST LP Pool"
+  //   );
+  //   console.log(anc_ust_pool_init.txhash);
+  //   console.log(
+  //     `Lockdrop :: ANC-UST Pool successfully initialized with Lockdrop \n`
+  //   );
+  //   network.anc_ust_lockdrop_pool_initialized = true;
+  //   writeArtifact(network, terra.config.chainID);
+  // }
+  //
+  // // Initialize MIR-UST Pool in Lockdrop
+  // // Initialize MIR-UST Pool in Lockdrop
+  // if (!network.mir_ust_lockdrop_pool_initialized) {
+  //   let mir_ust_init_msg = {
+  //     initialize_pool: {
+  //       terraswap_lp_token: network.mir_ust_terraswap_lp_token_address,
+  //       incentives_share: MIR_UST_ASTRO_INCENTIVES,
+  //     },
+  //   };
+  //   console.log(
+  //     `${terra.config.chainID} :: Lockdrop -::- Initialize MIR-UST LP Pool...`
+  //   );
+  //   let mir_ust_pool_init = await executeContract(
+  //     terra,
+  //     wallet,
+  //     network.lockdrop_address,
+  //     mir_ust_init_msg,
+  //     [],
+  //     "Lockdrop -::- Initialize MIR-UST LP Pool"
+  //   );
+  //   console.log(mir_ust_pool_init.txhash);
+  //   console.log(
+  //     `Lockdrop :: MIR-UST Pool successfully initialized with Lockdrop \n`
+  //   );
+  //   network.mir_ust_lockdrop_pool_initialized = true;
+  //   writeArtifact(network, terra.config.chainID);
+  // }
+  //
+  // // Initialize ORION-UST Pool in Lockdrop
+  // if (!network.orion_ust_lockdrop_pool_initialized) {
+  //   let orion_ust_init_msg = {
+  //     initialize_pool: {
+  //       terraswap_lp_token: network.orion_ust_terraswap_lp_token_address,
+  //       incentives_share: ORION_UST_ASTRO_INCENTIVES,
+  //     },
+  //   };
+  //   console.log(
+  //     `${terra.config.chainID} :: Lockdrop -::- Initialize ORION-UST LP Pool...`
+  //   );
+  //   let orion_ust_pool_init = await executeContract(
+  //     terra,
+  //     wallet,
+  //     network.lockdrop_address,
+  //     orion_ust_init_msg,
+  //     [],
+  //     "Lockdrop -::- Initialize ORION-UST LP Pool"
+  //   );
+  //   console.log(orion_ust_pool_init.txhash);
+  //   console.log(
+  //     `Lockdrop :: ORION-UST Pool successfully initialized with Lockdrop \n`
+  //   );
+  //   network.orion_ust_lockdrop_pool_initialized = true;
+  //   writeArtifact(network, terra.config.chainID);
+  // }
+  //
+  // // Initialize STT-UST Pool in Lockdrop
+  // if (!network.stt_ust_lockdrop_pool_initialized) {
+  //   let stt_ust_init_msg = {
+  //     initialize_pool: {
+  //       terraswap_lp_token: network.stt_ust_terraswap_lp_token_address,
+  //       incentives_share: STT_UST_ASTRO_INCENTIVES,
+  //     },
+  //   };
+  //   console.log(
+  //     `${terra.config.chainID} :: Lockdrop -::- Initialize STT-UST LP Pool...`
+  //   );
+  //   let stt_ust_pool_init = await executeContract(
+  //     terra,
+  //     wallet,
+  //     network.lockdrop_address,
+  //     stt_ust_init_msg,
+  //     [],
+  //     "Lockdrop -::- Initialize STT-UST LP Pool"
+  //   );
+  //   console.log(stt_ust_pool_init.txhash);
+  //   console.log(
+  //     `Lockdrop :: STT-UST Pool successfully initialized with Lockdrop \n`
+  //   );
+  //   network.stt_ust_lockdrop_pool_initialized = true;
+  //   writeArtifact(network, terra.config.chainID);
+  // }
+  //
+  // // Initialize VKR-UST Pool in Lockdrop
+  // if (!network.vkr_ust_lockdrop_pool_initialized) {
+  //   let vkr_ust_init_msg = {
+  //     initialize_pool: {
+  //       terraswap_lp_token: network.vkr_ust_terraswap_lp_token_address,
+  //       incentives_share: VKR_UST_ASTRO_INCENTIVES,
+  //     },
+  //   };
+  //
+  //   console.log(
+  //     `${terra.config.chainID} :: Lockdrop -::- Initialize VKR-UST LP Pool...`
+  //   );
+  //   let vkr_ust_pool_init = await executeContract(
+  //     terra,
+  //     wallet,
+  //     network.lockdrop_address,
+  //     vkr_ust_init_msg,
+  //     [],
+  //     "Lockdrop -::- Initialize VKR-UST LP Pool"
+  //   );
+  //   console.log(vkr_ust_pool_init.txhash);
+  //   console.log(
+  //     `Lockdrop :: VKR-UST Pool successfully initialized with Lockdrop \n`
+  //   );
+  //   network.vkr_ust_lockdrop_pool_initialized = true;
+  //   writeArtifact(network, terra.config.chainID);
+  // }
+  //
+  // // Initialize MINE-UST Pool in Lockdrop
+  // if (!network.mine_ust_lockdrop_pool_initialized) {
+  //   let mine_ust_init_msg = {
+  //     initialize_pool: {
+  //       terraswap_lp_token: network.mine_ust_terraswap_lp_token_address,
+  //       incentives_share: MINE_UST_ASTRO_INCENTIVES,
+  //     },
+  //   };
+  //
+  //   console.log(
+  //     `${terra.config.chainID} :: Lockdrop -::- Initialize MINE-UST LP Pool...`
+  //   );
+  //   let mine_ust_pool_init = await executeContract(
+  //     terra,
+  //     wallet,
+  //     network.lockdrop_address,
+  //     mine_ust_init_msg,
+  //     [],
+  //     "Lockdrop -::- Initialize MINE-UST LP Pool"
+  //   );
+  //   console.log(mine_ust_pool_init.txhash);
+  //   console.log(
+  //     `Lockdrop :: MINE-UST Pool successfully initialized with Lockdrop \n`
+  //   );
+  //   network.mine_ust_lockdrop_pool_initialized = true;
+  //   writeArtifact(network, terra.config.chainID);
+  // }
+  //
+  // // Initialize PSI-UST Pool in Lockdrop
+  // if (!network.psi_ust_lockdrop_pool_initialized) {
+  //   let psi_ust_init_msg = {
+  //     initialize_pool: {
+  //       terraswap_lp_token: network.psi_ust_terraswap_lp_token_address,
+  //       incentives_share: PSI_UST_ASTRO_INCENTIVES,
+  //     },
+  //   };
+  //
+  //   console.log(
+  //     `${terra.config.chainID} :: Lockdrop -::- Initialize PSI-UST LP Pool...`
+  //   );
+  //   let psi_ust_pool_init = await executeContract(
+  //     terra,
+  //     wallet,
+  //     network.lockdrop_address,
+  //     psi_ust_init_msg,
+  //     [],
+  //     " Lockdrop -::- Initialize PSI-UST LP Pool"
+  //   );
+  //   console.log(psi_ust_pool_init.txhash);
+  //   console.log(
+  //     `Lockdrop :: PSI-UST Pool successfully initialized with Lockdrop \n`
+  //   );
+  //   network.psi_ust_lockdrop_pool_initialized = true;
+  //   writeArtifact(network, terra.config.chainID);
+  // }
+  //
+  // // Initialize APOLLO-UST Pool with incentive
+  // if (!network.apollo_ust_lockdrop_pool_initialized) {
+  //   let apollo_ust_init_msg = {
+  //     initialize_pool: {
+  //       terraswap_lp_token: network.apollo_ust_terraswap_lp_token_address,
+  //       incentives_share: APOLLO_UST_ASTRO_INCENTIVES,
+  //     },
+  //   };
+  //   console.log(
+  //     `${terra.config.chainID} :: Lockdrop -::- Initialize APOLLO-UST LP Pool...`
+  //   );
+  //   let apollo_ust_pool_init = await executeContract(
+  //     terra,
+  //     wallet,
+  //     network.lockdrop_address,
+  //     apollo_ust_init_msg,
+  //     [],
+  //     "Lockdrop -::- Initialize APOLLO-UST LP Pool"
+  //   );
+  //   console.log(apollo_ust_pool_init.txhash);
+  //   console.log(
+  //     `Lockdrop :: APOLLO-UST Pool successfully initialized with Lockdrop \n`
+  //   );
+  //   network.apollo_ust_lockdrop_pool_initialized = true;
+  //   writeArtifact(network, terra.config.chainID);
+  // }
 
   writeArtifact(network, terra.config.chainID);
   console.log("FINISH");

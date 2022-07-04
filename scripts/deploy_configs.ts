@@ -52,7 +52,7 @@ export const mainnet: Config = {
   },
 };
 
-export const bombay_testnet: Config = {
+export const pisco_testnet: Config = {
   // 1 hr = 3600 :: 3600*5 = 5 hours of deposit window
   // 1 hr = 3600 :: 3600*2 = 2 hours of withdrawal window
   // Lockup duration :: Min 2 weeks and max 52 weeks [week means 1 hr when testing]

@@ -35,8 +35,8 @@ async function main() {
     `chainID: ${terra.config.chainID} wallet: ${wallet.key.accAddress}`
   );
 
-  if (terra.config.chainID != "bombay-12") {
-    console.log(`network must be bombay-12`);
+  if (terra.config.chainID != "pisco-1") {
+    console.log(`network must be pisco-1`);
     return;
   }
 
@@ -86,7 +86,7 @@ async function main() {
     );
     writeArtifact(network, terra.config.chainID);
   } else {
-    console.log(`ASTRO Token already deployed on bombay-12`);
+    console.log(`ASTRO Token already deployed on pisco-1`);
   }
 
   // Mint LUNA-UST LP tokens
@@ -114,7 +114,7 @@ async function main() {
       new Coin("uusd", inital_ust_liquidity_for_each),
     ]
   );
-  console.log(`LUNA-UST LP tokens successfully minted on bombay-12`);
+  console.log(`LUNA-UST LP tokens successfully minted on pisco-1`);
 
   // Mint LUNA-bLUNA LP tokens : Deploy bLUNA, create bLUNA-LUNA pair on Terraswap : Mint LP tokens
   if (!network.bluna_token_address) {
@@ -191,7 +191,7 @@ async function main() {
       },
       [new Coin("uluna", inital_ust_liquidity_for_each)]
     );
-    console.log(`LUNA-BLUNA LP tokens successfully minted on bombay-12 \n`);
+    console.log(`LUNA-BLUNA LP tokens successfully minted on pisco-1 \n`);
     writeArtifact(network, terra.config.chainID);
   }
 
@@ -270,7 +270,7 @@ async function main() {
       [new Coin("uusd", inital_ust_liquidity_for_each)]
     );
     await delay(300);
-    console.log(`ANC-UST LP tokens successfully minted on bombay-12 \n`);
+    console.log(`ANC-UST LP tokens successfully minted on pisco-1 \n`);
     writeArtifact(network, terra.config.chainID);
   }
 
@@ -349,7 +349,7 @@ async function main() {
       [new Coin("uusd", inital_ust_liquidity_for_each)]
     );
     await delay(300);
-    console.log(`MIR-UST LP tokens successfully minted on bombay-12 \n`);
+    console.log(`MIR-UST LP tokens successfully minted on pisco-1 \n`);
     writeArtifact(network, terra.config.chainID);
   }
 
@@ -429,7 +429,7 @@ async function main() {
       [new Coin("uusd", inital_ust_liquidity_for_each)]
     );
     await delay(300);
-    console.log(`ORION-UST LP tokens successfully minted on bombay-12 \n`);
+    console.log(`ORION-UST LP tokens successfully minted on pisco-1 \n`);
     writeArtifact(network, terra.config.chainID);
   }
 
@@ -508,7 +508,7 @@ async function main() {
       [new Coin("uusd", inital_ust_liquidity_for_each)]
     );
     await delay(300);
-    console.log(`STT-UST LP tokens successfully minted on bombay-12 \n`);
+    console.log(`STT-UST LP tokens successfully minted on pisco-1 \n`);
     writeArtifact(network, terra.config.chainID);
   }
 
@@ -586,7 +586,7 @@ async function main() {
       },
       [new Coin("uusd", inital_ust_liquidity_for_each)]
     );
-    console.log(`VKR-UST LP tokens successfully minted on bombay-12 \n`);
+    console.log(`VKR-UST LP tokens successfully minted on pisco-1 \n`);
     writeArtifact(network, terra.config.chainID);
   }
 
@@ -666,7 +666,7 @@ async function main() {
       [new Coin("uusd", inital_ust_liquidity_for_each)]
     );
     await delay(300);
-    console.log(`MINE-UST LP tokens successfully minted on bombay-12 \n`);
+    console.log(`MINE-UST LP tokens successfully minted on pisco-1 \n`);
     writeArtifact(network, terra.config.chainID);
   }
 
@@ -745,7 +745,7 @@ async function main() {
       [new Coin("uusd", inital_ust_liquidity_for_each)]
     );
     await delay(300);
-    console.log(`PSI-UST LP tokens successfully minted on bombay-12 \n`);
+    console.log(`PSI-UST LP tokens successfully minted on pisco-1 \n`);
     writeArtifact(network, terra.config.chainID);
   }
 
@@ -826,7 +826,7 @@ async function main() {
       [new Coin("uusd", inital_ust_liquidity_for_each)]
     );
 
-    console.log(`APOLLO-UST LP tokens successfully minted on bombay-12 \n`);
+    console.log(`APOLLO-UST LP tokens successfully minted on pisco-1 \n`);
     writeArtifact(network, terra.config.chainID);
   }
 
