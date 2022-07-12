@@ -14,7 +14,7 @@ import {
   writeArtifact,
   Client,
 } from "./helpers/helpers.js";
-import { bombay_testnet, mainnet, Config } from "./deploy_configs.js";
+import { pisco_testnet, mainnet, Config } from "./deploy_configs.js";
 import { join } from "path";
 
 let MULTI_SIG_TO_USE = "";
@@ -57,7 +57,7 @@ async function main() {
   // Configuration to use based on network instance
   if (terra.config.chainID == "bombay-12") {
     MULTI_SIG_TO_USE = wallet.key.accAddress;
-    CONFIGURATION = bombay_testnet;
+    CONFIGURATION = pisco_testnet;
   } else if (terra.config.chainID == "columbus-5") {
     CONFIGURATION = mainnet;
   }

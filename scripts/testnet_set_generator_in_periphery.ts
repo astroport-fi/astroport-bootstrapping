@@ -5,7 +5,7 @@ import {
   readArtifact,
   writeArtifact,
 } from "./helpers/helpers.js";
-import { bombay_testnet, Config } from "./deploy_configs.js";
+import { pisco_testnet, Config } from "./deploy_configs.js";
 
 async function main() {
   // terra, wallet

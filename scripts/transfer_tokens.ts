@@ -21,8 +21,8 @@ async function main() {
     `chainID: ${terra.config.chainID} wallet: ${wallet.key.accAddress}`
   );
 
-  if (terra.config.chainID != "bombay-12") {
-    console.log(`network must be bombay-12`);
+  if (terra.config.chainID != "pisco-1") {
+    console.log(`network must be pisco-1`);
     return;
   }
 
@@ -30,6 +30,7 @@ async function main() {
   console.log("network:", network);
 
   let ADDRESSES = [
+    wallet.key.accAddress,
     "terra17mpuq65hw5kt7d44kpw4nk7x339xhznaa0duzv",
     "terra1lv845g7szf9m3082qn3eehv9ewkjjr2kdyz0t6",
     "terra1mthww38ea56sjmwtswlvy0g4zzjspjwaw3e6t8",
